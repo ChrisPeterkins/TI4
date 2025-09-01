@@ -2,7 +2,7 @@
 
 A complete digital implementation of Twilight Imperium 4th Edition with Prophecy of Kings expansion.
 
-## 🚀 Features
+##  Features
 
 - Full TI4 base game implementation
 - Complete Prophecy of Kings expansion
@@ -14,7 +14,7 @@ A complete digital implementation of Twilight Imperium 4th Edition with Prophecy
 - Save/load functionality
 - Replay system
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 - **Frontend**: React 18, TypeScript, Three.js, Zustand
 - **Backend**: Node.js, Express, Boardgame.io, Socket.io
@@ -22,7 +22,7 @@ A complete digital implementation of Twilight Imperium 4th Edition with Prophecy
 - **Monorepo**: Lerna
 - **Build**: Vite
 
-## 📦 Project Structure
+##  Project Structure
 
 ```
 ti4-web-app/
@@ -34,7 +34,7 @@ ti4-web-app/
 └── docker/          # Docker configuration
 ```
 
-## 🚦 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -100,7 +100,7 @@ Following the implementation plan from `ti4-implementation-plan.md`:
 8. **Phase 8**: Companion & Mobile (Weeks 24-25)
 9. **Phase 9**: Polish & Launch Prep (Weeks 26-28)
 
-## 📊 Data Sources
+##  Data Sources
 
 This project leverages and builds upon several open-source TI4 projects:
 
@@ -110,21 +110,21 @@ This project leverages and builds upon several open-source TI4 projects:
 - [KeeganW/ti4](https://github.com/KeeganW/ti4) - Map generation
 - [von-grid](https://github.com/vonWolfehaus/von-grid) - Hexagonal grid math
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please read our contributing guidelines before submitting PRs.
 
-## 📄 License
+##  License
 
 MIT License - see LICENSE file for details
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Fantasy Flight Games for creating Twilight Imperium
 - The TI4 community for their passion and support
 - All the open-source projects that made this possible
 
-## 📞 Contact
+##  Contact
 
 - GitHub: [@ChrisPeterkins](https://github.com/ChrisPeterkins)
 - Project Link: [https://github.com/ChrisPeterkins/TI4](https://github.com/ChrisPeterkins/TI4)
