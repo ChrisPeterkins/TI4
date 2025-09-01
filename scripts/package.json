@@ -1,0 +1,12 @@
+{
+  "name": "@ti4/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TI4 Data extraction and utility scripts",
+  "scripts": {
+    "extract-all": "node extraction/extract-all.js",
+    "validate": "node validation/validate-data.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

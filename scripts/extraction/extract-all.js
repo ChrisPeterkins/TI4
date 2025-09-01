@@ -50,17 +50,17 @@ async function extractAll() {
       }
     }
     
-    // 2. Extract TypeScript types from AsyncTI4
+    // 2. Extract faction data from TwilightImperiumUltimate
+    log('\n🔄 Extracting faction data from TwilightImperiumUltimate...', 'blue');
+    await require('./extract-factions')();
+    
+    // 3. Port combat engine from ti4calc
+    log('\n⚔️ Porting combat engine from ti4calc...', 'blue');
+    await require('./extract-combat')();
+    
+    // 4. Extract TypeScript types from AsyncTI4
     log('\n📝 Extracting TypeScript types from AsyncTI4...', 'blue');
     await require('./extract-asyncti4-data')();
-    
-    // 3. Convert C# data from TwilightImperiumUltimate
-    log('\n🔄 Converting C# data from TwilightImperiumUltimate...', 'blue');
-    await require('./extract-ultimate-data')();
-    
-    // 4. Port combat engine from ti4calc
-    log('\n⚔️ Porting combat engine from ti4calc...', 'blue');
-    await require('./port-combat-engine')();
     
     // 5. Extract map generation from KeeganW/ti4
     log('\n🗺️ Extracting map generation algorithms...', 'blue');
@@ -72,13 +72,13 @@ async function extractAll() {
     
     // 7. Validate extracted data
     log('\n✅ Validating extracted data...', 'blue');
-    await require('./validate-data')();
+    await require('../validation/validate-data')();
     
     log('\n✨ Extraction complete!', 'green');
     log('📊 Summary:', 'bright');
-    log('  - TypeScript types extracted', 'green');
-    log('  - Game data converted from C#', 'green');
+    log('  - Faction data extracted', 'green');
     log('  - Combat engine ported', 'green');
+    log('  - TypeScript types extracted', 'green');
     log('  - Map generation extracted', 'green');
     log('  - Hexagonal math library installed', 'green');
     log('  - All data validated', 'green');
