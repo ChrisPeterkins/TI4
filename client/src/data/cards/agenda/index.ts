@@ -1,5 +1,5 @@
 // Agenda Cards - extracted from TI4_map_generator_bot
-// Generated: 2025-09-01T19:23:10.851Z
+// Generated: 2025-09-01T19:25:18.950Z
 
 export interface AgendaCard {
   alias: string;
@@ -31,7 +31,7 @@ export interface AgendaCard {
   homebrewReplacesID?: string | null;
 }
 
-export type AgendaType = 'Law' | 'Directive';
+export type AgendaType = 'Law' | 'Directive' | 'Agenda Phase';
 
 export type VoteTarget = 
   | 'For/Against'

@@ -113,7 +113,7 @@ export interface AgendaCard {
   homebrewReplacesID?: string | null;
 }
 
-export type AgendaType = 'Law' | 'Directive';
+export type AgendaType = 'Law' | 'Directive' | 'Agenda Phase';
 
 export type VoteTarget = 
   | 'For/Against'
