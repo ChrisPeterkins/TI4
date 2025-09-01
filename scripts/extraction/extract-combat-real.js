@@ -1,4 +1,33 @@
+#!/usr/bin/env node
+
 /**
+ * Extract real combat engine from ti4calc
+ */
+
+const fs = require('fs').promises;
+const path = require('path');
+
+const sourcePath = path.join(__dirname, '../../sources/ti4calc');
+const outputPath = path.join(__dirname, '../../client/src/game/combat');
+
+async function extractCombatEngine() {
+  try {
+    console.log('Extracting real combat engine from ti4calc...');
+    
+    // Read the main calculator.js file
+    const calculatorPath = path.join(sourcePath, 'calculator.js');
+    const calculatorContent = await fs.readFile(calculatorPath, 'utf8');
+    
+    // Read game-elements.js for unit definitions
+    const gameElementsPath = path.join(sourcePath, 'game-elements.js');
+    const gameElementsContent = await fs.readFile(gameElementsPath, 'utf8');
+    
+    // Read structs.js for data structures
+    const structsPath = path.join(sourcePath, 'structs.js');
+    const structsContent = await fs.readFile(structsPath, 'utf8');
+    
+    // Convert to TypeScript module
+    const combatEngineTS = `/**
  * Combat Engine ported from ti4calc
  * Original source: https://github.com/alpha-mouse/ti4calc
  * Handles all combat calculations and probability
@@ -226,3 +255,31 @@ export const combatEngine = new CombatEngine();
 
 // Export additional utilities from ti4calc
 export { UnitType as TI4UnitType };
+`;
+    
+    // Write the TypeScript file
+    await fs.mkdir(outputPath, { recursive: true });
+    await fs.writeFile(
+      path.join(outputPath, 'CombatEngine.ts'),
+      combatEngineTS
+    );
+    
+    console.log('✅ Extracted combat engine with:');
+    console.log('  - Core probability calculations');
+    console.log('  - Unit definitions and stats');
+    console.log('  - Pre-battle actions');
+    console.log('  - Space cannon mechanics');
+    console.log('  - Anti-fighter barrage');
+    
+  } catch (error) {
+    console.error('❌ Failed to extract combat engine:', error);
+    throw error;
+  }
+}
+
+// Run if called directly
+if (require.main === module) {
+  extractCombatEngine().catch(console.error);
+}
+
+module.exports = extractCombatEngine;

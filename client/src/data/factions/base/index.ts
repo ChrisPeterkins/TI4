@@ -1,90 +1,199 @@
 // Base game factions - extracted from TwilightImperiumUltimate
-export const baseFactions = [
+// Generated: 2025-09-01T16:15:22.060Z
+
+export interface Faction {
+  id: string;
+  name: string;
+  homeSystem: string;
+  commodities: number;
+  complexity: 'Low' | 'Medium' | 'High';
+  startingUnits: Record<string, number>;
+  startingTech: string[];
+}
+
+export const baseFactions: Faction[] = [
   {
-    "id": "arborec",
     "name": "The Arborec",
-    "shortName": "Arborec"
+    "id": "thearborec",
+    "homeSystem": "Tile05",
+    "commodities": 3,
+    "complexity": "High",
+    "gameVersion": "BaseGame",
+    "startingUnits": {
+      "infantry": 4,
+      "fighters": 2,
+      "cruisers": 1,
+      "carriers": 1,
+      "spaceDocks": 1,
+      "pds": 1
+    },
+    "startingTech": []
   },
   {
-    "id": "barony",
-    "name": "The Barony of Letnev",
-    "shortName": "Barony"
+    "name": "The Barony Of Letnev",
+    "id": "thebaronyofletnev",
+    "homeSystem": "Tile10",
+    "commodities": 2,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "saar",
-    "name": "The Clan of Saar",
-    "shortName": "Saar"
+    "name": "The Clan Of Saar",
+    "id": "theclanofsaar",
+    "homeSystem": "Tile11",
+    "commodities": 3,
+    "complexity": "Medium",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "muaat",
-    "name": "The Embers of Muaat",
-    "shortName": "Muaat"
+    "name": "The Embers Of Muaat",
+    "id": "theembersofmuaat",
+    "homeSystem": "Tile04",
+    "commodities": 4,
+    "complexity": "High",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "hacan",
-    "name": "The Emirates of Hacan",
-    "shortName": "Hacan"
+    "name": "The Emirates Of Hacan",
+    "id": "theemiratesofhacan",
+    "homeSystem": "Tile16",
+    "commodities": 6,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "sol",
-    "name": "The Federation of Sol",
-    "shortName": "Sol"
+    "name": "The Federation Of Sol",
+    "id": "thefederationofsol",
+    "homeSystem": "Tile01",
+    "commodities": 4,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "creuss",
-    "name": "The Ghosts of Creuss",
-    "shortName": "Creuss"
+    "name": "The Ghosts Of Creuss",
+    "id": "theghostsofcreuss",
+    "homeSystem": "Tile17",
+    "commodities": 4,
+    "complexity": "Medium",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "l1z1x",
     "name": "The L1Z1X Mindnet",
-    "shortName": "L1Z1X"
+    "id": "thel1z1xmindnet",
+    "homeSystem": "Tile06",
+    "commodities": 2,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "mentak",
     "name": "The Mentak Coalition",
-    "shortName": "Mentak"
+    "id": "thementakcoalition",
+    "homeSystem": "Tile02",
+    "commodities": 2,
+    "complexity": "High",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "naalu",
     "name": "The Naalu Collective",
-    "shortName": "Naalu"
+    "id": "thenaalucollective",
+    "homeSystem": "Tile09",
+    "commodities": 3,
+    "complexity": "Medium",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "nekro",
     "name": "The Nekro Virus",
-    "shortName": "Nekro"
+    "id": "thenekrovirus",
+    "homeSystem": "Tile08",
+    "commodities": 3,
+    "complexity": "High",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "sardakk",
     "name": "The Sardakk N'orr",
-    "shortName": "Sardakk"
+    "id": "sardakknorr",
+    "homeSystem": "Tile13",
+    "commodities": 3,
+    "complexity": "Medium",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "jolnar",
     "name": "The Universities of Jol-Nar",
-    "shortName": "Jol-Nar"
+    "id": "theuniversitiesofjolnar",
+    "homeSystem": "Tile12",
+    "commodities": 4,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": [
+      "Neural Motivator",
+      "Antimass Deflectors",
+      "Sarween Tools",
+      "Plasma Scoring"
+    ]
   },
   {
-    "id": "winnu",
     "name": "The Winnu",
-    "shortName": "Winnu"
+    "id": "thewinnu",
+    "homeSystem": "Tile07",
+    "commodities": 3,
+    "complexity": "Medium",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "xxcha",
     "name": "The Xxcha Kingdom",
-    "shortName": "Xxcha"
+    "id": "thexxchakingdom",
+    "homeSystem": "Tile14",
+    "commodities": 4,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "yin",
     "name": "The Yin Brotherhood",
-    "shortName": "Yin"
+    "id": "theyinbrotherhood",
+    "homeSystem": "Tile03",
+    "commodities": 2,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   },
   {
-    "id": "yssaril",
     "name": "The Yssaril Tribes",
-    "shortName": "Yssaril"
+    "id": "theyssariltribes",
+    "homeSystem": "Tile15",
+    "commodities": 3,
+    "complexity": "Low",
+    "gameVersion": "BaseGame",
+    "startingUnits": {},
+    "startingTech": []
   }
 ];
 
-export type BaseFactionId = 'arborec' | 'barony' | 'saar' | 'muaat' | 'hacan' | 'sol' | 'creuss' | 'l1z1x' | 'mentak' | 'naalu' | 'nekro' | 'sardakk' | 'jolnar' | 'winnu' | 'xxcha' | 'yin' | 'yssaril';
+export type BaseFactionId = 'thearborec' | 'thebaronyofletnev' | 'theclanofsaar' | 'theembersofmuaat' | 'theemiratesofhacan' | 'thefederationofsol' | 'theghostsofcreuss' | 'thel1z1xmindnet' | 'thementakcoalition' | 'thenaalucollective' | 'thenekrovirus' | 'sardakknorr' | 'theuniversitiesofjolnar' | 'thewinnu' | 'thexxchakingdom' | 'theyinbrotherhood' | 'theyssariltribes';
