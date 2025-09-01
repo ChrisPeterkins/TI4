@@ -1,0 +1,36 @@
+// Game constants
+
+export const GAME_CONSTANTS = {
+  DEFAULT_POINTS_TO_WIN: 10,
+  POK_POINTS_TO_WIN: 14,
+  MAX_PLAYERS: 8,
+  MIN_PLAYERS: 3,
+  STANDARD_PLAYERS: 6,
+  
+  STARTING_COMMAND_TOKENS: {
+    TACTICS: 3,
+    FLEET: 3,
+    STRATEGY: 2,
+  },
+  
+  BOARD_RINGS: {
+    SMALL: 2,  // 3-4 players
+    MEDIUM: 3, // 5-6 players
+    LARGE: 4,  // 7-8 players
+  },
+} as const;
+
+export const TIMING_WINDOWS = {
+  ACTION_CARD: 'ACTION_CARD',
+  AFTER_DICE_ROLLED: 'AFTER_DICE_ROLLED',
+  BEFORE_COMBAT: 'BEFORE_COMBAT',
+  AFTER_COMBAT: 'AFTER_COMBAT',
+  AGENDA_AFTER_VOTE: 'AGENDA_AFTER_VOTE',
+} as const;
+
+export const TECH_COLORS = {
+  RED: 'WARFARE',
+  BLUE: 'PROPULSION',
+  GREEN: 'BIOTIC',
+  YELLOW: 'CYBERNETIC',
+} as const;

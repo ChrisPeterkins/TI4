@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ti4-postgres
+    environment:
+      POSTGRES_USER: ti4user
+      POSTGRES_PASSWORD: ti4password
+      POSTGRES_DB: ti4db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ti4-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ti4-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ti4-network
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server/Dockerfile
+    container_name: ti4-server
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://ti4user:ti4password@postgres:5432/ti4db
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./server:/app/server
+      - ./shared:/app/shared
+      - /app/server/node_modules
+      - /app/shared/node_modules
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ti4-network
+    command: npm run dev
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/client/Dockerfile
+    container_name: ti4-client
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:3001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app/client
+      - ./shared:/app/shared
+      - /app/client/node_modules
+      - /app/shared/node_modules
+    depends_on:
+      - server
+    networks:
+      - ti4-network
+    command: npm run dev
+
+networks:
+  ti4-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

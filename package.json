@@ -1,0 +1,40 @@
+{
+  "name": "ti4-web-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Twilight Imperium 4th Edition Web Application",
+  "workspaces": [
+    "client",
+    "server",
+    "shared",
+    "scripts"
+  ],
+  "scripts": {
+    "dev": "lerna run dev --parallel",
+    "build": "lerna run build",
+    "test": "lerna run test",
+    "lint": "lerna run lint",
+    "clean": "lerna clean -y && rm -rf node_modules",
+    "bootstrap": "lerna bootstrap",
+    "setup": "npm install && lerna bootstrap"
+  },
+  "devDependencies": {
+    "lerna": "^8.0.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0",
+    "husky": "^8.0.0",
+    "lint-staged": "^15.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChrisPeterkins/TI4.git"
+  },
+  "author": "Chris Peterkins",
+  "license": "MIT"
+}
