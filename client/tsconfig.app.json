@@ -21,7 +21,14 @@
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "@ti4/shared/*": ["../shared/src/*"],
+      "@ti4/shared": ["../shared/src"]
+    }
   },
   "include": ["src"]
 }
