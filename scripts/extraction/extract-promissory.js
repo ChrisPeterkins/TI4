@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const promissorySourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/promissory_notes');
-const outputDir = path.join(__dirname, '../../client/src/data/cards/promissory');
+const outputDir = path.join(__dirname, '../../server/src/data/cards/promissory');
 
 // Load and process promissory notes data
 function loadPromissoryData() {

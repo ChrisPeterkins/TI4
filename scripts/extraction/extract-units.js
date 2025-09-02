@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const unitSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/units');
-const outputDir = path.join(__dirname, '../../client/src/data/units');
+const outputDir = path.join(__dirname, '../../server/src/data/units');
 
 // Unit type categories
 const unitCategories = {

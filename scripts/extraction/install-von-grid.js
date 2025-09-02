@@ -8,7 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/von-grid');
-const outputPath = path.join(__dirname, '../../client/src/three/geometry');
+const outputPath = path.join(__dirname, '../../server/src/three/geometry');
 
 async function extract() {
   try {

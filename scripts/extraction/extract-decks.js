@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const decksSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/decks');
-const outputDir = path.join(__dirname, '../../client/src/data/decks');
+const outputDir = path.join(__dirname, '../../server/src/data/decks');
 
 // Load and process decks data
 function loadDecksData() {

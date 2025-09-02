@@ -8,7 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/ti4');
-const outputPath = path.join(__dirname, '../../client/src/game/map');
+const outputPath = path.join(__dirname, '../../server/src/game/map');
 
 async function extract() {
   try {

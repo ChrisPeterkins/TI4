@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const tokensSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/tokens');
-const outputDir = path.join(__dirname, '../../client/src/data/tokens');
+const outputDir = path.join(__dirname, '../../server/src/data/tokens');
 
 // Load and process tokens data
 function loadTokensData() {

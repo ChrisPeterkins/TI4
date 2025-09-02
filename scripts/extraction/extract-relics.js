@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const relicsSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/relics');
-const outputDir = path.join(__dirname, '../../client/src/data/cards/relic');
+const outputDir = path.join(__dirname, '../../server/src/data/cards/relic');
 
 // Load and process relics data
 function loadRelicsData() {

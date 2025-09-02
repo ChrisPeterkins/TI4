@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const leaderSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/leaders');
-const outputDir = path.join(__dirname, '../../client/src/data/leaders');
+const outputDir = path.join(__dirname, '../../server/src/data/leaders');
 
 // Faction name mapping between TI4_map_generator_bot and our naming convention
 const factionMap = {

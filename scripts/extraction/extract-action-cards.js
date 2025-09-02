@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const actionCardsSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/action_cards');
-const outputDir = path.join(__dirname, '../../client/src/data/cards/action');
+const outputDir = path.join(__dirname, '../../server/src/data/cards/action');
 
 // Load and process action cards data
 function loadActionCardsData() {

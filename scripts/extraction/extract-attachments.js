@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const attachmentsSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/attachments');
-const outputDir = path.join(__dirname, '../../client/src/data/attachments');
+const outputDir = path.join(__dirname, '../../server/src/data/attachments');
 
 // Load and process attachments data
 function loadAttachmentsData() {

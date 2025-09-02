@@ -4,7 +4,7 @@ const path = require('path');
 // Source paths
 const publicObjectivesDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/public_objectives');
 const secretObjectivesDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/secret_objectives');
-const outputDir = path.join(__dirname, '../../client/src/data/cards/objective');
+const outputDir = path.join(__dirname, '../../server/src/data/cards/objective');
 
 // Load and process objectives data
 function loadObjectivesData(sourceDir, objectiveType) {

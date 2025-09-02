@@ -8,7 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/ti4_web_new');
-const outputPath = path.join(__dirname, '../../client/src');
+const outputPath = path.join(__dirname, '../../server/src');
 
 async function extract() {
   try {

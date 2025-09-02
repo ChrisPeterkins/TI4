@@ -8,7 +8,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/ti4calc');
-const outputPath = path.join(__dirname, '../../client/src/game/combat');
+const outputPath = path.join(__dirname, '../../server/src/game/combat');
 
 async function extractCombatEngine() {
   try {

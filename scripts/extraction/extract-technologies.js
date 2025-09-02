@@ -9,7 +9,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/TwilightImperiumUltimate');
-const outputPath = path.join(__dirname, '../../client/src/data/technologies');
+const outputPath = path.join(__dirname, '../../server/src/data/technologies');
 
 async function extractTechnologies() {
   try {

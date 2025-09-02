@@ -4,7 +4,7 @@ const path = require('path');
 // Source paths
 const rulesPath = path.join(__dirname, '../../sources/TwilightImperiumUltimate/src/TwilightImperiumUltimate.Web/Resources/Rules.resx');
 const ruleNotesPath = path.join(__dirname, '../../sources/TwilightImperiumUltimate/src/TwilightImperiumUltimate.Web/Resources/RuleNotes.resx');
-const outputDir = path.join(__dirname, '../../client/src/data/rules');
+const outputDir = path.join(__dirname, '../../server/src/data/rules');
 
 // Rule categories from the enum
 const ruleCategories = [

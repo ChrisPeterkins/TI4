@@ -9,7 +9,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const sourcePath = path.join(__dirname, '../../sources/TwilightImperiumUltimate');
-const outputPath = path.join(__dirname, '../../client/src/data/tiles');
+const outputPath = path.join(__dirname, '../../server/src/data/tiles');
 
 async function extractTiles() {
   try {

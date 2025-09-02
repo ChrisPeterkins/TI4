@@ -160,7 +160,7 @@ function formatFactionName(name) {
 const leadersData = extractLeaders();
 
 // Create output directory structure
-const outputDir = path.join(__dirname, '../../client/src/data/leaders');
+const outputDir = path.join(__dirname, '../../server/src/data/leaders');
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }

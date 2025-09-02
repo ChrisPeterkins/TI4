@@ -3,7 +3,7 @@ const path = require('path');
 
 // Source paths
 const colorsSourceDir = path.join(__dirname, '../../sources/TI4_map_generator_bot/src/main/resources/data/colors');
-const outputDir = path.join(__dirname, '../../client/src/data/colors');
+const outputDir = path.join(__dirname, '../../server/src/data/colors');
 
 // Load and process colors data
 function loadColorsData() {
