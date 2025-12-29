@@ -11,9 +11,11 @@ import type {
   StartGamePayload,
   UpdateSettingsPayload,
   ErrorEvent,
+  PlayerColor,
 } from '@ti4/shared';
 import { getUserId, getUser } from '../../middleware/auth.js';
 import * as lobbyRepo from '../../db/repositories/lobby.js';
+import * as gameRepo from '../../db/repositories/game.js';
 
 type TI4Server = Server<ClientToServerEvents, ServerToClientEvents>;
 type TI4Socket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -252,21 +254,32 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
         return callback(createError('SERVER_ERROR', 'Failed to start game'));
       }
 
-      // TODO: Create actual game using GameMachine
-      // For now, just emit game_starting event
-      const gameId = `game-${Date.now()}`; // Placeholder
+      // Create actual game using GameMachine
+      const game = await gameRepo.createGameFromLobby({
+        lobbyId: data.lobbyId,
+        players: lobby.players.map((p) => ({
+          userId: p.id,
+          name: p.name,
+          factionId: p.faction!,
+          color: p.color as PlayerColor,
+          seatIndex: lobby.players.indexOf(p),
+        })),
+        victoryPoints: lobby.settings.victoryPoints,
+        expansions: lobby.settings.expansions,
+      });
 
+      // Emit game_starting event to all lobby players
       io.to(getLobbyRoom(data.lobbyId)).emit('game_starting', {
-        gameId,
+        gameId: game.gameId,
         countdown: 3,
       });
 
       callback({
-        gameId,
+        gameId: game.gameId,
         countdown: 3,
       });
 
-      console.log(`Game starting for lobby ${data.lobbyId}`);
+      console.log(`Game ${game.gameId} started for lobby ${data.lobbyId}`);
     } catch (error) {
       console.error('Error starting game:', error);
       callback(createError('SERVER_ERROR', (error as Error).message));

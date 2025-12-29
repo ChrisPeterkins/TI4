@@ -1,0 +1,156 @@
+import { create } from 'zustand';
+import type { GameState, GameAction } from '@ti4/shared';
+import { useSocketStore } from './socket-store';
+
+interface GameStore {
+  // Game state
+  gameId: string | null;
+  gameState: GameState | null;
+
+  // UI state
+  isLoading: boolean;
+  error: string | null;
+
+  // Connection state
+  isConnected: boolean;
+
+  // Actions
+  joinGame: (gameId: string) => void;
+  leaveGame: () => void;
+  sendAction: (action: Omit<GameAction, 'playerId' | 'timestamp'>) => void;
+  requestState: () => void;
+
+  // Internal
+  setGameState: (state: GameState) => void;
+  setupListeners: () => void;
+  cleanupListeners: () => void;
+  reset: () => void;
+}
+
+const initialState = {
+  gameId: null,
+  gameState: null,
+  isLoading: false,
+  error: null,
+  isConnected: false,
+};
+
+export const useGameStore = create<GameStore>((set, get) => ({
+  ...initialState,
+
+  joinGame: (gameId: string) => {
+    const { socket } = useSocketStore.getState();
+    if (!socket) {
+      set({ error: 'Not connected to server' });
+      return;
+    }
+
+    set({ isLoading: true, error: null, gameId });
+
+    socket.emit('join_game', {
+      gameId,
+      playerId: '', // Will be filled by server
+      token: '' // Already authenticated via socket
+    });
+
+    get().setupListeners();
+  },
+
+  leaveGame: () => {
+    const { socket } = useSocketStore.getState();
+    const { gameId } = get();
+
+    if (socket && gameId) {
+      socket.emit('leave_game', { gameId });
+    }
+
+    get().cleanupListeners();
+    get().reset();
+  },
+
+  sendAction: (actionData) => {
+    const { socket } = useSocketStore.getState();
+    const { gameId, gameState } = get();
+
+    if (!socket || !gameId || !gameState) {
+      set({ error: 'Cannot send action: not in game' });
+      return;
+    }
+
+    // Find current user's player ID from game state
+    // This will need to be matched with the session user
+    const action: GameAction = {
+      ...actionData,
+      playerId: gameState.activePlayerId, // TODO: Get actual player ID
+      timestamp: Date.now(),
+    } as GameAction;
+
+    socket.emit('game_action', { gameId, action });
+  },
+
+  requestState: () => {
+    const { socket } = useSocketStore.getState();
+    const { gameId, gameState } = get();
+
+    if (!socket || !gameId) return;
+
+    socket.emit('request_state', {
+      gameId,
+      fromVersion: gameState?.version
+    });
+  },
+
+  setGameState: (state: GameState) => {
+    set({
+      gameState: state,
+      isLoading: false,
+      isConnected: true,
+    });
+  },
+
+  setupListeners: () => {
+    const { socket } = useSocketStore.getState();
+    if (!socket) return;
+
+    socket.on('game_state', (data) => {
+      get().setGameState(data.state);
+    });
+
+    socket.on('action_result', (data) => {
+      if (!data.result.success) {
+        set({ error: data.result.error || 'Action failed' });
+      }
+    });
+
+    socket.on('player_joined', (data) => {
+      console.log('Player joined:', data.playerId);
+    });
+
+    socket.on('player_left', (data) => {
+      console.log('Player left:', data.playerId);
+    });
+
+    socket.on('player_reconnected', (data) => {
+      console.log('Player reconnected:', data.playerId);
+    });
+
+    socket.on('error', (error) => {
+      set({ error: error.message, isLoading: false });
+    });
+  },
+
+  cleanupListeners: () => {
+    const { socket } = useSocketStore.getState();
+    if (!socket) return;
+
+    socket.off('game_state');
+    socket.off('action_result');
+    socket.off('player_joined');
+    socket.off('player_left');
+    socket.off('player_reconnected');
+  },
+
+  reset: () => {
+    set(initialState);
+  },
+}));

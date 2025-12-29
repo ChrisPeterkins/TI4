@@ -9,6 +9,7 @@ import type {
 import { config } from './config/index.js';
 import { authenticateSocket, getUser } from './middleware/auth.js';
 import { registerLobbyHandlers, getPublicLobbies } from './socket/handlers/lobby.js';
+import { registerGameHandlers } from './socket/handlers/game.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -56,30 +57,9 @@ io.on('connection', (socket) => {
   const user = getUser(socket);
   console.log(`Client connected: ${socket.id} (${user.email || user.id})`);
 
-  // Register lobby handlers
+  // Register handlers
   registerLobbyHandlers(io, socket);
-
-  // ========== GAME EVENTS ==========
-  // TODO: Move to separate game handler file
-
-  socket.on('join_game', (data) => {
-    console.log(`User joining game ${data.gameId}`);
-    socket.join(`game:${data.gameId}`);
-    // TODO: Validate user is part of this game
-    // TODO: Send current game state
-  });
-
-  socket.on('leave_game', (data) => {
-    console.log(`Player leaving game ${data.gameId}`);
-    socket.leave(`game:${data.gameId}`);
-  });
-
-  socket.on('game_action', (data) => {
-    console.log(`Game action:`, data.action.type);
-    // TODO: Validate user can take this action
-    // TODO: Process action through GameMachine
-    // TODO: Broadcast state update
-  });
+  registerGameHandlers(io, socket);
 
   socket.on('disconnect', () => {
     console.log(`Client disconnected: ${socket.id}`);
