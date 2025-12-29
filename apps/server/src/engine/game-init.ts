@@ -1,0 +1,364 @@
+import { v4 as uuidv4 } from 'uuid';
+import type {
+  GameState,
+  PlayerState,
+  MapState,
+  MapTile,
+  PlanetInstance,
+  StrategyCardState,
+  ObjectiveState,
+  AgendaState,
+  PlayerColor,
+  UnitInstance,
+  UnitType,
+} from '@ti4/shared';
+import { factions, systems, strategyCards } from '@ti4/game-data';
+import { getHomeSystemPositions, generateStandardMapPositions } from './utils/hex.js';
+
+export interface GameSetupOptions {
+  playerSetups: PlayerSetup[];
+  victoryPoints?: number;
+  expansions?: string[];
+}
+
+export interface PlayerSetup {
+  userId: string;
+  name: string;
+  factionId: string;
+  color: PlayerColor;
+}
+
+/**
+ * Create a new game state with the given setup options
+ */
+export function createGame(options: GameSetupOptions): GameState {
+  const gameId = uuidv4();
+  const playerCount = options.playerSetups.length;
+
+  // Create players
+  const players = options.playerSetups.map((setup, index) =>
+    createPlayer(setup, index)
+  );
+
+  // Randomly select speaker
+  const speakerIndex = Math.floor(Math.random() * playerCount);
+  const speakerId = players[speakerIndex].id;
+
+  // Create map
+  const map = createMap(playerCount, players);
+
+  // Create strategy cards
+  const strategyCardStates = createStrategyCards();
+
+  // Create objectives
+  const objectives = createObjectives();
+
+  // Create initial game state
+  const gameState: GameState = {
+    id: gameId,
+    version: 1,
+    round: 0,
+    phase: 'setup',
+    activePlayerId: speakerId,
+    speakerId,
+    initiativeOrder: [],
+    players,
+    map,
+    strategyCards: strategyCardStates,
+    objectives,
+    agendas: createAgendaState(),
+    actionCardDeck: shuffleArray(createActionCardDeck()),
+    actionCardDiscard: [],
+    agendaDeck: shuffleArray(createAgendaDeck()),
+    agendaDiscard: [],
+    laws: [],
+    custodiansTaken: false,
+    activeCombat: null,
+    timingWindows: [],
+    winner: null,
+  };
+
+  // Place starting units for each player
+  for (const player of players) {
+    placeStartingUnits(gameState, player);
+  }
+
+  // Deal starting action cards (not implemented yet - just placeholder)
+  // dealStartingActionCards(gameState);
+
+  // Deal secret objectives (not implemented yet)
+  // dealSecretObjectives(gameState);
+
+  return gameState;
+}
+
+/**
+ * Create a player state
+ */
+function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
+  const faction = factions[setup.factionId];
+  if (!faction) {
+    throw new Error(`Unknown faction: ${setup.factionId}`);
+  }
+
+  return {
+    id: uuidv4(),
+    name: setup.name,
+    faction: setup.factionId,
+    color: setup.color,
+    seatIndex,
+    commandTokens: {
+      tactics: 3,
+      fleet: 3,
+      strategy: 2,
+    },
+    tradeGoods: 0,
+    commodities: 0,
+    maxCommodities: faction.commodities,
+    technologies: [...faction.startingTech],
+    actionCards: [],
+    secretObjectives: [],
+    scoredObjectives: [],
+    promissoryNotesOwned: [faction.promissoryNote.id],
+    promissoryNotesInHand: [faction.promissoryNote.id],
+    planets: [],
+    strategyCard: null,
+    strategyCardUsed: false,
+    passed: false,
+    score: 0,
+    neighbors: [],
+    transactedWith: [],
+  };
+}
+
+/**
+ * Create the game map
+ */
+function createMap(playerCount: number, players: PlayerState[]): MapState {
+  const tiles: MapTile[] = [];
+  const homePositions = getHomeSystemPositions(playerCount);
+
+  // Place Mecatol Rex at center
+  tiles.push(createMapTile(18, { q: 0, r: 0 }));
+
+  // Place home systems
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    const faction = factions[player.faction];
+    if (!faction) continue;
+
+    const position = homePositions[i];
+    const homeSystemId = faction.homeSystemId;
+
+    tiles.push(createMapTile(homeSystemId, position, player.id));
+  }
+
+  // Generate positions for other tiles
+  const allPositions = generateStandardMapPositions(playerCount);
+  const usedPositions = new Set<string>();
+
+  // Mark used positions
+  usedPositions.add('0,0'); // Mecatol
+  for (const pos of homePositions) {
+    usedPositions.add(`${pos.q},${pos.r}`);
+  }
+
+  // Get available blue and red tiles
+  const blueTiles = Object.values(systems).filter(s => s.type === 'blue');
+  const redTiles = Object.values(systems).filter(s => s.type === 'red');
+
+  // Shuffle tiles
+  const shuffledBlue = shuffleArray([...blueTiles]);
+  const shuffledRed = shuffleArray([...redTiles]);
+
+  // Fill remaining positions
+  let blueIndex = 0;
+  let redIndex = 0;
+
+  for (const pos of allPositions) {
+    const key = `${pos.q},${pos.r}`;
+    if (usedPositions.has(key)) continue;
+
+    // Alternate between blue and red tiles (roughly)
+    // In a real implementation, this would follow proper map generation rules
+    const useBlue = Math.random() > 0.3 && blueIndex < shuffledBlue.length;
+
+    if (useBlue) {
+      tiles.push(createMapTile(shuffledBlue[blueIndex].id, pos));
+      blueIndex++;
+    } else if (redIndex < shuffledRed.length) {
+      tiles.push(createMapTile(shuffledRed[redIndex].id, pos));
+      redIndex++;
+    }
+
+    usedPositions.add(key);
+  }
+
+  return {
+    tiles,
+    playerCount,
+  };
+}
+
+/**
+ * Create a map tile from a system ID
+ */
+function createMapTile(
+  systemId: number,
+  position: { q: number; r: number },
+  controlledBy?: string
+): MapTile {
+  const system = systems[systemId];
+
+  const planets: PlanetInstance[] = system?.planets.map(planet => ({
+    id: uuidv4(),
+    planetId: planet.id,
+    controlledBy: controlledBy ?? null,
+    exhausted: false,
+    attachments: [],
+    units: [],
+  })) ?? [];
+
+  return {
+    id: uuidv4(),
+    systemId,
+    position,
+    rotation: 0,
+    planets,
+    wormhole: system?.wormhole ?? null,
+    anomaly: system?.anomaly ?? null,
+    units: [],
+    commandTokens: [],
+  };
+}
+
+/**
+ * Create strategy card states
+ */
+function createStrategyCards(): StrategyCardState[] {
+  return Object.values(strategyCards).map(card => ({
+    number: card.number,
+    name: card.name,
+    pickedBy: null,
+    exhausted: false,
+  }));
+}
+
+/**
+ * Create initial objectives state
+ */
+function createObjectives(): ObjectiveState {
+  // TODO: Properly shuffle and deal objectives
+  return {
+    publicStageI: [],
+    publicStageII: [],
+    revealedCount: 0,
+    secretDeck: [],
+  };
+}
+
+/**
+ * Create initial agenda state
+ */
+function createAgendaState(): AgendaState {
+  return {
+    currentAgenda: null,
+    currentAgendaNumber: 1,
+    votes: new Map(),
+    outcome: null,
+    riders: [],
+  };
+}
+
+/**
+ * Create action card deck (placeholder IDs)
+ */
+function createActionCardDeck(): string[] {
+  // TODO: Create actual action card deck based on expansions
+  const deck: string[] = [];
+  for (let i = 0; i < 80; i++) {
+    deck.push(`action_card_${i}`);
+  }
+  return deck;
+}
+
+/**
+ * Create agenda deck (placeholder IDs)
+ */
+function createAgendaDeck(): string[] {
+  // TODO: Create actual agenda deck based on expansions
+  const deck: string[] = [];
+  for (let i = 0; i < 40; i++) {
+    deck.push(`agenda_${i}`);
+  }
+  return deck;
+}
+
+/**
+ * Place starting units for a player
+ */
+function placeStartingUnits(state: GameState, player: PlayerState): void {
+  const faction = factions[player.faction];
+  if (!faction) return;
+
+  // Find player's home system tile
+  const homeTile = state.map.tiles.find(tile => {
+    const system = systems[tile.systemId];
+    return system?.factionId === player.faction;
+  });
+
+  if (!homeTile) return;
+
+  for (const startingUnit of faction.startingUnits) {
+    for (let i = 0; i < startingUnit.count; i++) {
+      const unit = createUnit(startingUnit.type, player.id);
+
+      if (startingUnit.planet) {
+        // Place on planet
+        const planet = homeTile.planets.find(
+          p => p.planetId === startingUnit.planet
+        );
+        if (planet) {
+          unit.planetId = planet.planetId;
+          planet.units.push(unit);
+
+          // Add planet to player's controlled planets
+          if (!player.planets.some(p => p.planetId === planet.planetId)) {
+            player.planets.push({
+              planetId: planet.planetId,
+              exhausted: false,
+              attachments: [],
+            });
+          }
+        }
+      } else {
+        // Place in space
+        homeTile.units.push(unit);
+      }
+    }
+  }
+}
+
+/**
+ * Create a unit instance
+ */
+function createUnit(type: UnitType, ownerId: string): UnitInstance {
+  return {
+    id: uuidv4(),
+    type,
+    ownerId,
+    damaged: false,
+  };
+}
+
+/**
+ * Shuffle an array (Fisher-Yates)
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}

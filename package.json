@@ -1,0 +1,32 @@
+{
+  "name": "ti4-online",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "clean": "turbo clean",
+    "dev:web": "npm run dev --workspace=@ti4/web",
+    "dev:server": "npm run dev --workspace=@ti4/server",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "db:generate": "npm run db:generate --workspace=@ti4/database",
+    "db:migrate": "npm run db:migrate --workspace=@ti4/database",
+    "db:push": "npm run db:push --workspace=@ti4/database",
+    "db:studio": "npm run db:studio --workspace=@ti4/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.2.0"
+}
