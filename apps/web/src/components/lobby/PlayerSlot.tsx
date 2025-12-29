@@ -5,6 +5,9 @@ import type { LobbyPlayer } from '@ti4/shared';
 interface PlayerSlotProps {
   player: LobbyPlayer | null;
   isCurrentUser: boolean;
+  isHost?: boolean;
+  onAddBot?: () => void;
+  onRemoveBot?: (seatIndex: number) => void;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -18,23 +21,41 @@ const COLOR_MAP: Record<string, string> = {
   black: 'bg-gray-800',
 };
 
-export default function PlayerSlot({ player, isCurrentUser }: PlayerSlotProps) {
+export default function PlayerSlot({
+  player,
+  isCurrentUser,
+  isHost,
+  onAddBot,
+  onRemoveBot,
+}: PlayerSlotProps) {
   if (!player) {
     return (
       <div className="flex items-center gap-4 p-4 bg-gray-700/50 rounded-lg border border-dashed border-gray-600">
         <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
           <span className="text-gray-400 text-lg">?</span>
         </div>
-        <div className="text-gray-500 italic">Waiting for player...</div>
+        <div className="flex-1 text-gray-500 italic">Waiting for player...</div>
+        {isHost && onAddBot && (
+          <button
+            onClick={onAddBot}
+            className="px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+          >
+            + Add Bot
+          </button>
+        )}
       </div>
     );
   }
+
+  const isBot = player.isBot === true;
 
   return (
     <div
       className={`flex items-center gap-4 p-4 rounded-lg border ${
         isCurrentUser
           ? 'bg-blue-900/30 border-blue-500'
+          : isBot
+          ? 'bg-purple-900/20 border-purple-600'
           : 'bg-gray-700/50 border-gray-600'
       }`}
     >
@@ -44,7 +65,7 @@ export default function PlayerSlot({ player, isCurrentUser }: PlayerSlotProps) {
           player.color ? COLOR_MAP[player.color] || 'bg-gray-600' : 'bg-gray-600'
         }`}
       >
-        {player.name.charAt(0).toUpperCase()}
+        {isBot ? '🤖' : player.name.charAt(0).toUpperCase()}
       </div>
 
       {/* Player info */}
@@ -54,6 +75,11 @@ export default function PlayerSlot({ player, isCurrentUser }: PlayerSlotProps) {
           {player.isHost && (
             <span className="px-2 py-0.5 bg-yellow-600 text-xs rounded-full">
               Host
+            </span>
+          )}
+          {isBot && (
+            <span className="px-2 py-0.5 bg-purple-600 text-xs rounded-full">
+              Bot
             </span>
           )}
           {isCurrentUser && (
@@ -76,6 +102,17 @@ export default function PlayerSlot({ player, isCurrentUser }: PlayerSlotProps) {
       >
         {player.ready ? 'Ready' : 'Not Ready'}
       </div>
+
+      {/* Remove bot button (host only) */}
+      {isBot && isHost && onRemoveBot && player.seatIndex !== undefined && (
+        <button
+          onClick={() => onRemoveBot(player.seatIndex!)}
+          className="px-2 py-1 text-sm text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded transition-colors"
+          title="Remove bot"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

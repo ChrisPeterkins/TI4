@@ -19,10 +19,12 @@ export interface GameSetupOptions {
   playerSetups: PlayerSetup[];
   victoryPoints?: number;
   expansions?: string[];
+  speakerIndex?: number; // Index of the player who should be speaker (from draft)
+  startPhase?: 'setup' | 'strategy'; // What phase to start in (default: 'setup', after draft: 'strategy')
 }
 
 export interface PlayerSetup {
-  userId: string;
+  userId: string | null; // null for bot players
   name: string;
   factionId: string;
   color: PlayerColor;
@@ -40,9 +42,14 @@ export function createGame(options: GameSetupOptions): GameState {
     createPlayer(setup, index)
   );
 
-  // Randomly select speaker
-  const speakerIndex = Math.floor(Math.random() * playerCount);
+  // Select speaker - use provided index (from draft) or random
+  const speakerIndex = options.speakerIndex ?? Math.floor(Math.random() * playerCount);
   const speakerId = players[speakerIndex].id;
+
+  // Determine starting phase - 'strategy' if coming from draft, 'setup' otherwise
+  const startPhase = options.startPhase ?? 'setup';
+  // Round 1 starts when we enter strategy phase
+  const startRound = startPhase === 'strategy' ? 1 : 0;
 
   // Create map
   const map = createMap(playerCount, players);
@@ -57,8 +64,8 @@ export function createGame(options: GameSetupOptions): GameState {
   const gameState: GameState = {
     id: gameId,
     version: 1,
-    round: 0,
-    phase: 'setup',
+    round: startRound,
+    phase: startPhase,
     activePlayerId: speakerId,
     speakerId,
     initiativeOrder: [],
@@ -180,15 +187,30 @@ function createMap(playerCount: number, players: PlayerState[]): MapState {
     if (usedPositions.has(key)) continue;
 
     // Alternate between blue and red tiles (roughly)
-    // In a real implementation, this would follow proper map generation rules
-    const useBlue = Math.random() > 0.3 && blueIndex < shuffledBlue.length;
+    // Aim for ~70% blue, 30% red, but ensure we always place a tile
+    let tilePlaced = false;
 
-    if (useBlue) {
+    if (Math.random() > 0.3 && blueIndex < shuffledBlue.length) {
+      // Use blue tile
       tiles.push(createMapTile(shuffledBlue[blueIndex].id, pos));
       blueIndex++;
+      tilePlaced = true;
     } else if (redIndex < shuffledRed.length) {
+      // Use red tile
       tiles.push(createMapTile(shuffledRed[redIndex].id, pos));
       redIndex++;
+      tilePlaced = true;
+    } else if (blueIndex < shuffledBlue.length) {
+      // Fallback to blue if we ran out of red
+      tiles.push(createMapTile(shuffledBlue[blueIndex].id, pos));
+      blueIndex++;
+      tilePlaced = true;
+    }
+
+    // If we still haven't placed a tile (ran out of both), use empty space (system 0)
+    if (!tilePlaced) {
+      console.warn(`No tiles available for position ${key}, using empty space`);
+      tiles.push(createMapTile(0, pos));
     }
 
     usedPositions.add(key);

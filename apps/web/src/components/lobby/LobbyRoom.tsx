@@ -28,12 +28,21 @@ export default function LobbyRoom({
     readyUp,
     updateSettings,
     startGame,
+    startDraft,
+    addBot,
+    removeBot,
     error,
   } = useLobbyStore();
 
   const currentPlayer = players.find((p) => p.id === currentUserId);
   const isHost = currentPlayer?.isHost ?? false;
-  const allReady = players.length >= 3 && players.every((p) => p.ready);
+  // For Milty Draft, only require color selection; for normal games, require both faction and color
+  const allReady = players.length >= 3 && players.every((p) => {
+    if (settings.miltyDraft) {
+      return p.ready && p.color;
+    }
+    return p.ready && p.faction && p.color;
+  });
   const canStart = isHost && allReady;
 
   const handleReadyToggle = () => {
@@ -47,6 +56,14 @@ export default function LobbyRoom({
       await startGame();
     } catch (err) {
       console.error('Failed to start game:', err);
+    }
+  };
+
+  const handleStartDraft = async () => {
+    try {
+      await startDraft();
+    } catch (err) {
+      console.error('Failed to start draft:', err);
     }
   };
 
@@ -106,12 +123,20 @@ export default function LobbyRoom({
                     key={player.id}
                     player={player}
                     isCurrentUser={player.id === currentUserId}
+                    isHost={isHost}
+                    onRemoveBot={removeBot}
                   />
                 ))}
                 {/* Empty slots */}
                 {Array.from({ length: settings.playerCount - players.length }).map(
                   (_, i) => (
-                    <PlayerSlot key={`empty-${i}`} player={null} isCurrentUser={false} />
+                    <PlayerSlot
+                      key={`empty-${i}`}
+                      player={null}
+                      isCurrentUser={false}
+                      isHost={isHost}
+                      onAddBot={() => addBot()}
+                    />
                   )
                 )}
               </div>
@@ -179,19 +204,30 @@ export default function LobbyRoom({
               <div className="bg-gray-800 rounded-lg p-6">
                 <h2 className="text-xl font-semibold mb-4">Your Selection</h2>
 
-                {/* Faction Select */}
-                <div className="mb-4">
-                  <label className="block text-sm text-gray-400 mb-2">
-                    Faction
-                  </label>
-                  <FactionSelect
-                    selectedFaction={currentPlayer.faction}
-                    takenFactions={takenFactions}
-                    expansions={settings.expansions}
-                    onSelect={selectFaction}
-                    disabled={currentPlayer.ready}
-                  />
-                </div>
+                {/* Milty Draft Notice */}
+                {settings.miltyDraft && (
+                  <div className="mb-4 p-3 bg-purple-900/30 border border-purple-500 rounded-lg">
+                    <p className="text-sm text-purple-300">
+                      <strong>Milty Draft enabled!</strong> Factions will be drafted after everyone is ready.
+                    </p>
+                  </div>
+                )}
+
+                {/* Faction Select - only show if NOT using Milty Draft */}
+                {!settings.miltyDraft && (
+                  <div className="mb-4">
+                    <label className="block text-sm text-gray-400 mb-2">
+                      Faction
+                    </label>
+                    <FactionSelect
+                      selectedFaction={currentPlayer.faction}
+                      takenFactions={takenFactions}
+                      expansions={settings.expansions}
+                      onSelect={selectFaction}
+                      disabled={currentPlayer.ready}
+                    />
+                  </div>
+                )}
 
                 {/* Color Select */}
                 <div className="mb-6">
@@ -209,7 +245,7 @@ export default function LobbyRoom({
                 {/* Ready Button */}
                 <button
                   onClick={handleReadyToggle}
-                  disabled={!currentPlayer.faction || !currentPlayer.color}
+                  disabled={settings.miltyDraft ? !currentPlayer.color : (!currentPlayer.faction || !currentPlayer.color)}
                   className={`w-full py-3 rounded-lg font-semibold ${
                     currentPlayer.ready
                       ? 'bg-yellow-600 hover:bg-yellow-700'
@@ -219,7 +255,13 @@ export default function LobbyRoom({
                   {currentPlayer.ready ? 'Cancel Ready' : 'Ready Up'}
                 </button>
 
-                {!currentPlayer.faction || !currentPlayer.color ? (
+                {settings.miltyDraft ? (
+                  !currentPlayer.color ? (
+                    <p className="text-sm text-gray-500 mt-2 text-center">
+                      Select color to ready up
+                    </p>
+                  ) : null
+                ) : !currentPlayer.faction || !currentPlayer.color ? (
                   <p className="text-sm text-gray-500 mt-2 text-center">
                     Select faction and color to ready up
                   </p>
@@ -227,18 +269,24 @@ export default function LobbyRoom({
               </div>
             )}
 
-            {/* Start Game Button (Host only) */}
+            {/* Start Game/Draft Button (Host only) */}
             {isHost && (
               <button
-                onClick={handleStartGame}
+                onClick={settings.miltyDraft ? handleStartDraft : handleStartGame}
                 disabled={!canStart}
-                className="w-full py-4 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+                className={`w-full py-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg ${
+                  settings.miltyDraft
+                    ? 'bg-purple-600 hover:bg-purple-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
                 {!allReady
                   ? players.length < 3
                     ? 'Need at least 3 players'
                     : 'Waiting for all players to ready'
-                  : 'Start Game'}
+                  : settings.miltyDraft
+                    ? 'Start Milty Draft'
+                    : 'Start Game'}
               </button>
             )}
           </div>

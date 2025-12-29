@@ -1,5 +1,9 @@
 import { prisma, LobbyStatus } from '@ti4/database';
-import type { LobbySettings, LobbyPlayer } from '@ti4/shared';
+import type { LobbySettings, LobbyPlayer, PlayerColor } from '@ti4/shared';
+import { factions } from '@ti4/game-data';
+
+// All available player colors
+const ALL_COLORS: PlayerColor[] = ['red', 'blue', 'yellow', 'green', 'purple', 'orange', 'pink', 'black'];
 
 /**
  * Generate a random 6-character lobby code
@@ -25,6 +29,11 @@ export async function createLobby(
   settings: LobbySettings;
   players: LobbyPlayer[];
 }> {
+  // Ensure 'base' expansion is always included (required for base game factions)
+  const expansions = settings.expansions.includes('base')
+    ? settings.expansions
+    : ['base', ...settings.expansions];
+
   // Generate unique code
   let code = generateLobbyCode();
   let attempts = 0;
@@ -51,7 +60,7 @@ export async function createLobby(
       hostId,
       playerCount: settings.playerCount,
       victoryPoints: settings.victoryPoints,
-      expansions: settings.expansions,
+      expansions, // Use the corrected expansions array with 'base' always included
       mapPreset: settings.mapPreset,
       miltyDraft: settings.miltyDraft,
       privateGame: settings.privateGame,
@@ -85,8 +94,8 @@ export async function createLobby(
       privateGame: lobby.privateGame,
     },
     players: lobby.players.map((p) => ({
-      id: p.userId,
-      name: p.user.name || 'Unknown',
+      id: p.userId!, // Host is always a real user
+      name: p.user!.name || 'Unknown',
       faction: p.factionId ?? undefined,
       color: p.color ?? undefined,
       ready: p.ready,
@@ -147,18 +156,20 @@ export async function getLobbyWithPlayers(lobbyId: string) {
       privateGame: lobby.privateGame,
     },
     players: lobby.players.map((p) => ({
-      id: p.userId,
-      name: p.user.name || 'Unknown',
+      id: p.isBot ? `bot_${p.seatIndex}` : p.userId!,
+      name: p.isBot ? (p.botName || `Bot ${(p.seatIndex ?? 0) + 1}`) : (p.user?.name || 'Unknown'),
       faction: p.factionId ?? undefined,
       color: p.color ?? undefined,
       ready: p.ready,
       isHost: p.isHost,
+      isBot: p.isBot,
+      seatIndex: p.seatIndex ?? undefined,
     })),
   };
 }
 
 /**
- * Add player to lobby
+ * Add player to lobby (or reconnect if already in lobby)
  */
 export async function addPlayerToLobby(lobbyId: string, userId: string) {
   const lobby = await prisma.lobby.findUnique({
@@ -174,14 +185,15 @@ export async function addPlayerToLobby(lobbyId: string, userId: string) {
     throw new Error('Lobby is not accepting players');
   }
 
-  if (lobby.players.length >= lobby.playerCount) {
-    throw new Error('Lobby is full');
-  }
-
-  // Check if player is already in lobby
+  // Check if player is already in lobby - allow reconnection
   const existingPlayer = lobby.players.find((p) => p.userId === userId);
   if (existingPlayer) {
-    throw new Error('Already in this lobby');
+    // Player is reconnecting - just return current lobby state
+    return getLobbyWithPlayers(lobbyId);
+  }
+
+  if (lobby.players.length >= lobby.playerCount) {
+    throw new Error('Lobby is full');
   }
 
   // Find next available seat
@@ -206,9 +218,11 @@ export async function addPlayerToLobby(lobbyId: string, userId: string) {
  * Remove player from lobby
  */
 export async function removePlayerFromLobby(lobbyId: string, userId: string) {
-  const lobbyPlayer = await prisma.lobbyPlayer.findUnique({
+  const lobbyPlayer = await prisma.lobbyPlayer.findFirst({
     where: {
-      lobbyId_userId: { lobbyId, userId },
+      lobbyId,
+      userId,
+      isBot: false,
     },
   });
 
@@ -253,10 +267,16 @@ export async function selectFaction(
     throw new Error('Faction already taken');
   }
 
+  const player = await prisma.lobbyPlayer.findFirst({
+    where: { lobbyId, userId, isBot: false },
+  });
+
+  if (!player) {
+    throw new Error('Player not in lobby');
+  }
+
   await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: { lobbyId, userId },
-    },
+    where: { id: player.id },
     data: {
       factionId,
       ready: false, // Reset ready when changing faction
@@ -274,12 +294,20 @@ export async function selectColor(
   userId: string,
   color: string
 ) {
+  const player = await prisma.lobbyPlayer.findFirst({
+    where: { lobbyId, userId, isBot: false },
+  });
+
+  if (!player) {
+    throw new Error('Player not in lobby');
+  }
+
   // Check if color is already taken
   const existingPlayer = await prisma.lobbyPlayer.findFirst({
     where: {
       lobbyId,
       color,
-      NOT: { userId },
+      NOT: { id: player.id },
     },
   });
 
@@ -288,9 +316,7 @@ export async function selectColor(
   }
 
   await prisma.lobbyPlayer.update({
-    where: {
-      lobbyId_userId: { lobbyId, userId },
-    },
+    where: { id: player.id },
     data: {
       color,
       ready: false, // Reset ready when changing color
@@ -308,19 +334,34 @@ export async function setPlayerReady(
   userId: string,
   ready: boolean
 ) {
-  const player = await prisma.lobbyPlayer.findUnique({
-    where: {
-      lobbyId_userId: { lobbyId, userId },
-    },
+  const lobby = await prisma.lobby.findUnique({
+    where: { id: lobbyId },
+  });
+
+  if (!lobby) {
+    throw new Error('Lobby not found');
+  }
+
+  const player = await prisma.lobbyPlayer.findFirst({
+    where: { lobbyId, userId, isBot: false },
   });
 
   if (!player) {
     throw new Error('Player not in lobby');
   }
 
-  // Require faction and color to be ready
-  if (ready && (!player.factionId || !player.color)) {
-    throw new Error('Must select faction and color before readying up');
+  // For Milty Draft, only require color to be ready
+  // For normal games, require both faction and color
+  if (ready) {
+    if (lobby.miltyDraft) {
+      if (!player.color) {
+        throw new Error('Must select color before readying up');
+      }
+    } else {
+      if (!player.factionId || !player.color) {
+        throw new Error('Must select faction and color before readying up');
+      }
+    }
   }
 
   await prisma.lobbyPlayer.update({
@@ -329,6 +370,35 @@ export async function setPlayerReady(
   });
 
   return getLobbyWithPlayers(lobbyId);
+}
+
+/**
+ * Update player faction directly (used by Milty Draft)
+ */
+export async function updatePlayerFaction(
+  lobbyId: string,
+  playerId: string,
+  factionId: string
+) {
+  // Find player by either userId or as a bot
+  const player = await prisma.lobbyPlayer.findFirst({
+    where: {
+      lobbyId,
+      OR: [
+        { userId: playerId },
+        { id: playerId },
+      ],
+    },
+  });
+
+  if (!player) {
+    throw new Error('Player not in lobby');
+  }
+
+  await prisma.lobbyPlayer.update({
+    where: { id: player.id },
+    data: { factionId },
+  });
 }
 
 /**
@@ -414,6 +484,180 @@ export async function startLobbyGame(lobbyId: string) {
 }
 
 /**
+ * Get available factions for a lobby (not already taken)
+ */
+function getAvailableFactions(lobby: { expansions: string[]; players: { factionId: string | null }[] }): string[] {
+  const takenFactions = new Set(lobby.players.map((p) => p.factionId).filter(Boolean));
+
+  // Get all factions that match the lobby's expansions
+  const allFactions = Object.values(factions);
+  const availableFactions = allFactions
+    .filter((f) => lobby.expansions.includes(f.expansion))
+    .map((f) => f.id)
+    .filter((id) => !takenFactions.has(id));
+
+  return availableFactions;
+}
+
+/**
+ * Get available colors for a lobby (not already taken)
+ */
+function getAvailableColors(lobby: { players: { color: string | null }[] }): PlayerColor[] {
+  const takenColors = new Set(lobby.players.map((p) => p.color).filter(Boolean));
+  return ALL_COLORS.filter((c) => !takenColors.has(c));
+}
+
+/**
+ * Pick a random element from an array
+ */
+function pickRandom<T>(arr: T[]): T | undefined {
+  if (arr.length === 0) return undefined;
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+/**
+ * Add a bot to the lobby (auto-assigns faction and color if not provided)
+ * Note: For Milty Draft lobbies, faction is NOT auto-assigned (bots participate in draft)
+ */
+export async function addBotToLobby(
+  lobbyId: string,
+  botName: string,
+  factionId?: string,
+  color?: string
+) {
+  const lobby = await prisma.lobby.findUnique({
+    where: { id: lobbyId },
+    include: { players: true },
+  });
+
+  if (!lobby) {
+    throw new Error('Lobby not found');
+  }
+
+  if (lobby.status !== LobbyStatus.WAITING) {
+    throw new Error('Lobby is not accepting players');
+  }
+
+  if (lobby.players.length >= lobby.playerCount) {
+    throw new Error('Lobby is full');
+  }
+
+  // Find next available seat
+  const usedSeats = new Set(lobby.players.map((p) => p.seatIndex));
+  let seatIndex = 0;
+  while (usedSeats.has(seatIndex)) {
+    seatIndex++;
+  }
+
+  // For Milty Draft lobbies, don't auto-assign faction - bots will participate in the draft
+  // For non-Milty lobbies, auto-assign faction if not provided
+  let assignedFaction: string | undefined = factionId;
+  if (!lobby.miltyDraft && !factionId) {
+    const availableFactions = getAvailableFactions(lobby);
+    assignedFaction = pickRandom(availableFactions);
+  }
+
+  // Auto-assign color if not provided (always needed regardless of draft mode)
+  const availableColors = getAvailableColors(lobby);
+  const assignedColor = color ?? pickRandom(availableColors);
+
+  await prisma.lobbyPlayer.create({
+    data: {
+      lobbyId,
+      isBot: true,
+      botName,
+      factionId: assignedFaction,
+      color: assignedColor,
+      ready: true, // Bots are always ready
+      seatIndex,
+    },
+  });
+
+  return getLobbyWithPlayers(lobbyId);
+}
+
+/**
+ * Remove a bot from the lobby
+ */
+export async function removeBotFromLobby(lobbyId: string, seatIndex: number) {
+  const lobbyPlayer = await prisma.lobbyPlayer.findFirst({
+    where: {
+      lobbyId,
+      seatIndex,
+      isBot: true,
+    },
+  });
+
+  if (!lobbyPlayer) {
+    throw new Error('Bot not found at this seat');
+  }
+
+  await prisma.lobbyPlayer.delete({
+    where: { id: lobbyPlayer.id },
+  });
+
+  return getLobbyWithPlayers(lobbyId);
+}
+
+/**
+ * Update bot settings
+ */
+export async function updateBot(
+  lobbyId: string,
+  seatIndex: number,
+  updates: { factionId?: string; color?: string; botName?: string }
+) {
+  const lobbyPlayer = await prisma.lobbyPlayer.findFirst({
+    where: {
+      lobbyId,
+      seatIndex,
+      isBot: true,
+    },
+  });
+
+  if (!lobbyPlayer) {
+    throw new Error('Bot not found at this seat');
+  }
+
+  // Check if faction is already taken
+  if (updates.factionId) {
+    const existingPlayer = await prisma.lobbyPlayer.findFirst({
+      where: {
+        lobbyId,
+        factionId: updates.factionId,
+        NOT: { id: lobbyPlayer.id },
+      },
+    });
+
+    if (existingPlayer) {
+      throw new Error('Faction already taken');
+    }
+  }
+
+  // Check if color is already taken
+  if (updates.color) {
+    const existingPlayer = await prisma.lobbyPlayer.findFirst({
+      where: {
+        lobbyId,
+        color: updates.color,
+        NOT: { id: lobbyPlayer.id },
+      },
+    });
+
+    if (existingPlayer) {
+      throw new Error('Color already taken');
+    }
+  }
+
+  await prisma.lobbyPlayer.update({
+    where: { id: lobbyPlayer.id },
+    data: updates,
+  });
+
+  return getLobbyWithPlayers(lobbyId);
+}
+
+/**
  * Get all public lobbies waiting for players
  */
 export async function getPublicLobbies() {
@@ -448,4 +692,41 @@ export async function getPublicLobbies() {
       miltyDraft: lobby.miltyDraft,
     },
   }));
+}
+
+/**
+ * Get lobbies where a user is a player
+ */
+export async function getLobbiesForUser(userId: string) {
+  const lobbyPlayers = await prisma.lobbyPlayer.findMany({
+    where: {
+      userId,
+      isBot: false,
+    },
+    include: {
+      lobby: {
+        include: {
+          host: { select: { name: true } },
+          players: true,
+        },
+      },
+    },
+  });
+
+  return lobbyPlayers
+    .filter((lp) => lp.lobby.status === LobbyStatus.WAITING)
+    .map((lp) => ({
+      id: lp.lobby.id,
+      code: lp.lobby.code,
+      hostName: lp.lobby.host.name || 'Unknown',
+      playerCount: lp.lobby.players.length,
+      maxPlayers: lp.lobby.playerCount,
+      isHost: lp.isHost,
+      settings: {
+        playerCount: lp.lobby.playerCount,
+        victoryPoints: lp.lobby.victoryPoints as 10 | 12 | 14,
+        expansions: lp.lobby.expansions,
+        miltyDraft: lp.lobby.miltyDraft,
+      },
+    }));
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
 import { useLobbyStore } from '@/stores/lobby-store';
 import LobbyRoom from '@/components/lobby/LobbyRoom';
+import MiltyDraft from '@/components/lobby/MiltyDraft';
 
 export default function LobbyRoomPage() {
   const params = useParams();
@@ -22,12 +23,20 @@ export default function LobbyRoomPage() {
     isGameStarting,
     gameId,
     countdown,
+    draftState,
+    draftPlayerMapping,
     joinLobby,
     leaveLobby,
   } = useLobbyStore();
 
   const urlLobbyId = params.lobbyId as string;
   const currentUserId = session?.user?.id;
+
+  // Local countdown state for visual display
+  const [displayCountdown, setDisplayCountdown] = useState<number | null>(null);
+  // Track when draft completed to show timeout error
+  const [draftCompleteTime, setDraftCompleteTime] = useState<number | null>(null);
+  const [draftCompleteTimeout, setDraftCompleteTimeout] = useState(false);
 
   // Join lobby if not already in it
   useEffect(() => {
@@ -38,13 +47,54 @@ export default function LobbyRoomPage() {
     }
   }, [isConnected, lobbyId, urlLobbyId, joinLobby, router]);
 
-  // Redirect to game when starting
+  // Track draft completion and set timeout
   useEffect(() => {
-    if (isGameStarting && gameId) {
+    if (draftState?.phase === 'complete' && !isGameStarting && !draftCompleteTime) {
+      setDraftCompleteTime(Date.now());
+    }
+    // Clear when game starts or draft resets
+    if (isGameStarting || !draftState || draftState.phase !== 'complete') {
+      setDraftCompleteTime(null);
+      setDraftCompleteTimeout(false);
+    }
+  }, [draftState?.phase, isGameStarting, draftCompleteTime]);
+
+  // Timeout for draft complete state (15 seconds)
+  useEffect(() => {
+    if (draftCompleteTime && !isGameStarting) {
       const timer = setTimeout(() => {
-        router.push(`/game/${gameId}`);
-      }, (countdown || 3) * 1000);
+        setDraftCompleteTimeout(true);
+      }, 15000);
       return () => clearTimeout(timer);
+    }
+  }, [draftCompleteTime, isGameStarting]);
+
+  // Countdown timer with visual decrement
+  useEffect(() => {
+    if (isGameStarting && gameId && countdown) {
+      // Initialize display countdown
+      setDisplayCountdown(countdown);
+
+      // Decrement every second
+      const interval = setInterval(() => {
+        setDisplayCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Redirect when countdown reaches 0
+      const redirectTimer = setTimeout(() => {
+        router.push(`/game/${gameId}`);
+      }, countdown * 1000);
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(redirectTimer);
+      };
     }
   }, [isGameStarting, gameId, countdown, router]);
 
@@ -98,8 +148,58 @@ export default function LobbyRoomPage() {
             Game Starting!
           </div>
           <div className="text-8xl font-bold text-white animate-pulse">
-            {countdown}
+            {displayCountdown ?? countdown}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Milty Draft mode - show draft UI while drafting
+  if (draftState && draftState.phase === 'drafting') {
+    return (
+      <MiltyDraft
+        draftState={draftState}
+        players={players}
+        currentUserId={currentUserId}
+        playerMapping={draftPlayerMapping}
+      />
+    );
+  }
+
+  // Draft complete but game not started yet - show loading state
+  if (draftState && draftState.phase === 'complete') {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-3xl font-bold text-green-400 mb-4">
+            Draft Complete!
+          </div>
+          {draftCompleteTimeout ? (
+            <>
+              <div className="text-xl text-red-400 mb-4">
+                Failed to start game. There may have been a server error.
+              </div>
+              {error && (
+                <div className="text-sm text-red-300 mb-4 max-w-md">
+                  {error}
+                </div>
+              )}
+              <button
+                onClick={() => router.push('/lobby')}
+                className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 text-white"
+              >
+                Back to Lobby List
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="text-xl text-gray-300 mb-6">
+                Setting up the game...
+              </div>
+              <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div>
+            </>
+          )}
         </div>
       </div>
     );

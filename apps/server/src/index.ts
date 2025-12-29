@@ -10,6 +10,7 @@ import { config } from './config/index.js';
 import { authenticateSocket, getUser } from './middleware/auth.js';
 import { registerLobbyHandlers, getPublicLobbies } from './socket/handlers/lobby.js';
 import { registerGameHandlers } from './socket/handlers/game.js';
+import * as lobbyRepo from './db/repositories/lobby.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,6 +47,21 @@ app.get('/api/lobbies', async (_req, res) => {
   } catch (error) {
     console.error('Error fetching lobbies:', error);
     res.status(500).json({ error: 'Failed to fetch lobbies' });
+  }
+});
+
+// User's lobbies endpoint (userId passed from authenticated Next.js app)
+app.get('/api/lobbies/my', async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    const lobbies = await lobbyRepo.getLobbiesForUser(userId);
+    res.json(lobbies);
+  } catch (error) {
+    console.error('Error fetching user lobbies:', error);
+    res.status(500).json({ error: 'Failed to fetch user lobbies' });
   }
 });
 

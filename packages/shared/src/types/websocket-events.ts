@@ -27,6 +27,19 @@ export interface ClientToServerEvents {
   ready_up: (data: ReadyUpPayload) => void;
   start_game: (data: StartGamePayload, callback: (response: GameStartingEvent | ErrorEvent) => void) => void;
   update_settings: (data: UpdateSettingsPayload) => void;
+
+  // Bot management
+  add_bot: (data: AddBotPayload) => void;
+  remove_bot: (data: RemoveBotPayload) => void;
+  update_bot: (data: UpdateBotPayload) => void;
+
+  // Milty Draft
+  start_draft: (data: StartDraftPayload, callback: (response: DraftStartedEvent | ErrorEvent) => void) => void;
+  make_draft_pick: (data: MiltyDraftPayload, callback: (response: DraftUpdatedEvent | ErrorEvent) => void) => void;
+}
+
+export interface StartDraftPayload {
+  lobbyId: UUID;
 }
 
 // Server -> Client Events
@@ -63,6 +76,41 @@ export interface ServerToClientEvents {
   lobby_updated: (data: LobbyUpdatedEvent) => void;
   player_ready: (data: PlayerReadyEvent) => void;
   game_starting: (data: GameStartingEvent) => void;
+
+  // Milty Draft
+  draft_started: (data: DraftStartedEvent) => void;
+  draft_updated: (data: DraftUpdatedEvent) => void;
+  draft_complete: (data: DraftCompleteEvent) => void;
+}
+
+// Maps draft player IDs (player_0, player_1, etc.) to real player info
+export interface DraftPlayerInfo {
+  id: string;         // Real player/user ID
+  name: string;       // Player name
+  isBot: boolean;
+}
+
+export interface DraftStartedEvent {
+  lobbyId: UUID;
+  draftState: MiltyDraftState;
+  playerMapping: Record<string, DraftPlayerInfo>; // draftPlayerId -> player info
+}
+
+export interface DraftUpdatedEvent {
+  lobbyId: UUID;
+  draftState: MiltyDraftState;
+  lastPick: MiltyDraftPick;
+  playerMapping: Record<string, DraftPlayerInfo>; // draftPlayerId -> player info
+}
+
+export interface DraftCompleteEvent {
+  lobbyId: UUID;
+  playerAssignments: {
+    playerId: string;
+    faction: string;
+    sliceId: number;
+    speakerPosition: number;
+  }[];
 }
 
 // Payload Types - Client to Server
@@ -104,6 +152,7 @@ export interface RequestStatePayload {
 export interface JoinedGameResponse {
   success: boolean;
   gameState?: GameState;
+  playerId?: UUID; // The player ID for the current user in this game
   error?: string;
 }
 
@@ -273,6 +322,27 @@ export interface UpdateSettingsPayload {
   settings: Partial<LobbySettings>;
 }
 
+// Bot management payloads
+export interface AddBotPayload {
+  lobbyId: UUID;
+  botName?: string;
+  factionId?: string;
+  color?: string;
+}
+
+export interface RemoveBotPayload {
+  lobbyId: UUID;
+  seatIndex: number;
+}
+
+export interface UpdateBotPayload {
+  lobbyId: UUID;
+  seatIndex: number;
+  botName?: string;
+  factionId?: string;
+  color?: string;
+}
+
 export interface LobbySettings {
   playerCount: number;
   expansions: string[];
@@ -280,6 +350,37 @@ export interface LobbySettings {
   mapPreset?: string;
   miltyDraft: boolean;
   privateGame: boolean;
+}
+
+// Milty Draft Types
+export interface MiltySlice {
+  id: number;
+  systems: number[]; // System IDs for this slice
+  totalResources: number;
+  totalInfluence: number;
+  optimalValue: number; // Combined resource + influence rating
+}
+
+export interface MiltyDraftState {
+  phase: 'setup' | 'drafting' | 'complete';
+  slices: MiltySlice[];
+  factionPool: string[]; // Available factions to draft
+  speakerOrder: (string | null)[]; // Player IDs in speaker order slots
+  draftOrder: string[]; // Order players pick in
+  currentPickIndex: number;
+  picks: MiltyDraftPick[];
+}
+
+export interface MiltyDraftPick {
+  playerId: string;
+  pickType: 'faction' | 'slice' | 'speaker';
+  value: string | number; // factionId, sliceId, or speaker position
+}
+
+export interface MiltyDraftPayload {
+  lobbyId: UUID;
+  pickType: 'faction' | 'slice' | 'speaker';
+  value: string | number;
 }
 
 export interface LobbyCreatedEvent {
@@ -303,6 +404,8 @@ export interface LobbyPlayer {
   color?: string;
   ready: boolean;
   isHost: boolean;
+  isBot?: boolean;
+  seatIndex?: number;
 }
 
 export interface PlayerReadyEvent {

@@ -6,6 +6,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useLobbyStore } from '@/stores/lobby-store';
 import CreateLobbyModal from '@/components/lobby/CreateLobbyModal';
 import LobbyList from '@/components/lobby/LobbyList';
+import MyLobbies from '@/components/lobby/MyLobbies';
 
 interface PublicLobby {
   id: string;
@@ -122,6 +123,9 @@ export default function LobbyPage() {
             {lobbyError}
           </div>
         )}
+
+        {/* My Lobbies */}
+        <MyLobbies />
 
         {/* Join by Code */}
         <div className="mb-8 p-6 bg-gray-800 rounded-lg">

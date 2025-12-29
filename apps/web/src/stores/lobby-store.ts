@@ -4,6 +4,9 @@ import type {
   LobbyPlayer,
   LobbyUpdatedEvent,
   ErrorEvent,
+  MiltyDraftState,
+  MiltyDraftPick,
+  DraftPlayerInfo,
 } from '@ti4/shared';
 import { useSocketStore } from './socket-store';
 
@@ -23,6 +26,17 @@ interface LobbyState {
   gameId: string | null;
   countdown: number | null;
 
+  // Milty Draft
+  draftState: MiltyDraftState | null;
+  lastPick: MiltyDraftPick | null;
+  draftPlayerMapping: Record<string, DraftPlayerInfo> | null;  // draftPlayerId -> player info
+  draftPlayerAssignments: {
+    playerId: string;
+    faction: string;
+    sliceId: number;
+    speakerPosition: number;
+  }[] | null;
+
   // Actions
   createLobby: (settings: LobbySettings) => Promise<void>;
   joinLobby: (codeOrId: string) => Promise<void>;
@@ -32,6 +46,15 @@ interface LobbyState {
   readyUp: (ready: boolean) => void;
   updateSettings: (settings: Partial<LobbySettings>) => void;
   startGame: () => Promise<void>;
+
+  // Bot management (host only)
+  addBot: (botName?: string, factionId?: string, color?: string) => void;
+  removeBot: (seatIndex: number) => void;
+  updateBot: (seatIndex: number, updates: { botName?: string; factionId?: string; color?: string }) => void;
+
+  // Milty Draft actions
+  startDraft: () => Promise<void>;
+  makeDraftPick: (pickType: 'faction' | 'slice' | 'speaker', value: string | number) => Promise<void>;
 
   // Internal
   setupListeners: () => void;
@@ -49,6 +72,10 @@ const initialState = {
   isGameStarting: false,
   gameId: null,
   countdown: null,
+  draftState: null,
+  lastPick: null,
+  draftPlayerMapping: null,
+  draftPlayerAssignments: null,
 };
 
 export const useLobbyStore = create<LobbyState>((set, get) => ({
@@ -201,6 +228,89 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     });
   },
 
+  addBot: (botName?: string, factionId?: string, color?: string) => {
+    const { socket } = useSocketStore.getState();
+    const { lobbyId } = get();
+
+    if (socket && lobbyId) {
+      socket.emit('add_bot', { lobbyId, botName, factionId, color });
+    }
+  },
+
+  removeBot: (seatIndex: number) => {
+    const { socket } = useSocketStore.getState();
+    const { lobbyId } = get();
+
+    if (socket && lobbyId) {
+      socket.emit('remove_bot', { lobbyId, seatIndex });
+    }
+  },
+
+  updateBot: (seatIndex: number, updates: { botName?: string; factionId?: string; color?: string }) => {
+    const { socket } = useSocketStore.getState();
+    const { lobbyId } = get();
+
+    if (socket && lobbyId) {
+      socket.emit('update_bot', { lobbyId, seatIndex, ...updates });
+    }
+  },
+
+  startDraft: async () => {
+    const { socket } = useSocketStore.getState();
+    const { lobbyId } = get();
+
+    if (!socket || !lobbyId) {
+      set({ error: 'Not in a lobby' });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    return new Promise<void>((resolve, reject) => {
+      socket.emit('start_draft', { lobbyId }, (response) => {
+        if ('draftState' in response) {
+          set({
+            draftState: response.draftState,
+            draftPlayerMapping: response.playerMapping,
+            isLoading: false,
+          });
+          resolve();
+        } else {
+          const error = response as ErrorEvent;
+          set({ error: error.message, isLoading: false });
+          reject(new Error(error.message));
+        }
+      });
+    });
+  },
+
+  makeDraftPick: async (pickType: 'faction' | 'slice' | 'speaker', value: string | number) => {
+    const { socket } = useSocketStore.getState();
+    const { lobbyId } = get();
+
+    if (!socket || !lobbyId) {
+      set({ error: 'Not in a lobby' });
+      return;
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      socket.emit('make_draft_pick', { lobbyId, pickType, value }, (response) => {
+        if ('draftState' in response) {
+          set({
+            draftState: response.draftState,
+            lastPick: response.lastPick,
+            draftPlayerMapping: response.playerMapping,
+          });
+          resolve();
+        } else {
+          const error = response as ErrorEvent;
+          set({ error: error.message });
+          reject(new Error(error.message));
+        }
+      });
+    });
+  },
+
   setupListeners: () => {
     const { socket } = useSocketStore.getState();
     if (!socket) return;
@@ -228,6 +338,28 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
       });
     });
 
+    // Milty Draft events
+    socket.on('draft_started', (data) => {
+      set({
+        draftState: data.draftState,
+        draftPlayerMapping: data.playerMapping,
+      });
+    });
+
+    socket.on('draft_updated', (data) => {
+      set({
+        draftState: data.draftState,
+        lastPick: data.lastPick,
+        draftPlayerMapping: data.playerMapping,
+      });
+    });
+
+    socket.on('draft_complete', (data) => {
+      set({
+        draftPlayerAssignments: data.playerAssignments,
+      });
+    });
+
     socket.on('error', (error) => {
       set({ error: error.message });
     });
@@ -240,6 +372,9 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     socket.off('lobby_updated');
     socket.off('player_ready');
     socket.off('game_starting');
+    socket.off('draft_started');
+    socket.off('draft_updated');
+    socket.off('draft_complete');
   },
 
   reset: () => {

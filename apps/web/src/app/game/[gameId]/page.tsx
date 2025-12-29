@@ -5,7 +5,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/stores/game-store';
+import { useLobbyStore } from '@/stores/lobby-store';
 import { GameBoard } from '@/components/game-board';
+import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel } from '@/components/game';
+import type { PickStrategyCardAction, PassAction, StrategicAction } from '@ti4/shared';
 
 export default function GamePage() {
   const params = useParams();
@@ -15,11 +18,14 @@ export default function GamePage() {
   const {
     gameId,
     gameState,
+    currentPlayerId,
     isLoading,
     error,
     isConnected,
     joinGame,
     leaveGame,
+    sendAction,
+    setCurrentPlayerId,
   } = useGameStore();
 
   const urlGameId = params.gameId as string;
@@ -77,12 +83,58 @@ export default function GamePage() {
     );
   }
 
-  // Find current player
-  const currentPlayer = gameState.players.find((p) => {
-    // Match by checking game player mapping
-    // For now, just use the first player as a placeholder
-    return true; // TODO: Match with actual userId
-  });
+  // Find current player using the playerId from the store
+  const currentPlayer = currentPlayerId
+    ? gameState.players.find((p) => p.id === currentPlayerId) ?? null
+    : null;
+
+  // Check if it's the current player's turn
+  const isMyTurn = currentPlayerId === gameState.activePlayerId;
+
+  // Handle strategy card pick
+  const handlePickCard = (cardNumber: number) => {
+    sendAction({
+      type: 'pick_strategy_card',
+      cardNumber,
+    } as Omit<PickStrategyCardAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle tactical action - for now just shows we need to implement system activation
+  const handleTacticalAction = () => {
+    // TODO: Open system selection modal
+    console.log('Tactical action clicked - system selection coming soon');
+  };
+
+  // Handle strategic action
+  const handleStrategicAction = () => {
+    if (!currentPlayer?.strategyCard) return;
+    sendAction({
+      type: 'strategic_action',
+      cardNumber: currentPlayer.strategyCard,
+    } as Omit<StrategicAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle pass
+  const handlePass = () => {
+    sendAction({
+      type: 'pass',
+    } as Omit<PassAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle score objective
+  const handleScoreObjective = (objectiveId: string) => {
+    sendAction({
+      type: 'score_objective',
+      objectiveId,
+    } as any); // TODO: Add proper type
+  };
+
+  // Handle confirm status
+  const handleConfirmStatus = () => {
+    sendAction({
+      type: 'confirm_status',
+    } as any); // TODO: Add proper type
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -90,13 +142,8 @@ export default function GamePage() {
       <header className="fixed top-0 left-0 right-0 z-10 bg-gray-800/90 backdrop-blur border-b border-gray-700">
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold">TI4</h1>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-400">Round</span>
-              <span className="font-mono text-yellow-400">{gameState.round}</span>
-              <span className="text-gray-400">|</span>
-              <span className="capitalize">{gameState.phase} Phase</span>
-            </div>
+            <h1 className="text-lg font-bold text-white">TI4</h1>
+            <TurnIndicator gameState={gameState} currentPlayerId={currentPlayerId} />
           </div>
 
           <div className="flex items-center gap-4">
@@ -116,6 +163,7 @@ export default function GamePage() {
             <button
               onClick={() => {
                 leaveGame();
+                useLobbyStore.getState().reset(); // Clear lobby state to prevent redirect back
                 router.push('/lobby');
               }}
               className="px-3 py-1 text-sm bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
@@ -126,10 +174,55 @@ export default function GamePage() {
         </div>
       </header>
 
-      {/* Game Board */}
-      <main className="pt-12">
-        <GameBoard gameState={gameState} />
-      </main>
+      {/* Main Layout */}
+      <div className="pt-12 pb-16 flex">
+        {/* Left Sidebar - Player Dashboard */}
+        <aside className="fixed left-0 top-12 bottom-16 w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4">
+          {currentPlayer && (
+            <PlayerDashboard
+              player={currentPlayer}
+              isActivePlayer={currentPlayer.id === gameState.activePlayerId}
+            />
+          )}
+        </aside>
+
+        {/* Game Board - centered */}
+        <main className="ml-72 flex-1">
+          <GameBoard gameState={gameState} />
+        </main>
+      </div>
+
+      {/* Strategy Phase Panel */}
+      {gameState.phase === 'strategy' && (
+        <StrategyPhasePanel
+          gameState={gameState}
+          currentPlayerId={currentPlayerId}
+          onPickCard={handlePickCard}
+        />
+      )}
+
+      {/* Action Phase Panel */}
+      {gameState.phase === 'action' && (
+        <ActionPhasePanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          isMyTurn={isMyTurn}
+          onTacticalAction={handleTacticalAction}
+          onStrategicAction={handleStrategicAction}
+          onPass={handlePass}
+        />
+      )}
+
+      {/* Status Phase Panel */}
+      {gameState.phase === 'status' && (
+        <StatusPhasePanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          isMyTurn={isMyTurn}
+          onScoreObjective={handleScoreObjective}
+          onConfirmStatus={handleConfirmStatus}
+        />
+      )}
 
       {/* Player Info Bar */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 bg-gray-800/90 backdrop-blur border-t border-gray-700">

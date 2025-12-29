@@ -10,21 +10,24 @@ function toJson(state: GameState): Prisma.InputJsonValue {
 interface CreateGameFromLobbyOptions {
   lobbyId: string;
   players: {
-    userId: string;
+    userId: string | null; // null for bots
     name: string;
     factionId: string;
     color: PlayerColor;
     seatIndex: number;
+    isBot?: boolean;
   }[];
   victoryPoints?: number;
   expansions?: string[];
+  speakerIndex?: number; // Index of player who should be speaker (from draft)
+  fromDraft?: boolean; // If true, start in strategy phase
 }
 
 /**
  * Create a new game from a lobby
  */
 export async function createGameFromLobby(options: CreateGameFromLobbyOptions) {
-  const { lobbyId, players, victoryPoints, expansions } = options;
+  const { lobbyId, players, victoryPoints, expansions, speakerIndex, fromDraft } = options;
 
   // Create game state using the engine
   const setupOptions: GameSetupOptions = {
@@ -36,6 +39,8 @@ export async function createGameFromLobby(options: CreateGameFromLobbyOptions) {
     })),
     victoryPoints,
     expansions,
+    speakerIndex,
+    startPhase: fromDraft ? 'strategy' : 'setup',
   };
 
   const gameState = createGameState(setupOptions);
@@ -59,7 +64,9 @@ export async function createGameFromLobby(options: CreateGameFromLobbyOptions) {
             factionId: p.factionId,
             color: p.color,
             seatIndex: p.seatIndex,
-            connected: true,
+            isBot: p.isBot ?? false,
+            botName: p.isBot ? p.name : null,
+            connected: !p.isBot, // Bots are not "connected" as socket clients
             lastSeenAt: new Date(),
           };
         }),
@@ -214,9 +221,11 @@ export async function updatePlayerConnection(
  * Get player by user ID in a game
  */
 export async function getGamePlayer(gameId: string, userId: string) {
-  return prisma.gamePlayer.findUnique({
+  return prisma.gamePlayer.findFirst({
     where: {
-      gameId_userId: { gameId, userId },
+      gameId,
+      userId,
+      isBot: false,
     },
   });
 }
@@ -225,9 +234,11 @@ export async function getGamePlayer(gameId: string, userId: string) {
  * Check if user is a player in the game
  */
 export async function isPlayerInGame(gameId: string, userId: string): Promise<boolean> {
-  const player = await prisma.gamePlayer.findUnique({
+  const player = await prisma.gamePlayer.findFirst({
     where: {
-      gameId_userId: { gameId, userId },
+      gameId,
+      userId,
+      isBot: false,
     },
   });
   return !!player;

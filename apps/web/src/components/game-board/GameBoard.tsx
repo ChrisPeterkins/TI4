@@ -197,39 +197,70 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
     let isDragging = false;
     let dragStart = { x: 0, y: 0 };
     let containerStart = { x: 0, y: 0 };
+    let hasDragged = false;
 
-    // Pan with mouse drag
+    // Zoom limits
+    const MIN_ZOOM = 0.2;
+    const MAX_ZOOM = 5;
+
+    // Pan with any mouse button drag
     app.stage.on('pointerdown', (event) => {
-      if (event.button === 1 || event.button === 2) { // Middle or right click
-        isDragging = true;
-        dragStart = { x: event.globalX, y: event.globalY };
-        containerStart = { x: boardContainer.x, y: boardContainer.y };
-      }
+      isDragging = true;
+      hasDragged = false;
+      dragStart = { x: event.globalX, y: event.globalY };
+      containerStart = { x: boardContainer.x, y: boardContainer.y };
+
+      // Change cursor to grabbing
+      app.canvas.style.cursor = 'grabbing';
     });
 
     app.stage.on('pointerup', () => {
       isDragging = false;
+      app.canvas.style.cursor = 'grab';
     });
 
     app.stage.on('pointerupoutside', () => {
       isDragging = false;
+      app.canvas.style.cursor = 'grab';
     });
 
     app.stage.on('pointermove', (event) => {
       if (isDragging) {
         const dx = event.globalX - dragStart.x;
         const dy = event.globalY - dragStart.y;
-        boardContainer.position.set(containerStart.x + dx, containerStart.y + dy);
+
+        // Only start panning if moved more than 3 pixels (prevents accidental drags)
+        if (!hasDragged && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+          hasDragged = true;
+        }
+
+        if (hasDragged) {
+          boardContainer.position.set(containerStart.x + dx, containerStart.y + dy);
+        }
       }
     });
 
+    // Set initial cursor
+    app.canvas.style.cursor = 'grab';
+
     // Zoom with mouse wheel
     const canvas = app.canvas;
+
+    // Throttle wheel events for performance
+    let lastWheelTime = 0;
+    const WHEEL_THROTTLE = 16; // ~60fps
+
     canvas.addEventListener('wheel', (event: WheelEvent) => {
       event.preventDefault();
 
-      const scaleFactor = event.deltaY > 0 ? 0.9 : 1.1;
-      const newScale = Math.max(0.3, Math.min(2, boardContainer.scale.x * scaleFactor));
+      // Throttle wheel events
+      const now = Date.now();
+      if (now - lastWheelTime < WHEEL_THROTTLE) return;
+      lastWheelTime = now;
+
+      // Use smaller scale factor for smoother zooming
+      const scaleFactor = event.deltaY > 0 ? 0.92 : 1.08;
+      const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, boardContainer.scale.x * scaleFactor));
 
       // Zoom toward mouse position
       const mouseX = event.offsetX;
@@ -311,7 +342,7 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
       {/* Controls hint */}
       <div className="absolute top-4 right-4 bg-black/60 text-white/60 p-2 rounded text-xs">
         <div>Scroll to zoom</div>
-        <div>Right-click drag to pan</div>
+        <div>Click + drag to pan</div>
       </div>
     </div>
   );

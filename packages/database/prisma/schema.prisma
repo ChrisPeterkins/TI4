@@ -108,8 +108,13 @@ model LobbyPlayer {
   lobbyId String
   lobby   Lobby  @relation(fields: [lobbyId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  // User reference (null for bots)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  // Bot fields
+  isBot   Boolean @default(false)
+  botName String? // Display name for bots
 
   factionId String? // Selected faction
   color     String? // Selected color
@@ -120,8 +125,9 @@ model LobbyPlayer {
 
   joinedAt DateTime @default(now())
 
-  @@unique([lobbyId, userId])
   @@unique([lobbyId, seatIndex])
+  // Only enforce unique userId if not null (bots don't have userId)
+  @@index([lobbyId, userId])
 }
 
 // ============= GAME STATE =============
@@ -169,8 +175,13 @@ model GamePlayer {
   gameId String
   game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  // User reference (null for bots)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  // Bot fields
+  isBot   Boolean @default(false)
+  botName String? // Display name for bots
 
   playerId  String // UUID used in GameState.players[].id
   factionId String
@@ -180,8 +191,8 @@ model GamePlayer {
   connected  Boolean  @default(false)
   lastSeenAt DateTime @default(now())
 
-  @@unique([gameId, userId])
   @@unique([gameId, playerId])
+  @@index([gameId, userId])
 }
 
 // ============= GAME HISTORY =============

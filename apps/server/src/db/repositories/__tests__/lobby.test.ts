@@ -303,17 +303,38 @@ describe('Lobby Repository', () => {
       );
     });
 
-    it('should throw error when player already in lobby', async () => {
+    it('should allow reconnection when player already in lobby', async () => {
       mockPrisma.lobby.findUnique.mockResolvedValue({
         id: 'lobby-1',
+        code: 'ABC123',
+        hostId: 'user-1',
         status: 'WAITING',
         playerCount: 6,
-        players: [{ userId: 'user-1', seatIndex: 0 }],
+        victoryPoints: 10,
+        expansions: [],
+        mapPreset: null,
+        miltyDraft: false,
+        privateGame: false,
+        players: [
+          {
+            userId: 'user-1',
+            factionId: 'sol',
+            color: 'blue',
+            ready: true,
+            isHost: true,
+            isBot: false,
+            seatIndex: 0,
+            user: { id: 'user-1', name: 'Player 1' },
+          },
+        ],
       });
 
-      await expect(addPlayerToLobby('lobby-1', 'user-1')).rejects.toThrow(
-        'Already in this lobby'
-      );
+      const result = await addPlayerToLobby('lobby-1', 'user-1');
+
+      // Should return existing lobby state instead of throwing
+      expect(result).toBeDefined();
+      expect(result?.players).toHaveLength(1);
+      expect(result?.players[0].id).toBe('user-1');
     });
 
     it('should throw error when lobby not accepting players', async () => {
@@ -332,10 +353,11 @@ describe('Lobby Repository', () => {
 
   describe('removePlayerFromLobby', () => {
     it('should remove non-host player', async () => {
-      mockPrisma.lobbyPlayer.findUnique.mockResolvedValue({
+      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue({
         id: 'player-1',
         userId: 'user-2',
         isHost: false,
+        isBot: false,
       });
       mockPrisma.lobbyPlayer.delete.mockResolvedValue({});
       mockPrisma.lobby.findUnique.mockResolvedValue({
@@ -356,6 +378,8 @@ describe('Lobby Repository', () => {
             color: null,
             ready: false,
             isHost: true,
+            isBot: false,
+            seatIndex: 0,
             user: { id: 'user-1', name: 'Player 1' },
           },
         ],
@@ -368,10 +392,11 @@ describe('Lobby Repository', () => {
     });
 
     it('should close lobby when host leaves', async () => {
-      mockPrisma.lobbyPlayer.findUnique.mockResolvedValue({
+      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue({
         id: 'player-1',
         userId: 'user-1',
         isHost: true,
+        isBot: false,
       });
       mockPrisma.lobby.update.mockResolvedValue({});
 
@@ -387,7 +412,20 @@ describe('Lobby Repository', () => {
 
   describe('selectFaction', () => {
     it('should update player faction', async () => {
-      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue(null); // No one has this faction
+      // First call checks if faction is taken (return null)
+      // Second call finds the player
+      mockPrisma.lobbyPlayer.findFirst
+        .mockResolvedValueOnce(null) // faction not taken
+        .mockResolvedValueOnce({
+          id: 'player-1',
+          userId: 'user-1',
+          lobbyId: 'lobby-1',
+          factionId: null,
+          color: null,
+          ready: false,
+          isHost: true,
+          isBot: false,
+        });
       mockPrisma.lobbyPlayer.update.mockResolvedValue({});
       mockPrisma.lobby.findUnique.mockResolvedValue({
         id: 'lobby-1',
@@ -407,6 +445,8 @@ describe('Lobby Repository', () => {
             color: null,
             ready: false,
             isHost: true,
+            isBot: false,
+            seatIndex: 0,
             user: { id: 'user-1', name: 'Player 1' },
           },
         ],
@@ -415,9 +455,7 @@ describe('Lobby Repository', () => {
       await selectFaction('lobby-1', 'user-1', 'sol');
 
       expect(mockPrisma.lobbyPlayer.update).toHaveBeenCalledWith({
-        where: {
-          lobbyId_userId: { lobbyId: 'lobby-1', userId: 'user-1' },
-        },
+        where: { id: 'player-1' },
         data: {
           factionId: 'sol',
           ready: false,
@@ -439,7 +477,20 @@ describe('Lobby Repository', () => {
 
   describe('selectColor', () => {
     it('should update player color', async () => {
-      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue(null);
+      // First call finds the player
+      // Second call checks if color is taken (return null)
+      mockPrisma.lobbyPlayer.findFirst
+        .mockResolvedValueOnce({
+          id: 'player-1',
+          userId: 'user-1',
+          lobbyId: 'lobby-1',
+          factionId: null,
+          color: null,
+          ready: false,
+          isHost: true,
+          isBot: false,
+        })
+        .mockResolvedValueOnce(null); // color not taken
       mockPrisma.lobbyPlayer.update.mockResolvedValue({});
       mockPrisma.lobby.findUnique.mockResolvedValue({
         id: 'lobby-1',
@@ -458,9 +509,7 @@ describe('Lobby Repository', () => {
       await selectColor('lobby-1', 'user-1', 'blue');
 
       expect(mockPrisma.lobbyPlayer.update).toHaveBeenCalledWith({
-        where: {
-          lobbyId_userId: { lobbyId: 'lobby-1', userId: 'user-1' },
-        },
+        where: { id: 'player-1' },
         data: {
           color: 'blue',
           ready: false,
@@ -482,12 +531,13 @@ describe('Lobby Repository', () => {
 
   describe('setPlayerReady', () => {
     it('should set player ready when faction and color selected', async () => {
-      mockPrisma.lobbyPlayer.findUnique.mockResolvedValue({
+      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue({
         id: 'player-1',
         userId: 'user-1',
         factionId: 'sol',
         color: 'blue',
         ready: false,
+        isBot: false,
       });
       mockPrisma.lobbyPlayer.update.mockResolvedValue({});
       mockPrisma.lobby.findUnique.mockResolvedValue({
@@ -513,12 +563,13 @@ describe('Lobby Repository', () => {
     });
 
     it('should throw error when trying to ready without faction', async () => {
-      mockPrisma.lobbyPlayer.findUnique.mockResolvedValue({
+      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue({
         id: 'player-1',
         userId: 'user-1',
         factionId: null,
         color: 'blue',
         ready: false,
+        isBot: false,
       });
 
       await expect(setPlayerReady('lobby-1', 'user-1', true)).rejects.toThrow(
@@ -527,12 +578,13 @@ describe('Lobby Repository', () => {
     });
 
     it('should throw error when trying to ready without color', async () => {
-      mockPrisma.lobbyPlayer.findUnique.mockResolvedValue({
+      mockPrisma.lobbyPlayer.findFirst.mockResolvedValue({
         id: 'player-1',
         userId: 'user-1',
         factionId: 'sol',
         color: null,
         ready: false,
+        isBot: false,
       });
 
       await expect(setPlayerReady('lobby-1', 'user-1', true)).rejects.toThrow(

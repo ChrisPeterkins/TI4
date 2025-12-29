@@ -21,7 +21,7 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
   const [settings, setSettings] = useState<LobbySettings>({
     playerCount: 6,
     victoryPoints: 10,
-    expansions: ['pok'],
+    expansions: ['base', 'pok'], // 'base' is always required
     miltyDraft: false,
     privateGame: false,
   });

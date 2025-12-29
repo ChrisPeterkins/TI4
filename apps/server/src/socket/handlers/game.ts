@@ -7,6 +7,7 @@ import type {
 import { getUserId, getUser } from '../../middleware/auth.js';
 import * as gameRepo from '../../db/repositories/game.js';
 import { GameMachine } from '../../engine/game-machine.js';
+import { generateBotAction, getBotActionDelay, isBot } from '../../engine/bot-ai.js';
 
 type TI4Server = Server<ClientToServerEvents, ServerToClientEvents>;
 type TI4Socket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -16,6 +17,12 @@ const socketGameMap = new Map<string, string>();
 
 // Cache of active game machines
 const gameMachines = new Map<string, GameMachine>();
+
+// Cache of bot player IDs per game
+const gameBotPlayers = new Map<string, Set<string>>();
+
+// Track pending bot actions to prevent duplicates
+const pendingBotActions = new Set<string>();
 
 /**
  * Get game room name
@@ -48,6 +55,109 @@ async function getGameMachine(gameId: string): Promise<GameMachine | null> {
 }
 
 /**
+ * Get or load bot player IDs for a game
+ */
+async function getBotPlayerIds(gameId: string): Promise<Set<string>> {
+  // Check cache first
+  let botIds = gameBotPlayers.get(gameId);
+  if (botIds) {
+    return botIds;
+  }
+
+  // Load from database
+  const game = await gameRepo.getGame(gameId);
+  if (!game) {
+    return new Set();
+  }
+
+  // Find bot players
+  botIds = new Set(
+    game.players
+      .filter(p => p.isBot)
+      .map(p => p.playerId)
+  );
+
+  gameBotPlayers.set(gameId, botIds);
+  return botIds;
+}
+
+/**
+ * Process bot turn if the active player is a bot
+ */
+async function processBotTurnIfNeeded(
+  io: TI4Server,
+  gameId: string,
+  machine: GameMachine
+): Promise<void> {
+  const state = machine.getState();
+  const activePlayerId = state.activePlayerId;
+  const botIds = await getBotPlayerIds(gameId);
+
+  // Check if active player is a bot
+  if (!isBot(state, activePlayerId, botIds)) {
+    return;
+  }
+
+  // Prevent duplicate bot actions
+  const actionKey = `${gameId}:${activePlayerId}:${state.version}`;
+  if (pendingBotActions.has(actionKey)) {
+    return;
+  }
+  pendingBotActions.add(actionKey);
+
+  // Add delay to make it feel more natural
+  const delay = getBotActionDelay('medium');
+
+  setTimeout(async () => {
+    try {
+      // Re-check state hasn't changed
+      const currentState = machine.getState();
+      if (currentState.activePlayerId !== activePlayerId) {
+        pendingBotActions.delete(actionKey);
+        return;
+      }
+
+      // Generate bot action
+      const action = generateBotAction(currentState, activePlayerId);
+      if (!action) {
+        pendingBotActions.delete(actionKey);
+        return;
+      }
+
+      console.log(`Bot ${activePlayerId} performing action: ${action.type}`);
+
+      // Process the action
+      const result = machine.processAction(action);
+
+      if (result.success) {
+        const newState = machine.getState();
+
+        // Persist the new state
+        await gameRepo.updateGameState(gameId, newState, {
+          playerId: activePlayerId,
+          type: action.type,
+          data: action,
+        });
+
+        // Broadcast state update
+        io.to(getGameRoom(gameId)).emit('game_state', { state: newState });
+
+        console.log(`Bot action completed: ${action.type}`);
+
+        // Check if next player is also a bot
+        await processBotTurnIfNeeded(io, gameId, machine);
+      } else {
+        console.error(`Bot action failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error processing bot turn:', error);
+    } finally {
+      pendingBotActions.delete(actionKey);
+    }
+  }, delay);
+}
+
+/**
  * Register game event handlers for a socket
  */
 export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
@@ -59,9 +169,9 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
     try {
       const { gameId } = data;
 
-      // Verify user is a player in this game
-      const isPlayer = await gameRepo.isPlayerInGame(gameId, userId);
-      if (!isPlayer) {
+      // Get game player info (also verifies user is a player)
+      const gamePlayer = await gameRepo.getGamePlayer(gameId, userId);
+      if (!gamePlayer) {
         socket.emit('error', {
           code: 'UNAUTHORIZED',
           message: 'You are not a player in this game',
@@ -86,15 +196,25 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
         return;
       }
 
-      // Send current game state to the joining player
-      socket.emit('game_state', { state: game.state });
+      // Send joined_game response with playerId and game state
+      socket.emit('joined_game', {
+        success: true,
+        gameState: game.state,
+        playerId: gamePlayer.playerId,
+      });
 
       // Notify other players
       socket.to(getGameRoom(gameId)).emit('player_reconnected', {
-        playerId: userId,
+        playerId: gamePlayer.playerId,
       });
 
-      console.log(`${user.email || userId} joined game ${gameId}`);
+      console.log(`${user.email || userId} joined game ${gameId} as ${gamePlayer.playerId}`);
+
+      // Check if current active player is a bot (trigger bot turns)
+      const machine = await getGameMachine(gameId);
+      if (machine) {
+        await processBotTurnIfNeeded(io, gameId, machine);
+      }
     } catch (error) {
       console.error('Error joining game:', error);
       socket.emit('error', {
@@ -197,6 +317,9 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       });
 
       console.log(`Game ${gameId}: ${action.type} by ${gamePlayer.playerId}`);
+
+      // Check if next player is a bot and process their turn
+      await processBotTurnIfNeeded(io, gameId, machine);
     } catch (error) {
       console.error('Error processing game action:', error);
       socket.emit('error', {
@@ -256,4 +379,5 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
  */
 export function clearGameMachine(gameId: string): void {
   gameMachines.delete(gameId);
+  gameBotPlayers.delete(gameId);
 }

@@ -6,6 +6,7 @@ interface GameStore {
   // Game state
   gameId: string | null;
   gameState: GameState | null;
+  currentPlayerId: string | null; // The player ID for the current user in this game
 
   // UI state
   isLoading: boolean;
@@ -22,6 +23,7 @@ interface GameStore {
 
   // Internal
   setGameState: (state: GameState) => void;
+  setCurrentPlayerId: (playerId: string) => void;
   setupListeners: () => void;
   cleanupListeners: () => void;
   reset: () => void;
@@ -30,6 +32,7 @@ interface GameStore {
 const initialState = {
   gameId: null,
   gameState: null,
+  currentPlayerId: null as string | null,
   isLoading: false,
   error: null,
   isConnected: false,
@@ -70,18 +73,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   sendAction: (actionData) => {
     const { socket } = useSocketStore.getState();
-    const { gameId, gameState } = get();
+    const { gameId, gameState, currentPlayerId } = get();
 
     if (!socket || !gameId || !gameState) {
       set({ error: 'Cannot send action: not in game' });
       return;
     }
 
-    // Find current user's player ID from game state
-    // This will need to be matched with the session user
+    if (!currentPlayerId) {
+      set({ error: 'Cannot send action: player ID not set' });
+      return;
+    }
+
     const action: GameAction = {
       ...actionData,
-      playerId: gameState.activePlayerId, // TODO: Get actual player ID
+      playerId: currentPlayerId,
       timestamp: Date.now(),
     } as GameAction;
 
@@ -108,9 +114,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
+  setCurrentPlayerId: (playerId: string) => {
+    set({ currentPlayerId: playerId });
+  },
+
   setupListeners: () => {
     const { socket } = useSocketStore.getState();
     if (!socket) return;
+
+    socket.on('joined_game', (data) => {
+      if (data.success && data.gameState && data.playerId) {
+        get().setCurrentPlayerId(data.playerId);
+        get().setGameState(data.gameState);
+      } else if (data.error) {
+        set({ error: data.error, isLoading: false });
+      }
+    });
 
     socket.on('game_state', (data) => {
       get().setGameState(data.state);
@@ -143,6 +162,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { socket } = useSocketStore.getState();
     if (!socket) return;
 
+    socket.off('joined_game');
     socket.off('game_state');
     socket.off('action_result');
     socket.off('player_joined');
