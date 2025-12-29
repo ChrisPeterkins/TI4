@@ -317,6 +317,7 @@ describe('Lobby Repository', () => {
         privateGame: false,
         players: [
           {
+            id: 'player-record-1', // Prisma record ID
             userId: 'user-1',
             factionId: 'sol',
             color: 'blue',
@@ -334,7 +335,7 @@ describe('Lobby Repository', () => {
       // Should return existing lobby state instead of throwing
       expect(result).toBeDefined();
       expect(result?.players).toHaveLength(1);
-      expect(result?.players[0].id).toBe('user-1');
+      expect(result?.players[0].id).toBe('player-record-1'); // Now returns Prisma record ID
     });
 
     it('should throw error when lobby not accepting players', async () => {

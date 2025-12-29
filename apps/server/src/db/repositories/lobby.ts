@@ -94,7 +94,7 @@ export async function createLobby(
       privateGame: lobby.privateGame,
     },
     players: lobby.players.map((p) => ({
-      id: p.userId!, // Host is always a real user
+      id: p.id, // Use actual Prisma record ID for database operations
       name: p.user!.name || 'Unknown',
       faction: p.factionId ?? undefined,
       color: p.color ?? undefined,
@@ -156,7 +156,7 @@ export async function getLobbyWithPlayers(lobbyId: string) {
       privateGame: lobby.privateGame,
     },
     players: lobby.players.map((p) => ({
-      id: p.isBot ? `bot_${p.seatIndex}` : p.userId!,
+      id: p.id, // Use actual Prisma record ID for database operations
       name: p.isBot ? (p.botName || `Bot ${(p.seatIndex ?? 0) + 1}`) : (p.user?.name || 'Unknown'),
       faction: p.factionId ?? undefined,
       color: p.color ?? undefined,

@@ -156,12 +156,16 @@ async function handleDraftComplete(
 ): Promise<void> {
   const assignments = getFinalAssignments(draftState);
 
+  console.log(`[Draft] Raw assignments:`, JSON.stringify(assignments, null, 2));
+  console.log(`[Draft] Player mapping:`, Object.fromEntries(playerMapping));
+
   // Convert draft player IDs back to real user IDs
   const realAssignments = assignments.map(a => ({
     ...a,
     playerId: playerMapping.get(a.playerId) || a.playerId,
   }));
 
+  console.log(`[Draft] Real assignments:`, JSON.stringify(realAssignments, null, 2));
   console.log(`[Draft] Emitting draft_complete for lobby ${lobbyId}`);
   io.to(getLobbyRoom(lobbyId)).emit('draft_complete', {
     lobbyId,
@@ -180,6 +184,7 @@ async function handleDraftComplete(
   try {
     // Update lobby players with drafted factions
     for (const assignment of realAssignments) {
+      console.log(`[Draft] Updating faction for player ${assignment.playerId} to ${assignment.faction}`);
       await lobbyRepo.updatePlayerFaction(lobbyId, assignment.playerId, assignment.faction);
     }
 
