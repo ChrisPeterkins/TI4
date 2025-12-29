@@ -1,6 +1,9 @@
 'use client';
 
+import Image from 'next/image';
 import type { LobbyPlayer } from '@ti4/shared';
+import { getFactionIconUrl } from '@/lib/assets';
+import { factions } from '@ti4/game-data';
 
 interface PlayerSlotProps {
   player: LobbyPlayer | null;
@@ -68,6 +71,21 @@ export default function PlayerSlot({
         {isBot ? '🤖' : player.name.charAt(0).toUpperCase()}
       </div>
 
+      {/* Faction icon (if selected) */}
+      {player.faction && (
+        <div className="w-10 h-10 relative flex-shrink-0">
+          <Image
+            src={getFactionIconUrl(player.faction)}
+            alt={factions[player.faction]?.name || player.faction}
+            fill
+            className="object-contain"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
       {/* Player info */}
       <div className="flex-1">
         <div className="flex items-center gap-2">
@@ -87,7 +105,7 @@ export default function PlayerSlot({
           )}
         </div>
         <div className="text-sm text-gray-400">
-          {player.faction || 'No faction selected'}
+          {player.faction ? factions[player.faction]?.name || player.faction : 'No faction selected'}
           {player.color && ` • ${player.color}`}
         </div>
       </div>

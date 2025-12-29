@@ -34,7 +34,7 @@ export default function LobbyRoom({
     error,
   } = useLobbyStore();
 
-  const currentPlayer = players.find((p) => p.id === currentUserId);
+  const currentPlayer = players.find((p) => p.userId === currentUserId);
   const isHost = currentPlayer?.isHost ?? false;
   // For Milty Draft, only require color selection; for normal games, require both faction and color
   const allReady = players.length >= 3 && players.every((p) => {
@@ -69,10 +69,10 @@ export default function LobbyRoom({
 
   // Get taken factions and colors
   const takenFactions = players
-    .filter((p) => p.id !== currentUserId && p.faction)
+    .filter((p) => p.userId !== currentUserId && p.faction)
     .map((p) => p.faction!);
   const takenColors = players
-    .filter((p) => p.id !== currentUserId && p.color)
+    .filter((p) => p.userId !== currentUserId && p.color)
     .map((p) => p.color!);
 
   return (
@@ -122,7 +122,7 @@ export default function LobbyRoom({
                   <PlayerSlot
                     key={player.id}
                     player={player}
-                    isCurrentUser={player.id === currentUserId}
+                    isCurrentUser={player.userId === currentUserId}
                     isHost={isHost}
                     onRemoveBot={removeBot}
                   />

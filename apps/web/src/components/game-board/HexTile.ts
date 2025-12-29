@@ -78,6 +78,11 @@ export class HexTileSprite extends Container {
     const pixelPos = hexToPixel(this.tile.position, this.config);
     this.position.set(pixelPos.x, pixelPos.y);
 
+    // Log first few tiles for debugging
+    if (this.tile.position.q === 0 && this.tile.position.r === 0) {
+      console.log('[HexTile] Center tile created at pixel:', pixelPos.x, pixelPos.y, 'texture:', !!options.texture);
+    }
+
     // Create hex mask for clipping the tile sprite
     this.hexMask = new Graphics();
     this.addChild(this.hexMask);

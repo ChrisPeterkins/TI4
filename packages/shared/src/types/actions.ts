@@ -48,6 +48,14 @@ export interface ProduceUnitsAction extends BaseAction {
   units: { type: UnitType; count: number }[];
 }
 
+export interface SkipMovementAction extends BaseAction {
+  type: 'skip_movement';
+}
+
+export interface SkipProductionAction extends BaseAction {
+  type: 'skip_production';
+}
+
 export interface PlayActionCardAction extends BaseAction {
   type: 'play_action_card';
   cardId: string;
@@ -286,6 +294,8 @@ export type GameAction =
   | TacticalAction
   | MoveUnitsAction
   | ProduceUnitsAction
+  | SkipMovementAction
+  | SkipProductionAction
   | PlayActionCardAction
   | ComponentAction
   | StrategicAction

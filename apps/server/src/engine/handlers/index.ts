@@ -1,7 +1,15 @@
 import type { GameState, GameAction } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
-import { handlePass, handleTacticalAction, handleStrategicAction } from './action-phase.js';
+import {
+  handlePass,
+  handleTacticalAction,
+  handleStrategicAction,
+  handleMoveUnits,
+  handleSkipMovement,
+  handleProduceUnits,
+  handleSkipProduction,
+} from './action-phase.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -22,6 +30,19 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'strategic_action':
       return handleStrategicAction(state, action);
+
+    // Tactical Sub-phases
+    case 'move_units':
+      return handleMoveUnits(state, action);
+
+    case 'skip_movement':
+      return handleSkipMovement(state, action);
+
+    case 'produce_units':
+      return handleProduceUnits(state, action);
+
+    case 'skip_production':
+      return handleSkipProduction(state, action);
 
     // Combat
     case 'assign_hits':

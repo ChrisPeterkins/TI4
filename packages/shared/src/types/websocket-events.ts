@@ -399,6 +399,7 @@ export interface LobbyUpdatedEvent {
 
 export interface LobbyPlayer {
   id: UUID;
+  userId?: UUID; // User ID for human players (undefined for bots)
   name: string;
   faction?: string;
   color?: string;

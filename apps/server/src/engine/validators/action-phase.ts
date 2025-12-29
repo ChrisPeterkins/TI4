@@ -3,10 +3,30 @@ import type {
   PassAction,
   TacticalAction,
   StrategicAction,
+  MoveUnitsAction,
+  SkipMovementAction,
+  ProduceUnitsAction,
+  SkipProductionAction,
   HexCoord,
+  UnitType,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
-import { findTileAtPosition, getAdjacentPositions } from '../utils/hex.js';
+import { findTileAtPosition, getAdjacentPositions, findPath, hexDistance } from '../utils/hex.js';
+import {
+  isShipType,
+  isGroundUnit,
+  isStructure,
+  getUnitMoveValue,
+  getUnitCapacity,
+  calculateFleetSupply,
+  countFleetSupplyUnits,
+  calculateCapacityInSystem,
+  calculateProductionCapacity,
+  calculateAvailableResources,
+  calculateProductionCost,
+  calculateProductionCount,
+  countsTowardsFleetSupply,
+} from '../utils/units.js';
 
 /**
  * Validate pass action
@@ -174,60 +194,299 @@ function isPlayerHomeSystem(state: GameState, factionId: string, systemId: numbe
 }
 
 /**
- * Validate movement within a tactical action
+ * Validate move_units action during tactical movement
  */
-export function validateMovement(
+export function validateMoveUnits(
   state: GameState,
-  playerId: string,
-  moves: { unitId: string; from: HexCoord; to: HexCoord }[]
+  action: MoveUnitsAction
 ): ValidationResult {
-  const targetPosition = state.subPhase === 'tactical_movement'
-    ? findActivatedSystem(state, playerId)
-    : null;
-
-  if (!targetPosition) {
-    return { valid: false, error: 'No activated system for movement' };
+  // Must be in tactical movement sub-phase
+  if (state.subPhase !== 'tactical_movement') {
+    return { valid: false, error: 'Can only move units during tactical movement phase' };
   }
 
-  // All moves must end in the activated system
-  for (const move of moves) {
-    if (move.to.q !== targetPosition.q || move.to.r !== targetPosition.r) {
+  // Must be active player
+  if (state.activePlayerId !== action.playerId) {
+    return { valid: false, error: 'Not your turn' };
+  }
+
+  // Must have an activated system
+  if (!state.activatedSystem) {
+    return { valid: false, error: 'No system activated for this tactical action' };
+  }
+
+  const player = state.players.find(p => p.id === action.playerId);
+  if (!player) {
+    return { valid: false, error: 'Player not found' };
+  }
+
+  const targetTile = findTileAtPosition(state.map, state.activatedSystem);
+  if (!targetTile) {
+    return { valid: false, error: 'Activated system not found' };
+  }
+
+  // Track units moving into the system and their capacity requirements
+  const movingShips: UnitType[] = [];
+  const movingGroundUnits: UnitType[] = [];
+  const movingFighters: number[] = [];
+
+  // Validate each move
+  for (const move of action.moves) {
+    // All moves must end in the activated system
+    if (move.to.systemPosition.q !== state.activatedSystem.q ||
+        move.to.systemPosition.r !== state.activatedSystem.r) {
       return { valid: false, error: 'All units must move to the activated system' };
     }
-  }
 
-  // Validate each unit can legally move
-  for (const move of moves) {
-    const fromTile = findTileAtPosition(state.map, move.from);
+    // Find the source tile
+    const fromTile = findTileAtPosition(state.map, move.from.systemPosition);
     if (!fromTile) {
-      return { valid: false, error: 'Invalid source system' };
+      return { valid: false, error: 'Source system not found' };
     }
 
-    const unit = fromTile.units.find(u => u.id === move.unitId);
+    // Cannot move FROM a system you activated this round
+    if (fromTile.commandTokens.includes(action.playerId) &&
+        (fromTile.position.q !== state.activatedSystem.q ||
+         fromTile.position.r !== state.activatedSystem.r)) {
+      return { valid: false, error: 'Cannot move units from a system you activated this round' };
+    }
+
+    // Find the unit - could be in space or on a planet
+    let unit;
+    if (move.from.planetId) {
+      const planet = fromTile.planets.find(p => p.planetId === move.from.planetId);
+      unit = planet?.units.find(u => u.id === move.unitId);
+    } else {
+      unit = fromTile.units.find(u => u.id === move.unitId);
+    }
+
     if (!unit) {
-      return { valid: false, error: 'Unit not found in source system' };
+      return { valid: false, error: `Unit ${move.unitId} not found in source location` };
     }
 
-    if (unit.ownerId !== playerId) {
+    if (unit.ownerId !== action.playerId) {
       return { valid: false, error: 'Cannot move units you do not own' };
     }
 
-    // TODO: Check unit movement range, capacity, anomaly restrictions, etc.
+    // Structures cannot move
+    if (isStructure(unit.type)) {
+      return { valid: false, error: 'Structures cannot move' };
+    }
+
+    // Check if unit has movement value (ships only)
+    if (isShipType(unit.type)) {
+      const moveValue = getUnitMoveValue(unit.type, player);
+
+      // Check if path exists within movement range
+      const path = findPath(state.map, move.from.systemPosition, state.activatedSystem, moveValue);
+      if (!path) {
+        return { valid: false, error: `${unit.type} cannot reach destination (movement: ${moveValue})` };
+      }
+
+      movingShips.push(unit.type);
+    } else if (isGroundUnit(unit.type) || unit.type === 'fighter') {
+      // Ground units and fighters need a carrier
+      if (!move.carrier) {
+        return { valid: false, error: `${unit.type} requires a carrier to move between systems` };
+      }
+
+      // Carrier must be in the same source system and also moving
+      const carrierMove = action.moves.find(m => m.unitId === move.carrier);
+      if (!carrierMove) {
+        return { valid: false, error: `Carrier ${move.carrier} is not moving to carry ${unit.type}` };
+      }
+
+      if (unit.type === 'fighter') {
+        movingFighters.push(1);
+      } else {
+        movingGroundUnits.push(unit.type);
+      }
+    }
+  }
+
+  // Check fleet supply at destination
+  const currentFleetSupply = countFleetSupplyUnits(targetTile.units, action.playerId);
+  const newShipsCountingSupply = movingShips.filter(t => countsTowardsFleetSupply(t)).length;
+  const maxFleetSupply = calculateFleetSupply(player);
+
+  if (currentFleetSupply + newShipsCountingSupply > maxFleetSupply) {
+    return {
+      valid: false,
+      error: `Fleet supply exceeded: ${currentFleetSupply + newShipsCountingSupply}/${maxFleetSupply}`,
+    };
+  }
+
+  // Check capacity for fighters and ground units
+  // Calculate capacity from carriers in destination (existing + moving)
+  let totalCapacity = calculateCapacityInSystem(targetTile, player);
+  for (const shipType of movingShips) {
+    totalCapacity += getUnitCapacity(shipType, player);
+  }
+
+  // Count units needing capacity (fighters in space, transported ground units)
+  let unitsNeedingCapacity = 0;
+  for (const unit of targetTile.units) {
+    if (unit.ownerId === action.playerId &&
+        (unit.type === 'fighter' || (isGroundUnit(unit.type) && !unit.planetId))) {
+      unitsNeedingCapacity++;
+    }
+  }
+  unitsNeedingCapacity += movingFighters.length + movingGroundUnits.length;
+
+  if (unitsNeedingCapacity > totalCapacity) {
+    return {
+      valid: false,
+      error: `Insufficient capacity: ${unitsNeedingCapacity} units need ${totalCapacity} capacity`,
+    };
   }
 
   return { valid: true };
 }
 
 /**
- * Find the system activated by the current player
+ * Validate skip_movement action
  */
-function findActivatedSystem(state: GameState, playerId: string): HexCoord | null {
-  for (const tile of state.map.tiles) {
-    // The most recently activated system would be tracked elsewhere
-    // For now, return the first tile with the player's command token
-    if (tile.commandTokens.includes(playerId)) {
-      return tile.position;
+export function validateSkipMovement(
+  state: GameState,
+  action: SkipMovementAction
+): ValidationResult {
+  if (state.subPhase !== 'tactical_movement') {
+    return { valid: false, error: 'Can only skip movement during tactical movement phase' };
+  }
+
+  if (state.activePlayerId !== action.playerId) {
+    return { valid: false, error: 'Not your turn' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate produce_units action during tactical production
+ */
+export function validateProduceUnits(
+  state: GameState,
+  action: ProduceUnitsAction
+): ValidationResult {
+  if (state.subPhase !== 'tactical_production') {
+    return { valid: false, error: 'Can only produce units during tactical production phase' };
+  }
+
+  if (state.activePlayerId !== action.playerId) {
+    return { valid: false, error: 'Not your turn' };
+  }
+
+  if (!state.activatedSystem) {
+    return { valid: false, error: 'No system activated for this tactical action' };
+  }
+
+  // Must produce in the activated system
+  if (action.systemPosition.q !== state.activatedSystem.q ||
+      action.systemPosition.r !== state.activatedSystem.r) {
+    return { valid: false, error: 'Can only produce in the activated system' };
+  }
+
+  const player = state.players.find(p => p.id === action.playerId);
+  if (!player) {
+    return { valid: false, error: 'Player not found' };
+  }
+
+  const tile = findTileAtPosition(state.map, action.systemPosition);
+  if (!tile) {
+    return { valid: false, error: 'System not found' };
+  }
+
+  // Check for space dock
+  const hasSpaceDock = tile.planets.some(p =>
+    p.units.some(u => u.ownerId === action.playerId && u.type === 'space_dock')
+  ) || tile.units.some(u => u.ownerId === action.playerId && u.type === 'space_dock');
+
+  if (!hasSpaceDock) {
+    return { valid: false, error: 'No space dock in this system' };
+  }
+
+  // Calculate production capacity
+  const productionCapacity = calculateProductionCapacity(tile, player);
+  const unitCount = calculateProductionCount(action.units);
+
+  if (unitCount > productionCapacity) {
+    return {
+      valid: false,
+      error: `Production capacity exceeded: ${unitCount}/${productionCapacity}`,
+    };
+  }
+
+  // Calculate cost
+  const cost = calculateProductionCost(action.units);
+  const availableResources = calculateAvailableResources(state, player);
+
+  if (cost > availableResources) {
+    return {
+      valid: false,
+      error: `Insufficient resources: need ${cost}, have ${availableResources}`,
+    };
+  }
+
+  // Check fleet supply for new ships
+  const newShips = action.units
+    .filter(u => countsTowardsFleetSupply(u.type))
+    .reduce((sum, u) => sum + u.count, 0);
+  const currentFleetSupply = countFleetSupplyUnits(tile.units, action.playerId);
+  const maxFleetSupply = calculateFleetSupply(player);
+
+  if (currentFleetSupply + newShips > maxFleetSupply) {
+    return {
+      valid: false,
+      error: `Fleet supply exceeded: ${currentFleetSupply + newShips}/${maxFleetSupply}`,
+    };
+  }
+
+  // Check capacity for fighters and ground units
+  const newFightersAndGround = action.units
+    .filter(u => u.type === 'fighter' || isGroundUnit(u.type))
+    .reduce((sum, u) => sum + u.count, 0);
+
+  // Add capacity from newly produced carriers
+  let newCapacity = 0;
+  for (const prod of action.units) {
+    if (['carrier', 'dreadnought', 'war_sun', 'flagship', 'cruiser'].includes(prod.type)) {
+      newCapacity += getUnitCapacity(prod.type, player) * prod.count;
     }
   }
-  return null;
+
+  const existingCapacity = calculateCapacityInSystem(tile, player);
+  const existingNeedingCapacity = tile.units.filter(u =>
+    u.ownerId === action.playerId &&
+    (u.type === 'fighter' || (isGroundUnit(u.type) && !u.planetId))
+  ).length;
+
+  const totalCapacity = existingCapacity + newCapacity;
+  const totalNeeding = existingNeedingCapacity + newFightersAndGround;
+
+  if (totalNeeding > totalCapacity) {
+    return {
+      valid: false,
+      error: `Insufficient capacity for produced units: ${totalNeeding}/${totalCapacity}`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate skip_production action
+ */
+export function validateSkipProduction(
+  state: GameState,
+  action: SkipProductionAction
+): ValidationResult {
+  if (state.subPhase !== 'tactical_production') {
+    return { valid: false, error: 'Can only skip production during tactical production phase' };
+  }
+
+  if (state.activePlayerId !== action.playerId) {
+    return { valid: false, error: 'Not your turn' };
+  }
+
+  return { valid: true };
 }

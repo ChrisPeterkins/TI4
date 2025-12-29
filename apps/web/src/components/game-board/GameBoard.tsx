@@ -13,13 +13,78 @@ interface GameBoardProps {
   gameState: GameState;
   onTileClick?: (tile: MapTile) => void;
   onTileHover?: (tile: MapTile | null) => void;
+  highlightedTiles?: { q: number; r: number }[];
   className?: string;
+}
+
+/**
+ * Direct render function that doesn't depend on React state
+ */
+function renderTilesDirectly(
+  map: MapState,
+  boardContainer: Container,
+  hexConfig: HexConfig,
+  playerColors: Map<string, PlayerColor>,
+  players: GameState['players']
+): void {
+  // Clear existing children
+  boardContainer.removeChildren();
+
+  // Create tiles
+  map.tiles.forEach((tile) => {
+    const system = systems[tile.systemId];
+    const systemType = system?.type ?? 'blue';
+
+    // Find owner color for home systems
+    let ownerColor: string | undefined;
+    if (systemType === 'home') {
+      const owner = players.find(p => {
+        const playerFactionHome = systems[tile.systemId]?.factionId;
+        return playerFactionHome === p.faction;
+      });
+      ownerColor = owner?.color;
+    }
+
+    // Get preloaded texture
+    const texture = getTileTexture(tile.systemId);
+
+    const hexTile = new HexTileSprite({
+      tile,
+      config: hexConfig,
+      systemType: systemType as 'home' | 'blue' | 'red' | 'mecatol' | 'hyperlane',
+      ownerColor: ownerColor as PlayerColor | undefined,
+      playerColors,
+      texture,
+    });
+
+    boardContainer.addChild(hexTile);
+  });
+}
+
+/**
+ * Direct center function that doesn't depend on React state
+ */
+function centerBoardDirectly(
+  app: Application,
+  boardContainer: Container,
+  tiles: MapState['tiles'],
+  hexConfig: HexConfig
+): void {
+  if (!tiles.length) return;
+
+  const positions = tiles.map(t => t.position);
+  const bounds = getHexBounds(positions, hexConfig);
+
+  const newX = app.screen.width / 2 - (bounds.minX + bounds.width / 2);
+  const newY = app.screen.height / 2 - (bounds.minY + bounds.height / 2);
+
+  boardContainer.position.set(newX, newY);
 }
 
 /**
  * Main game board component using Pixi.js
  */
-export function GameBoard({ gameState, onTileClick, onTileHover, className }: GameBoardProps) {
+export function GameBoard({ gameState, onTileClick, onTileHover, highlightedTiles, className }: GameBoardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
   const boardContainerRef = useRef<Container | null>(null);
@@ -57,7 +122,7 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
         setTexturesLoaded(true);
         setLoadingProgress('');
       } catch (error) {
-        console.error('Failed to load some textures:', error);
+        console.error('[GameBoard] Failed to load textures:', error);
         // Continue anyway - we have fallback rendering
         setTexturesLoaded(true);
         setLoadingProgress('');
@@ -72,18 +137,23 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
     if (!containerRef.current || appRef.current) return;
 
     const initPixi = async () => {
+      console.log('[GameBoard] initPixi starting...');
+      const container = containerRef.current!;
+      console.log('[GameBoard] Container size:', container.clientWidth, 'x', container.clientHeight);
+
       const app = new Application();
 
       await app.init({
         background: '#0a0a0a',
-        resizeTo: containerRef.current!,
+        resizeTo: container,
         antialias: true,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
       });
 
-      containerRef.current!.appendChild(app.canvas);
+      container.appendChild(app.canvas);
       appRef.current = app;
+      console.log('[GameBoard] Pixi app created, screen:', app.screen.width, 'x', app.screen.height);
 
       // Create main board container
       const boardContainer = new Container();
@@ -98,6 +168,22 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
       setupPanZoom(app, boardContainer);
 
       setIsReady(true);
+
+      // Wait for textures and render directly (avoids race condition with React effects)
+      const waitAndRender = async () => {
+        // Wait for textures to be ready (check every 100ms, max 5 seconds)
+        for (let i = 0; i < 50; i++) {
+          const systemIds = gameState.map.tiles.map(t => t.systemId);
+          const allCached = systemIds.every(id => getTileTexture(id) !== undefined);
+          if (allCached) {
+            renderTilesDirectly(gameState.map, boardContainer, hexConfig, playerColors, gameState.players);
+            centerBoardDirectly(app, boardContainer, gameState.map.tiles, hexConfig);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      };
+      waitAndRender();
     };
 
     initPixi();
@@ -110,21 +196,46 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
     };
   }, []);
 
-  // Render tiles when ready and textures are loaded
+  // Re-render tiles when game state changes (after initial render from Pixi init)
   useEffect(() => {
-    if (!isReady || !texturesLoaded || !boardContainerRef.current || !appRef.current) return;
+    if (!isReady || !texturesLoaded || !boardContainerRef.current || !appRef.current) {
+      return;
+    }
 
+    // Re-render tiles (initial render is handled in Pixi init)
     renderTiles(gameState.map);
     centerBoard();
-  }, [isReady, texturesLoaded, gameState.map]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.map]);
+
+  // Apply highlighting to tiles
+  useEffect(() => {
+    // Clear all existing highlights first
+    tilesRef.current.forEach(tile => tile.clearHighlight());
+
+    // Apply new highlights
+    if (highlightedTiles && highlightedTiles.length > 0) {
+      const highlightColor = 0x00ff00; // Green highlight for valid tiles
+      highlightedTiles.forEach(pos => {
+        const key = `${pos.q},${pos.r}`;
+        const tile = tilesRef.current.get(key);
+        tile?.highlight(highlightColor);
+      });
+    }
+  }, [highlightedTiles]);
 
   /**
    * Render all map tiles
    */
   const renderTiles = useCallback((map: MapState) => {
-    if (!boardContainerRef.current) return;
+    console.log('[GameBoard] renderTiles called with', map.tiles.length, 'tiles');
+    if (!boardContainerRef.current) {
+      console.log('[GameBoard] ERROR: No board container!');
+      return;
+    }
 
     const boardContainer = boardContainerRef.current;
+    console.log('[GameBoard] Board container parent:', boardContainer.parent ? 'has parent' : 'NO PARENT');
 
     // Clear existing tiles
     tilesRef.current.forEach(tile => tile.destroy());
@@ -132,7 +243,8 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
     boardContainer.removeChildren();
 
     // Create tiles
-    map.tiles.forEach(tile => {
+    let createdCount = 0;
+    map.tiles.forEach((tile) => {
       const system = systems[tile.systemId];
       const systemType = system?.type ?? 'blue';
 
@@ -167,7 +279,9 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
 
       boardContainer.addChild(hexTile);
       tilesRef.current.set(`${tile.position.q},${tile.position.r}`, hexTile);
+      createdCount++;
     });
+    console.log('[GameBoard] Created', createdCount, 'tiles, boardContainer.children:', boardContainer.children.length);
   }, [gameState.players, hexConfig, playerColors, onTileClick, onTileHover]);
 
   /**
@@ -183,11 +297,15 @@ export function GameBoard({ gameState, onTileClick, onTileHover, className }: Ga
     const positions = gameState.map.tiles.map(t => t.position);
     const bounds = getHexBounds(positions, hexConfig);
 
+    console.log('[GameBoard] centerBoard - bounds:', bounds);
+    console.log('[GameBoard] centerBoard - screen:', app.screen.width, 'x', app.screen.height);
+
     // Center the board
-    boardContainer.position.set(
-      app.screen.width / 2 - (bounds.minX + bounds.width / 2),
-      app.screen.height / 2 - (bounds.minY + bounds.height / 2)
-    );
+    const newX = app.screen.width / 2 - (bounds.minX + bounds.width / 2);
+    const newY = app.screen.height / 2 - (bounds.minY + bounds.height / 2);
+
+    console.log('[GameBoard] centerBoard - positioning at:', newX, newY);
+    boardContainer.position.set(newX, newY);
   }, [gameState.map.tiles, hexConfig]);
 
   /**

@@ -1,18 +1,48 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/stores/game-store';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { GameBoard } from '@/components/game-board';
+import dynamic from 'next/dynamic';
 import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel } from '@/components/game';
-import type { PickStrategyCardAction, PassAction, StrategicAction } from '@ti4/shared';
+import type { UnitMoveSelection } from '@/components/game';
+
+// Dynamically import 3D board to avoid SSR issues with Three.js
+const GameBoard3D = dynamic(
+  () => import('@/components/game-board-3d').then(mod => mod.GameBoard3D),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full flex items-center justify-center bg-gray-900">
+        <div className="text-white">Loading 3D board...</div>
+      </div>
+    ),
+  }
+);
+import type {
+  PickStrategyCardAction,
+  PassAction,
+  StrategicAction,
+  TacticalAction,
+  MoveUnitsAction,
+  SkipMovementAction,
+  ProduceUnitsAction,
+  SkipProductionAction,
+  MapTile,
+  HexCoord,
+  UnitType,
+} from '@ti4/shared';
+
+type TacticalUIState = 'idle' | 'selecting_system';
 
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const { isConnected: socketConnected, isLoading: socketLoading } = useSocket();
   const {
@@ -31,6 +61,13 @@ export default function GamePage() {
   const urlGameId = params.gameId as string;
   const currentUserId = session?.user?.id;
 
+  // 3D mode toggle (via URL param ?3d=true)
+  const [use3D, setUse3D] = useState(() => searchParams.get('3d') === 'true');
+
+  // UI state for tactical action flow
+  const [tacticalUIState, setTacticalUIState] = useState<TacticalUIState>('idle');
+  const [highlightedTiles, setHighlightedTiles] = useState<HexCoord[]>([]);
+
   // Join game when connected
   useEffect(() => {
     if (socketConnected && !gameId && urlGameId) {
@@ -44,6 +81,26 @@ export default function GamePage() {
       leaveGame();
     };
   }, [leaveGame]);
+
+  // Reset tactical UI state when sub-phase changes
+  useEffect(() => {
+    if (gameState?.subPhase !== 'awaiting_action') {
+      setTacticalUIState('idle');
+      setHighlightedTiles([]);
+    }
+  }, [gameState?.subPhase]);
+
+  // Get valid tiles for activation (have tactics token, not already activated)
+  const getValidActivationTiles = useCallback((): HexCoord[] => {
+    if (!gameState || !currentPlayerId) return [];
+
+    return gameState.map.tiles
+      .filter(tile => {
+        // Cannot activate a system that already has your command token
+        return !tile.commandTokens.includes(currentPlayerId);
+      })
+      .map(tile => tile.position);
+  }, [gameState, currentPlayerId]);
 
   if (socketLoading || isLoading) {
     return (
@@ -99,10 +156,36 @@ export default function GamePage() {
     } as Omit<PickStrategyCardAction, 'playerId' | 'timestamp'>);
   };
 
-  // Handle tactical action - for now just shows we need to implement system activation
+  // Handle tactical action - enter system selection mode
   const handleTacticalAction = () => {
-    // TODO: Open system selection modal
-    console.log('Tactical action clicked - system selection coming soon');
+    if (!currentPlayer || currentPlayer.commandTokens.tactics < 1) return;
+
+    setTacticalUIState('selecting_system');
+    setHighlightedTiles(getValidActivationTiles());
+  };
+
+  // Handle tile click - for system activation during tactical action
+  const handleTileClick = (tile: MapTile) => {
+    if (tacticalUIState === 'selecting_system' && currentPlayerId) {
+      // Check if this tile can be activated
+      if (!tile.commandTokens.includes(currentPlayerId)) {
+        // Send tactical action
+        sendAction({
+          type: 'tactical_action',
+          systemPosition: tile.position,
+        } as Omit<TacticalAction, 'playerId' | 'timestamp'>);
+
+        // Reset UI state
+        setTacticalUIState('idle');
+        setHighlightedTiles([]);
+      }
+    }
+  };
+
+  // Handle cancel system selection
+  const handleCancelSelection = () => {
+    setTacticalUIState('idle');
+    setHighlightedTiles([]);
   };
 
   // Handle strategic action
@@ -119,6 +202,44 @@ export default function GamePage() {
     sendAction({
       type: 'pass',
     } as Omit<PassAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle move units
+  const handleMoveUnits = (moves: UnitMoveSelection[]) => {
+    sendAction({
+      type: 'move_units',
+      moves: moves.map(m => ({
+        unitId: m.unitId,
+        from: m.from,
+        to: m.to,
+        carrier: m.carrier,
+      })),
+    } as Omit<MoveUnitsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle skip movement
+  const handleSkipMovement = () => {
+    sendAction({
+      type: 'skip_movement',
+    } as Omit<SkipMovementAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle produce units
+  const handleProduceUnits = (units: { type: UnitType; count: number }[]) => {
+    if (!gameState.activatedSystem) return;
+
+    sendAction({
+      type: 'produce_units',
+      systemPosition: gameState.activatedSystem,
+      units,
+    } as Omit<ProduceUnitsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle skip production
+  const handleSkipProduction = () => {
+    sendAction({
+      type: 'skip_production',
+    } as Omit<SkipProductionAction, 'playerId' | 'timestamp'>);
   };
 
   // Handle score objective
@@ -147,6 +268,18 @@ export default function GamePage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* 2D/3D Toggle */}
+            <button
+              onClick={() => setUse3D(!use3D)}
+              className={`px-3 py-1 text-sm rounded transition-colors ${
+                use3D
+                  ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50'
+                  : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              {use3D ? '3D' : '2D'}
+            </button>
+
             {/* Connection Status */}
             <div className="flex items-center gap-2">
               <div
@@ -174,10 +307,10 @@ export default function GamePage() {
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="pt-12 pb-16 flex">
+      {/* Main Layout - use fixed positioning for reliable centering */}
+      <div className="fixed inset-0 top-12 bottom-16 flex">
         {/* Left Sidebar - Player Dashboard */}
-        <aside className="fixed left-0 top-12 bottom-16 w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4">
+        <aside className="w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4 flex-shrink-0">
           {currentPlayer && (
             <PlayerDashboard
               player={currentPlayer}
@@ -186,9 +319,39 @@ export default function GamePage() {
           )}
         </aside>
 
-        {/* Game Board - centered */}
-        <main className="ml-72 flex-1">
-          <GameBoard gameState={gameState} />
+        {/* Game Board - fills remaining space */}
+        <main className="flex-1 overflow-hidden relative">
+          {use3D ? (
+            <GameBoard3D
+              gameState={gameState}
+              onTileClick={handleTileClick}
+              highlightedTiles={highlightedTiles}
+            />
+          ) : (
+            <GameBoard
+              gameState={gameState}
+              onTileClick={handleTileClick}
+              highlightedTiles={highlightedTiles}
+            />
+          )}
+
+          {/* System Selection Overlay */}
+          {tacticalUIState === 'selecting_system' && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+              <div className="bg-green-800/90 backdrop-blur rounded-lg px-6 py-3 shadow-xl border border-green-500/50">
+                <div className="text-center">
+                  <p className="text-green-100 font-medium">Select a system to activate</p>
+                  <p className="text-green-300/70 text-sm mt-1">Click a system on the map</p>
+                </div>
+                <button
+                  onClick={handleCancelSelection}
+                  className="mt-3 w-full px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
@@ -202,7 +365,7 @@ export default function GamePage() {
       )}
 
       {/* Action Phase Panel */}
-      {gameState.phase === 'action' && (
+      {gameState.phase === 'action' && tacticalUIState === 'idle' && (
         <ActionPhasePanel
           gameState={gameState}
           currentPlayer={currentPlayer}
@@ -210,6 +373,10 @@ export default function GamePage() {
           onTacticalAction={handleTacticalAction}
           onStrategicAction={handleStrategicAction}
           onPass={handlePass}
+          onMoveUnits={handleMoveUnits}
+          onSkipMovement={handleSkipMovement}
+          onProduceUnits={handleProduceUnits}
+          onSkipProduction={handleSkipProduction}
         />
       )}
 

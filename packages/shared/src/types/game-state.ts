@@ -55,6 +55,8 @@ export interface GameState {
   activeCombat: CombatInstance | null;
   timingWindows: TimingWindow[];
   winner: UUID | null;
+  // Tactical action tracking
+  activatedSystem?: HexCoord;
 }
 
 // Player State

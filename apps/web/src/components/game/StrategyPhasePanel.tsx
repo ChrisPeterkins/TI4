@@ -4,24 +4,13 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { strategyCards } from '@ti4/game-data';
 import type { GameState, StrategyCardState } from '@ti4/shared';
+import { getStrategyCardUrl } from '@/lib/assets';
 
 interface StrategyPhasePanelProps {
   gameState: GameState;
   currentPlayerId: string | null;
   onPickCard: (cardNumber: number) => void;
 }
-
-// Map card numbers to image filenames
-const CARD_IMAGES: Record<number, string> = {
-  1: '/images/strategy-cards/leadership.png',
-  2: '/images/strategy-cards/diplomacy.png',
-  3: '/images/strategy-cards/politics.png',
-  4: '/images/strategy-cards/construction.png',
-  5: '/images/strategy-cards/trade.png',
-  6: '/images/strategy-cards/warfare.png',
-  7: '/images/strategy-cards/technology.png',
-  8: '/images/strategy-cards/imperial.png',
-};
 
 // Card colors for fallback styling
 const CARD_COLORS: Record<number, { bg: string; border: string; glow: string }> = {
@@ -121,9 +110,9 @@ export function StrategyPhasePanel({
       {/* Main content area */}
       <div className="relative flex items-center justify-center w-full h-full">
         {/* Ring of Strategy Cards */}
-        <div className="relative" style={{ width: '800px', height: '800px' }}>
+        <div className="relative" style={{ width: '1000px', height: '1000px' }}>
           {/* Center display for selected/hovered card details */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-72 text-center z-20">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-80 text-center z-20">
             {displayCard ? (
               <div className={`bg-gradient-to-br ${CARD_COLORS[displayCard.number].bg} rounded-xl p-5 border-2 ${CARD_COLORS[displayCard.number].border} shadow-2xl`}>
                 <div className="text-sm text-white/70 mb-1">#{displayCard.number}</div>
@@ -149,7 +138,7 @@ export function StrategyPhasePanel({
 
           {/* Cards arranged in a ring */}
           {cards.map((cardData, index) => {
-            const position = getCardPosition(index, cards.length, 320);
+            const position = getCardPosition(index, cards.length, 400);
             const cardState = gameState.strategyCards.find(c => c.number === cardData.number);
             const isAvailable = cardState ? isCardAvailable(cardState) : true;
             const pickedBy = getCardOwner(cardData.number);
@@ -181,24 +170,24 @@ export function StrategyPhasePanel({
                 style={{
                   left: `calc(50% + ${position.x}px)`,
                   top: `calc(50% + ${position.y}px)`,
-                  width: '120px',
-                  height: '180px',
+                  width: '160px',
+                  height: '240px',
                 }}
               >
                 {/* Card Image */}
                 <div className="relative w-full h-full">
                   <Image
-                    src={CARD_IMAGES[cardData.number]}
+                    src={getStrategyCardUrl(cardData.number)}
                     alt={cardData.name}
                     fill
                     className="object-cover"
-                    sizes="120px"
+                    sizes="160px"
                     priority
                   />
 
                   {/* Card Number Badge */}
-                  <div className="absolute top-1 left-1 w-7 h-7 rounded-full bg-black/80 border border-white/30 flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">{cardData.number}</span>
+                  <div className="absolute top-2 left-2 w-8 h-8 rounded-full bg-black/80 border border-white/30 flex items-center justify-center">
+                    <span className="text-sm font-bold text-white">{cardData.number}</span>
                   </div>
 
                   {/* Picked Overlay */}

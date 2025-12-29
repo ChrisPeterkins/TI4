@@ -575,11 +575,13 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
         const draftPlayerId = `player_${i}`;
         const lobbyPlayer = lobby.players[i];
         playerIds.push(draftPlayerId);
-        playerMapping.set(draftPlayerId, lobbyPlayer.id);
+        // Use userId for human players (for session matching), id for bots (for DB operations)
+        playerMapping.set(draftPlayerId, lobbyPlayer.userId || lobbyPlayer.id);
 
         // Store full player info for client display
+        // Use userId for human players (for frontend currentUserId matching), id for bots
         playerInfoMapping[draftPlayerId] = {
-          id: lobbyPlayer.id,
+          id: lobbyPlayer.userId || lobbyPlayer.id,
           name: lobbyPlayer.name,
           isBot: lobbyPlayer.isBot ?? false,
         };

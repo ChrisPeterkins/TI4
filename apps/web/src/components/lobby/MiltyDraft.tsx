@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { factions, systems } from '@ti4/game-data';
 import type { MiltyDraftState, MiltySlice, LobbyPlayer, DraftPlayerInfo } from '@ti4/shared';
+import { getFactionIconUrl } from '@/lib/assets';
 
 interface MiltyDraftProps {
   draftState: MiltyDraftState;
@@ -15,9 +16,10 @@ interface MiltyDraftProps {
 
 /**
  * Get the tile image path for a system ID
+ * Uses the tiles from KeeganW/ti4 (webp format)
  */
 function getTileImagePath(systemId: number): string {
-  return `/assets/tiles/ST_${systemId}.webp`;
+  return `/images/tiles/ST_${systemId}.webp`;
 }
 
 /**
@@ -426,9 +428,22 @@ export default function MiltyDraft({ draftState, players, currentUserId, playerM
                     }`}
                     onClick={() => canPick && handlePick('faction', factionId)}
                   >
-                    <div className="font-medium text-sm">{faction?.name || factionId}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 relative flex-shrink-0">
+                        <Image
+                          src={getFactionIconUrl(factionId)}
+                          alt={faction?.name || factionId}
+                          fill
+                          className="object-contain"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <div className="font-medium text-sm">{faction?.name || factionId}</div>
+                    </div>
                     {isPicked && (
-                      <div className="mt-1 text-xs text-gray-500">
+                      <div className="mt-1 text-xs text-gray-500 pl-10">
                         Picked by {getPlayerName(
                           draftState.picks.find(p => p.pickType === 'faction' && p.value === factionId)?.playerId || ''
                         )}

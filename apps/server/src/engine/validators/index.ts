@@ -1,7 +1,15 @@
 import type { GameState, GameAction } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
-import { validatePass, validateTacticalAction, validateStrategicAction } from './action-phase.js';
+import {
+  validatePass,
+  validateTacticalAction,
+  validateStrategicAction,
+  validateMoveUnits,
+  validateSkipMovement,
+  validateProduceUnits,
+  validateSkipProduction,
+} from './action-phase.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -27,6 +35,19 @@ export function validateAction(state: GameState, action: GameAction): Validation
 
     case 'strategic_action':
       return validateStrategicAction(state, action);
+
+    // Tactical Sub-phases
+    case 'move_units':
+      return validateMoveUnits(state, action);
+
+    case 'skip_movement':
+      return validateSkipMovement(state, action);
+
+    case 'produce_units':
+      return validateProduceUnits(state, action);
+
+    case 'skip_production':
+      return validateSkipProduction(state, action);
 
     // Combat
     case 'assign_hits':

@@ -23,19 +23,20 @@ let texturesLoaded = false;
 
 /**
  * Unit type to filename mapping
+ * Files are in /images/units/ with lowercase names
  */
 const UNIT_FILENAMES: Record<UnitType, string> = {
-  fighter: 'Fighter_Plastic.png',
-  infantry: 'Infantry_Plastic.png',
-  mech: 'Mech_Plastic.png',
-  destroyer: 'Destroyer_Plastic.png',
-  carrier: 'Carrier_Plastic.png',
-  cruiser: 'Cruiser_Plastic.png',
-  dreadnought: 'Dreadnought_Plastic.png',
-  war_sun: 'War_Sun_Plastic.png',
-  flagship: 'Flagship_Plastic.png',
-  pds: 'PDS_Plastic.png',
-  space_dock: 'Space_Dock_Plastic.png',
+  fighter: 'fighter.png',
+  infantry: 'infantry.png',
+  mech: 'infantry.png', // Fallback - no mech image yet
+  destroyer: 'destroyer.png',
+  carrier: 'carrier.png',
+  cruiser: 'cruiser.png',
+  dreadnought: 'dreadnought.png',
+  war_sun: 'warsun.png',
+  flagship: 'flagship.png',
+  pds: 'pds.png',
+  space_dock: 'spacedock.png',
 };
 
 /**
@@ -92,30 +93,33 @@ export interface UnitGroup {
 
 /**
  * Load all unit textures
+ * Uses simple individual asset loading to avoid bundle registration issues
  */
 export async function loadUnitTextures(): Promise<void> {
   if (texturesLoaded) return;
 
   const { Assets } = await import('pixi.js');
 
-  const urls: Record<string, string> = {};
-  for (const [type, filename] of Object.entries(UNIT_FILENAMES)) {
-    urls[type] = `/assets/units/${filename}`;
-  }
+  console.log('[UnitRenderer] Loading unit textures...');
 
-  try {
-    Assets.addBundle('units', urls);
-    const textures = await Assets.loadBundle('units');
-
-    for (const [type, texture] of Object.entries(textures)) {
-      unitTextureCache.set(type as UnitType, texture as Texture);
+  const loadPromises = Object.entries(UNIT_FILENAMES).map(async ([type, filename]) => {
+    const url = `/images/units/${filename}`;
+    try {
+      const texture = await Assets.load<Texture>(url);
+      unitTextureCache.set(type as UnitType, texture);
+      return { type, success: true };
+    } catch (error) {
+      console.warn(`[UnitRenderer] Failed to load ${type}:`, error);
+      return { type, success: false };
     }
+  });
 
-    texturesLoaded = true;
-    console.log('Unit textures loaded successfully');
-  } catch (error) {
-    console.warn('Failed to load unit textures, using fallback shapes:', error);
-  }
+  const results = await Promise.all(loadPromises);
+  const loaded = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
+
+  texturesLoaded = true;
+  console.log(`[UnitRenderer] Unit textures loaded: ${loaded} success, ${failed} failed`);
 }
 
 /**

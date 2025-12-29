@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { strategyCards } from '@ti4/game-data';
-import type { GameState, PlayerState } from '@ti4/shared';
+import type { GameState, PlayerState, HexCoord, UnitType } from '@ti4/shared';
+import { MovementPanel, type UnitMoveSelection } from './MovementPanel';
+import { ProductionPanel } from './ProductionPanel';
 
 interface ActionPhasePanelProps {
   gameState: GameState;
@@ -11,6 +13,10 @@ interface ActionPhasePanelProps {
   onTacticalAction: () => void;
   onStrategicAction: () => void;
   onPass: () => void;
+  onMoveUnits: (moves: UnitMoveSelection[]) => void;
+  onSkipMovement: () => void;
+  onProduceUnits: (units: { type: UnitType; count: number }[]) => void;
+  onSkipProduction: () => void;
 }
 
 export function ActionPhasePanel({
@@ -20,14 +26,69 @@ export function ActionPhasePanel({
   onTacticalAction,
   onStrategicAction,
   onPass,
+  onMoveUnits,
+  onSkipMovement,
+  onProduceUnits,
+  onSkipProduction,
 }: ActionPhasePanelProps) {
   const activePlayer = gameState.players.find((p) => p.id === gameState.activePlayerId);
+  const subPhase = gameState.subPhase;
 
   // Check if current player can use their strategy card
   const canUseStrategyCard = currentPlayer?.strategyCard && !isStrategyCardExhausted(gameState, currentPlayer.strategyCard);
 
   // Check if current player has passed
   const hasPassed = currentPlayer?.passed || false;
+
+  // Render movement panel during tactical_movement sub-phase
+  if (subPhase === 'tactical_movement' && isMyTurn && currentPlayer) {
+    return (
+      <MovementPanel
+        gameState={gameState}
+        currentPlayer={currentPlayer}
+        onMoveUnits={onMoveUnits}
+        onSkipMovement={onSkipMovement}
+      />
+    );
+  }
+
+  // Render production panel during tactical_production sub-phase
+  if (subPhase === 'tactical_production' && isMyTurn && currentPlayer) {
+    return (
+      <ProductionPanel
+        gameState={gameState}
+        currentPlayer={currentPlayer}
+        onProduceUnits={onProduceUnits}
+        onSkipProduction={onSkipProduction}
+      />
+    );
+  }
+
+  // Waiting message during sub-phases when not my turn
+  if (subPhase && subPhase !== 'awaiting_action') {
+    const subPhaseNames: Record<string, string> = {
+      tactical_movement: 'movement',
+      tactical_production: 'production',
+      tactical_space_combat: 'space combat',
+      tactical_invasion: 'invasion',
+      strategic_primary: 'strategic action',
+      strategic_secondary: 'secondary ability',
+    };
+
+    return (
+      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-20">
+        <div className="bg-gray-800 rounded-lg border border-gray-700 px-6 py-3 shadow-xl">
+          <div className="text-center">
+            <span className="text-gray-400">Waiting for </span>
+            <span className="text-yellow-400 font-bold">{activePlayer?.name}</span>
+            <span className="text-gray-400"> to complete </span>
+            <span className="text-blue-400">{subPhaseNames[subPhase] || subPhase}</span>
+            <span className="text-gray-400">...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isMyTurn) {
     return (
@@ -67,14 +128,23 @@ export function ActionPhasePanel({
           {/* Tactical Action */}
           <button
             onClick={onTacticalAction}
-            className="group flex flex-col items-center gap-2 px-6 py-4 bg-green-600/20 border border-green-500/50 rounded-lg hover:bg-green-600/30 hover:border-green-400 transition-all"
+            disabled={!currentPlayer || currentPlayer.commandTokens.tactics < 1}
+            className={`group flex flex-col items-center gap-2 px-6 py-4 rounded-lg transition-all ${
+              currentPlayer && currentPlayer.commandTokens.tactics >= 1
+                ? 'bg-green-600/20 border border-green-500/50 hover:bg-green-600/30 hover:border-green-400'
+                : 'bg-gray-700/50 border border-gray-600 opacity-50 cursor-not-allowed'
+            }`}
           >
-            <div className="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              currentPlayer && currentPlayer.commandTokens.tactics >= 1 ? 'bg-green-600' : 'bg-gray-600'
+            }`}>
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <span className="text-green-400 font-medium">Tactical</span>
+            <span className={`font-medium ${
+              currentPlayer && currentPlayer.commandTokens.tactics >= 1 ? 'text-green-400' : 'text-gray-500'
+            }`}>Tactical</span>
             <span className="text-xs text-gray-500">Activate a system</span>
           </button>
 
