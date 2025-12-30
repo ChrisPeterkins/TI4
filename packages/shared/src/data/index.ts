@@ -2,3 +2,4 @@
 export * from './objectives.js';
 export * from './agendas.js';
 export * from './action-cards.js';
+export * from './promissory-notes.js';

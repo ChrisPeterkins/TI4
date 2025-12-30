@@ -70,6 +70,11 @@ export interface ServerToClientEvents {
   action_cards_drawn: (data: ActionCardsDrawnEvent) => void;
   action_cards_discarded: (data: ActionCardsDiscardedEvent) => void;
 
+  // Transactions
+  transaction_proposed: (data: TransactionProposedEvent) => void;
+  transaction_accepted: (data: TransactionAcceptedEvent) => void;
+  transaction_declined: (data: TransactionDeclinedEvent) => void;
+
   // Chat
   chat_message: (data: ChatMessageEvent) => void;
 
@@ -264,6 +269,24 @@ export interface ActionCardsDrawnEvent {
 export interface ActionCardsDiscardedEvent {
   playerId: UUID;
   discardedCount: number;
+}
+
+export interface TransactionProposedEvent {
+  transactionId: string;
+  initiatorId: UUID;
+  targetId: UUID;
+}
+
+export interface TransactionAcceptedEvent {
+  transactionId: string;
+  initiatorId: UUID;
+  targetId: UUID;
+}
+
+export interface TransactionDeclinedEvent {
+  transactionId: string;
+  initiatorId: UUID;
+  targetId: UUID;
 }
 
 export interface ChatMessageEvent {

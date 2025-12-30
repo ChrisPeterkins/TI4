@@ -2,10 +2,12 @@ import type {
   GameState,
   CastVoteAction,
   SpeakerTiebreakAction,
+  PlayRiderAction,
   AgendaPhaseState,
   UUID,
+  RiderRecord,
 } from '@ti4/shared';
-import { AGENDAS_BY_ID } from '@ti4/shared';
+import { AGENDAS_BY_ID, ACTION_CARDS_BY_ID, isRiderCard } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import {
   calculateVotingOrder,
@@ -14,6 +16,9 @@ import {
   determineWinner,
   getValidOutcomes,
 } from '../utils/agenda.js';
+import { checkTimingTrigger } from './timing-windows.js';
+import { removeCard, hasCard, discardCards } from '../utils/deck.js';
+import { handleDrawActionCards } from './action-cards.js';
 
 // =============================================================================
 // INITIALIZATION
@@ -101,13 +106,58 @@ export function handleRevealAgenda(
   state.agendaPhase.electedPlayer = null;
   state.agendaPhase.electedPlanet = null;
 
-  // MVP: Skip timing windows (when_revealed, after_revealed)
-  // Advance directly to voting
-  advanceToVoting(state);
+  // Update step to "when revealed"
+  state.agendaPhase.currentStep = 'when_revealed';
+  state.subPhase = 'when_revealed';
+
+  // Trigger timing window for "when agenda revealed"
+  const triggeredEvents: string[] = ['agenda_revealed'];
+  const data: Record<string, unknown> = {
+    agendaId,
+    agendaType: agenda.type,
+    electionType: agenda.electionType,
+  };
+
+  const whenRevealedResult = checkTimingTrigger(state, 'agenda_revealed', {
+    agendaId,
+    additionalData: {
+      agendaType: agenda.type,
+      electionType: agenda.electionType,
+    },
+  });
+
+  if (whenRevealedResult.triggeredEvents?.includes('timing_window_opened')) {
+    triggeredEvents.push('timing_window_opened');
+    if (whenRevealedResult.data) {
+      data.timingWindow = whenRevealedResult.data;
+    }
+  } else {
+    // No one can respond to when_revealed, move to after_revealed
+    const afterRevealedResult = checkTimingTrigger(state, 'after_agenda_revealed', {
+      agendaId,
+      additionalData: {
+        agendaType: agenda.type,
+        electionType: agenda.electionType,
+      },
+    });
+
+    if (afterRevealedResult.triggeredEvents?.includes('timing_window_opened')) {
+      triggeredEvents.push('timing_window_opened');
+      state.agendaPhase.currentStep = 'after_revealed';
+      state.subPhase = 'after_revealed';
+      if (afterRevealedResult.data) {
+        data.timingWindow = afterRevealedResult.data;
+      }
+    } else {
+      // No one can respond to after_revealed either, advance to voting
+      advanceToVoting(state);
+    }
+  }
 
   return {
     success: true,
-    triggeredEvents: ['agenda_revealed'],
+    triggeredEvents,
+    data,
   };
 }
 
@@ -246,6 +296,86 @@ export function handleSpeakerTiebreak(
   };
 }
 
+/**
+ * Handle playing a rider card during agenda phase.
+ * Players can play riders after an agenda is revealed.
+ * They predict an outcome and cannot vote on this agenda.
+ */
+export function handlePlayRider(
+  state: GameState,
+  action: PlayRiderAction
+): HandlerResult {
+  if (!state.agendaPhase) {
+    return { success: false, error: 'Agenda phase not initialized' };
+  }
+
+  // Can only play riders during the "after_revealed" step
+  if (
+    state.agendaPhase.currentStep !== 'when_revealed' &&
+    state.agendaPhase.currentStep !== 'after_revealed'
+  ) {
+    return { success: false, error: 'Can only play riders after agenda is revealed' };
+  }
+
+  const player = state.players.find(p => p.id === action.playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Validate card is a rider
+  if (!isRiderCard(action.cardId)) {
+    return { success: false, error: 'Card is not a rider' };
+  }
+
+  // Check player has the card
+  if (!hasCard(player.actionCards, action.cardId)) {
+    return { success: false, error: 'Player does not have this card' };
+  }
+
+  // Validate prediction is a valid outcome for this agenda
+  const validOutcomes = getValidOutcomes(state, state.agendaPhase.currentElectionType);
+  if (!validOutcomes.includes(action.prediction)) {
+    return { success: false, error: `Invalid prediction: ${action.prediction}` };
+  }
+
+  // Check player hasn't already played a rider
+  const alreadyPlayed = state.agendaPhase.riders.some(
+    r => r.playerId === action.playerId && !r.resolved
+  );
+  if (alreadyPlayed) {
+    return { success: false, error: 'You have already played a rider on this agenda' };
+  }
+
+  // Remove card from player's hand
+  player.actionCards = removeCard(player.actionCards, action.cardId);
+
+  // Add to discard pile
+  state.actionCardDiscard = discardCards(state.actionCardDiscard, [action.cardId]);
+
+  // Record the rider
+  const riderRecord: RiderRecord = {
+    playerId: action.playerId,
+    cardId: action.cardId,
+    prediction: action.prediction,
+    resolved: false,
+    success: false,
+  };
+  state.agendaPhase.riders.push(riderRecord);
+
+  const cardData = ACTION_CARDS_BY_ID[action.cardId];
+
+  return {
+    success: true,
+    triggeredEvents: ['rider_played'],
+    data: {
+      playerId: action.playerId,
+      cardId: action.cardId,
+      cardName: cardData?.name || action.cardId,
+      prediction: action.prediction,
+    },
+  };
+}
+
 // =============================================================================
 // STEP TRANSITIONS
 // =============================================================================
@@ -253,6 +383,7 @@ export function handleSpeakerTiebreak(
 /**
  * Advance to voting step.
  * Sets first voter and updates state.
+ * Skips players who have played riders (they cannot vote).
  */
 function advanceToVoting(state: GameState): void {
   if (!state.agendaPhase) return;
@@ -261,17 +392,49 @@ function advanceToVoting(state: GameState): void {
   state.subPhase = 'voting';
   state.agendaPhase.currentVoterIndex = 0;
 
-  // Set first voter as active player
-  if (state.agendaPhase.votingOrder.length > 0) {
-    state.activePlayerId = state.agendaPhase.votingOrder[0];
+  // Get players who played riders - they automatically abstain
+  const riderPlayerIds = state.agendaPhase.riders.map(r => r.playerId);
+
+  // Mark rider players as having voted (abstained)
+  for (const playerId of riderPlayerIds) {
+    if (!state.agendaPhase.votingComplete.includes(playerId)) {
+      state.agendaPhase.votingComplete.push(playerId);
+      // Record as abstained due to rider
+      state.agendaPhase.votes[playerId] = {
+        outcome: '',
+        votes: 0,
+        extraVotes: 0,
+        abstained: true,
+        exhaustedPlanets: [],
+      };
+    }
+  }
+
+  // Find first voter who hasn't played a rider
+  while (state.agendaPhase.currentVoterIndex < state.agendaPhase.votingOrder.length) {
+    const voter = state.agendaPhase.votingOrder[state.agendaPhase.currentVoterIndex];
+    if (!riderPlayerIds.includes(voter)) {
+      state.activePlayerId = voter;
+      return;
+    }
+    state.agendaPhase.currentVoterIndex++;
+  }
+
+  // All players have riders or have voted - tally votes
+  if (state.agendaPhase.votingComplete.length >= state.agendaPhase.votingOrder.length) {
+    tallyAndResolve(state);
   }
 }
 
 /**
  * Advance voting to next player or tally votes.
+ * Skips players who played riders.
  */
 function advanceVoting(state: GameState): void {
   if (!state.agendaPhase) return;
+
+  // Get players who played riders - they cannot vote
+  const riderPlayerIds = state.agendaPhase.riders.map(r => r.playerId);
 
   // Check if all players have voted
   if (state.agendaPhase.votingComplete.length >= state.agendaPhase.votingOrder.length) {
@@ -283,10 +446,13 @@ function advanceVoting(state: GameState): void {
   // Move to next voter
   state.agendaPhase.currentVoterIndex++;
 
-  // Find next player who hasn't voted
+  // Find next player who hasn't voted and hasn't played a rider
   while (state.agendaPhase.currentVoterIndex < state.agendaPhase.votingOrder.length) {
     const nextVoter = state.agendaPhase.votingOrder[state.agendaPhase.currentVoterIndex];
-    if (!state.agendaPhase.votingComplete.includes(nextVoter)) {
+    if (
+      !state.agendaPhase.votingComplete.includes(nextVoter) &&
+      !riderPlayerIds.includes(nextVoter)
+    ) {
       state.activePlayerId = nextVoter;
       return;
     }
@@ -351,6 +517,9 @@ function advanceToResolveOutcome(state: GameState): void {
   // Apply the outcome
   applyAgendaOutcome(state);
 
+  // Resolve riders - check predictions and apply rewards
+  resolveRiders(state);
+
   // Move agenda to discard
   if (state.agendaPhase.currentAgendaId) {
     // Only discard directives - laws stay in play
@@ -361,6 +530,75 @@ function advanceToResolveOutcome(state: GameState): void {
 
   // Auto-advance to next agenda or complete phase
   advanceToNextAgenda(state);
+}
+
+/**
+ * Resolve all riders for the current agenda.
+ * Check predictions against outcome and apply rewards.
+ */
+function resolveRiders(state: GameState): void {
+  if (!state.agendaPhase) return;
+
+  const outcome = state.agendaPhase.electedOutcome;
+
+  for (const rider of state.agendaPhase.riders) {
+    if (rider.resolved) continue;
+
+    rider.resolved = true;
+    rider.success = rider.prediction === outcome;
+
+    if (!rider.success) continue;
+
+    // Apply rider reward based on card type
+    const player = state.players.find(p => p.id === rider.playerId);
+    if (!player) continue;
+
+    switch (rider.cardId) {
+      case 'imperial_rider':
+        // Gain 1 victory point
+        player.score += 1;
+        break;
+
+      case 'construction_rider':
+        // Place 1 PDS or 1 space dock on a planet you control
+        // Note: This requires player choice, so we mark it pending
+        // For now, we just flag it as successful - UI will handle choice
+        break;
+
+      case 'diplomacy_rider':
+        // Choose 1 system with your planet, other players place command token
+        // Requires player choice - UI will handle
+        break;
+
+      case 'leadership_rider':
+        // Gain 3 command tokens
+        player.commandTokens.tactics += 1;
+        player.commandTokens.fleet += 1;
+        player.commandTokens.strategy += 1;
+        break;
+
+      case 'politics_rider':
+        // Draw 3 action cards and become speaker
+        handleDrawActionCards(state, rider.playerId, 3);
+        state.speakerId = rider.playerId;
+        break;
+
+      case 'technology_rider':
+        // Research 1 technology
+        // Requires player choice - UI will handle
+        break;
+
+      case 'trade_rider':
+        // Gain 5 trade goods
+        player.tradeGoods += 5;
+        break;
+
+      case 'warfare_rider':
+        // Place 1 cruiser, 1 destroyer, 1 fighter in a system with your ships
+        // Requires player choice - UI will handle
+        break;
+    }
+  }
 }
 
 /**
@@ -417,6 +655,7 @@ function advanceToNextAgenda(state: GameState): void {
     state.agendaPhase.electedOutcome = null;
     state.agendaPhase.electedPlayer = null;
     state.agendaPhase.electedPlanet = null;
+    state.agendaPhase.riders = []; // Clear riders for next agenda
 
     // Speaker reveals next agenda
     state.activePlayerId = state.speakerId;

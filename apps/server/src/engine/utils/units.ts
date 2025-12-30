@@ -9,6 +9,15 @@ import type {
 } from '@ti4/shared';
 import { units, upgradedUnits } from '@ti4/game-data';
 import { systems } from '@ti4/game-data';
+import {
+  getEffectiveFleetLimit,
+  getEffectiveHandLimit,
+} from '../abilities/fleet-modifiers.js';
+import {
+  canProduceUnitType,
+  getSaarProductionCapacity,
+  isFloatingDock,
+} from '../abilities/production-modifiers.js';
 
 // Unit category types for easy categorization
 export type ShipType = 'fighter' | 'destroyer' | 'carrier' | 'cruiser' | 'dreadnought' | 'war_sun' | 'flagship';
@@ -113,9 +122,21 @@ export function getUnitCapacity(type: UnitType, player: PlayerState): number {
 
 /**
  * Calculate player's fleet supply (fleet tokens + 3)
+ * Basic version without faction abilities
  */
 export function calculateFleetSupply(player: PlayerState): number {
   return player.commandTokens.fleet + 3;
+}
+
+/**
+ * Calculate player's effective fleet limit with faction abilities
+ * (e.g., Letnev Armada +2)
+ */
+export function calculateFleetSupplyWithAbilities(
+  state: GameState,
+  playerId: string
+): number {
+  return getEffectiveFleetLimit(state, playerId);
 }
 
 /**
@@ -138,6 +159,22 @@ export function wouldViolateFleetSupply(
   const currentCount = countFleetSupplyUnits(tile.units, player.id);
   const newShipCount = additionalShips.filter(t => countsTowardsFleetSupply(t)).length;
   const fleetSupply = calculateFleetSupply(player);
+
+  return (currentCount + newShipCount) > fleetSupply;
+}
+
+/**
+ * Check if adding units would violate fleet supply (with faction abilities)
+ */
+export function wouldViolateFleetSupplyWithAbilities(
+  state: GameState,
+  playerId: string,
+  tile: MapTile,
+  additionalShips: UnitType[]
+): boolean {
+  const currentCount = countFleetSupplyUnits(tile.units, playerId);
+  const newShipCount = additionalShips.filter(t => countsTowardsFleetSupply(t)).length;
+  const fleetSupply = calculateFleetSupplyWithAbilities(state, playerId);
 
   return (currentCount + newShipCount) > fleetSupply;
 }
@@ -233,6 +270,53 @@ export function calculateProductionCapacity(
   }
 
   return totalProduction;
+}
+
+/**
+ * Calculate production capacity with faction abilities
+ * Handles special cases like Saar's Production 5 floating docks
+ */
+export function calculateProductionCapacityWithAbilities(
+  state: GameState,
+  tile: MapTile,
+  playerId: string
+): number {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return 0;
+
+  // Check if player has floating docks (Saar)
+  if (isFloatingDock(state, playerId)) {
+    return getSaarProductionCapacity(state, playerId, tile.id);
+  }
+
+  // Use standard calculation for non-Saar players
+  return calculateProductionCapacity(tile, player);
+}
+
+/**
+ * Check if a player can produce a specific unit type
+ * Accounts for faction restrictions (e.g., Arborec cannot produce infantry)
+ */
+export function canProduceUnit(
+  state: GameState,
+  playerId: string,
+  unitType: UnitType,
+  systemId?: string
+): boolean {
+  return canProduceUnitType(state, playerId, unitType, systemId);
+}
+
+/**
+ * Filter a list of units to only those the player can produce
+ * based on faction abilities
+ */
+export function filterProducibleUnits(
+  state: GameState,
+  playerId: string,
+  unitTypes: UnitType[],
+  systemId?: string
+): UnitType[] {
+  return unitTypes.filter(type => canProduceUnit(state, playerId, type, systemId));
 }
 
 /**

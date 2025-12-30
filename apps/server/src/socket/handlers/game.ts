@@ -355,6 +355,71 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
     }
   });
 
+  // Chat Message
+  socket.on('chat_message', async (data) => {
+    try {
+      const { gameId, message, targetPlayerId } = data;
+
+      // Get game player info
+      const gamePlayer = await gameRepo.getGamePlayer(gameId, userId);
+      if (!gamePlayer) {
+        socket.emit('error', {
+          code: 'UNAUTHORIZED',
+          message: 'You are not a player in this game',
+        });
+        return;
+      }
+
+      // Get the player name
+      const game = await gameRepo.getGame(gameId);
+      if (!game) {
+        socket.emit('error', {
+          code: 'GAME_NOT_FOUND',
+          message: 'Game not found',
+        });
+        return;
+      }
+
+      const player = game.state.players.find(p => p.id === gamePlayer.playerId);
+      const playerName = player?.name || 'Unknown';
+
+      // Create chat message event
+      const chatEvent = {
+        id: `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        playerId: gamePlayer.playerId,
+        playerName,
+        message: message.slice(0, 500), // Limit message length
+        timestamp: Date.now(),
+        isPrivate: !!targetPlayerId,
+      };
+
+      if (targetPlayerId) {
+        // Private message - send only to sender and target
+        // Find the socket(s) for the target player
+        const targetGame = await gameRepo.getGamePlayer(gameId, targetPlayerId);
+        if (targetGame) {
+          // Send to target player (all their sockets in this game room)
+          io.to(getGameRoom(gameId)).emit('chat_message', chatEvent);
+          // Note: In a more sophisticated implementation, we'd track user->socket mapping
+          // and only send to specific sockets. For now, filtering happens on client.
+        }
+        // Send back to sender
+        socket.emit('chat_message', chatEvent);
+      } else {
+        // Public message - broadcast to all players in the game
+        io.to(getGameRoom(gameId)).emit('chat_message', chatEvent);
+      }
+
+      console.log(`Chat in game ${gameId}: ${playerName}: ${message.slice(0, 50)}...`);
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      socket.emit('error', {
+        code: 'SERVER_ERROR',
+        message: 'Failed to send chat message',
+      });
+    }
+  });
+
   // Handle disconnect - clean up game membership
   socket.on('disconnect', async () => {
     const gameId = socketGameMap.get(socket.id);

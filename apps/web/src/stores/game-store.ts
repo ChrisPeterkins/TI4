@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, GameAction, DiceRoll, ActionCardTargets } from '@ti4/shared';
+import type { GameState, GameAction, DiceRoll, ActionCardTargets, TransactionOffer, ChatMessageEvent } from '@ti4/shared';
 import { useSocketStore } from './socket-store';
 import { toast } from './toast-store';
 
@@ -45,6 +45,21 @@ interface GameStore {
   cancelCardPlay: () => void;
   setCardTargetMode: (cardId: string, targetType: 'player' | 'system' | 'planet' | 'unit') => void;
 
+  // Transaction UI state
+  showTransactionModal: boolean;
+
+  // Chat state
+  chatMessages: ChatMessageEvent[];
+
+  // Transaction actions
+  toggleTransactionModal: () => void;
+  proposeTransaction: (targetPlayerId: string, offering: TransactionOffer, requesting: TransactionOffer) => void;
+  acceptTransaction: (transactionId: string) => void;
+  declineTransaction: (transactionId: string) => void;
+
+  // Chat actions
+  sendChatMessage: (message: string, targetPlayerId?: string) => void;
+
   // Internal
   setGameState: (state: GameState) => void;
   setCurrentPlayerId: (playerId: string) => void;
@@ -69,6 +84,10 @@ const initialState = {
     cardId: string;
     requiresTarget: 'player' | 'system' | 'planet' | 'unit' | null;
   } | null,
+  // Transaction UI state
+  showTransactionModal: false,
+  // Chat state
+  chatMessages: [] as ChatMessageEvent[],
   isLoading: false,
   error: null,
   isConnected: false,
@@ -192,6 +211,62 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
+  // Transaction actions
+  toggleTransactionModal: () => {
+    set((state) => ({ showTransactionModal: !state.showTransactionModal }));
+  },
+
+  proposeTransaction: (targetPlayerId: string, offering: TransactionOffer, requesting: TransactionOffer) => {
+    const { sendAction } = get();
+    sendAction({
+      type: 'propose_transaction',
+      targetPlayerId,
+      offering,
+      requesting,
+    } as Omit<GameAction, 'playerId' | 'timestamp'>);
+    // Close modal after proposing
+    set({ showTransactionModal: false });
+  },
+
+  acceptTransaction: (transactionId: string) => {
+    const { sendAction } = get();
+    sendAction({
+      type: 'accept_transaction',
+      transactionId,
+    } as Omit<GameAction, 'playerId' | 'timestamp'>);
+    set({ showTransactionModal: false });
+  },
+
+  declineTransaction: (transactionId: string) => {
+    const { sendAction } = get();
+    sendAction({
+      type: 'decline_transaction',
+      transactionId,
+    } as Omit<GameAction, 'playerId' | 'timestamp'>);
+    set({ showTransactionModal: false });
+  },
+
+  // Chat actions
+  sendChatMessage: (message: string, targetPlayerId?: string) => {
+    const { socket } = useSocketStore.getState();
+    const { gameId } = get();
+
+    if (!socket || !gameId) {
+      toast.error('Cannot send message: not connected');
+      return;
+    }
+
+    if (!message.trim()) {
+      return;
+    }
+
+    socket.emit('chat_message', {
+      gameId,
+      message: message.trim(),
+      targetPlayerId,
+    });
+  },
+
   setGameState: (state: GameState) => {
     set({
       gameState: state,
@@ -293,6 +368,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.on('action_cards_discarded', (data: { playerId: string; discardedCount: number }) => {
       console.log('Action cards discarded:', data);
     });
+
+    // Transaction events
+    socket.on('transaction_proposed', (data: { transactionId: string; initiatorId: string; targetId: string }) => {
+      const { currentPlayerId, gameState } = get();
+      if (data.targetId === currentPlayerId) {
+        const initiator = gameState?.players.find(p => p.id === data.initiatorId);
+        toast.info(`${initiator?.name || 'A player'} proposed a trade with you!`);
+      }
+    });
+
+    socket.on('transaction_accepted', (data: { transactionId: string; initiatorId: string; targetId: string }) => {
+      const { currentPlayerId, gameState } = get();
+      if (data.initiatorId === currentPlayerId) {
+        const target = gameState?.players.find(p => p.id === data.targetId);
+        toast.success(`${target?.name || 'Player'} accepted your trade!`);
+      }
+    });
+
+    socket.on('transaction_declined', (data: { transactionId: string; initiatorId: string; targetId: string }) => {
+      const { currentPlayerId, gameState } = get();
+      if (data.initiatorId === currentPlayerId) {
+        const target = gameState?.players.find(p => p.id === data.targetId);
+        toast.info(`${target?.name || 'Player'} declined your trade.`);
+      }
+    });
+
+    // Chat events
+    socket.on('chat_message', (data: ChatMessageEvent) => {
+      set((state) => ({
+        chatMessages: [...state.chatMessages, data].slice(-100), // Keep last 100 messages
+      }));
+    });
   },
 
   cleanupListeners: () => {
@@ -312,6 +419,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.off('action_card_played');
     socket.off('action_cards_drawn');
     socket.off('action_cards_discarded');
+    socket.off('transaction_proposed');
+    socket.off('transaction_accepted');
+    socket.off('transaction_declined');
+    socket.off('chat_message');
   },
 
   reset: () => {

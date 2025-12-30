@@ -13,6 +13,7 @@ import type {
 import { ACTION_CARDS_BY_ID, isSabotageCard } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { drawCards, discardCards, removeCard, hasCard } from '../utils/deck.js';
+import { checkTimingTrigger } from './timing-windows.js';
 
 // Action card hand limit
 const ACTION_CARD_HAND_LIMIT = 7;
@@ -46,7 +47,7 @@ export function handlePlayActionCard(
   // Add to discard pile
   state.actionCardDiscard = discardCards(state.actionCardDiscard, [action.cardId]);
 
-  // Handle Sabotage cards specially
+  // Handle Sabotage cards specially - they target another action card
   if (isSabotageCard(action.cardId)) {
     return {
       success: true,
@@ -60,15 +61,36 @@ export function handlePlayActionCard(
     };
   }
 
-  return {
-    success: true,
-    triggeredEvents: ['action_card_played'],
-    data: {
-      cardId: action.cardId,
+  // Open a timing window for other players to potentially Sabotage
+  const timingResult = checkTimingTrigger(state, 'action_card_played', {
+    sourceCardId: action.cardId,
+    sourcePlayerId: action.playerId,
+    additionalData: {
       cardName: cardData.name,
-      playerId: action.playerId,
       targets: action.targets,
     },
+  });
+
+  // Build result with timing window info
+  const triggeredEvents = ['action_card_played'];
+  const data: Record<string, unknown> = {
+    cardId: action.cardId,
+    cardName: cardData.name,
+    playerId: action.playerId,
+    targets: action.targets,
+  };
+
+  if (timingResult.triggeredEvents?.includes('timing_window_opened')) {
+    triggeredEvents.push('timing_window_opened');
+    if (timingResult.data) {
+      data.timingWindow = timingResult.data;
+    }
+  }
+
+  return {
+    success: true,
+    triggeredEvents,
+    data,
   };
 }
 

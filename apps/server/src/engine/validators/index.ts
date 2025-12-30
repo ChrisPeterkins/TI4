@@ -16,6 +16,10 @@ import type {
   ResearchTechnologyAction,
   StrategicPrimaryAction,
   StrategicSecondaryAction,
+  ProposeTransactionAction,
+  AcceptTransactionAction,
+  DeclineTransactionAction,
+  PlayPromissoryNoteAction,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
@@ -61,6 +65,12 @@ import {
   validateStrategicPrimary,
   validateStrategicSecondary,
 } from './strategy-cards.js';
+import {
+  validateProposeTransaction,
+  validateAcceptTransaction,
+  validateDeclineTransaction,
+} from './transactions.js';
+import { validatePlayPromissoryNote } from './promissory-notes.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -169,6 +179,20 @@ export function validateAction(state: GameState, action: GameAction): Validation
     case 'research_technology':
       return validateResearchTechnology(state, action as ResearchTechnologyAction);
 
+    // Transactions
+    case 'propose_transaction':
+      return validateProposeTransaction(state, action as ProposeTransactionAction);
+
+    case 'accept_transaction':
+      return validateAcceptTransaction(state, action as AcceptTransactionAction);
+
+    case 'decline_transaction':
+      return validateDeclineTransaction(state, action as DeclineTransactionAction);
+
+    // Promissory Notes
+    case 'play_promissory_note':
+      return validatePlayPromissoryNote(state, action as PlayPromissoryNoteAction);
+
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };
   }
@@ -187,6 +211,10 @@ function isPlayersTurn(state: GameState, action: GameAction): boolean {
     'play_action_card',         // Some action cards can be played in response (e.g., Sabotage)
     'discard_action_cards',     // Discard to hand limit can happen during status phase
     'strategic_secondary',      // Secondary abilities are resolved by non-active players
+    'propose_transaction',      // Any player can propose during action phase
+    'accept_transaction',       // Target player accepts/declines
+    'decline_transaction',      // Either player can decline
+    'play_promissory_note',     // Some notes can be played at timing windows
   ];
   if (outOfTurnActions.includes(action.type)) {
     return true;

@@ -7,7 +7,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/stores/game-store';
 import { useLobbyStore } from '@/stores/lobby-store';
 import dynamic from 'next/dynamic';
-import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel } from '@/components/game';
+import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel, TransactionModal, GameLog, Chat } from '@/components/game';
 import type { UnitMoveSelection } from '@/components/game';
 
 // Dynamically import 3D board to avoid SSR issues with Three.js
@@ -75,6 +75,15 @@ export default function GamePage() {
     leaveGame,
     sendAction,
     setCurrentPlayerId,
+    // Transaction state
+    showTransactionModal,
+    toggleTransactionModal,
+    proposeTransaction,
+    acceptTransaction,
+    declineTransaction,
+    // Chat state
+    chatMessages,
+    sendChatMessage,
   } = useGameStore();
 
   const urlGameId = params.gameId as string;
@@ -83,6 +92,25 @@ export default function GamePage() {
   // UI state for tactical action flow
   const [tacticalUIState, setTacticalUIState] = useState<TacticalUIState>('idle');
   const [highlightedTiles, setHighlightedTiles] = useState<HexCoord[]>([]);
+  const [showGameLog, setShowGameLog] = useState(true);
+  const [rightPanelTab, setRightPanelTab] = useState<'log' | 'chat'>('log');
+
+  // 3D UI mode: when true, player info is shown in 3D stations instead of sidebar
+  const [use3DPlayerStations, setUse3DPlayerStations] = useState(() => {
+    // Check localStorage for saved preference
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ti4-use-3d-stations');
+      return saved !== 'false'; // Default to true
+    }
+    return true;
+  });
+
+  // Save preference to localStorage when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ti4-use-3d-stations', String(use3DPlayerStations));
+    }
+  }, [use3DPlayerStations]);
 
   // Join game when connected
   useEffect(() => {
@@ -404,6 +432,23 @@ export default function GamePage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* 3D Mode Toggle */}
+            <button
+              onClick={() => setUse3DPlayerStations(!use3DPlayerStations)}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
+                use3DPlayerStations
+                  ? 'bg-blue-600/30 text-blue-400 hover:bg-blue-600/40'
+                  : 'bg-gray-600/30 text-gray-400 hover:bg-gray-600/40'
+              }`}
+              title={use3DPlayerStations ? 'Switch to sidebar view' : 'Switch to 3D stations view'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              {use3DPlayerStations ? '3D Stations' : 'Sidebar'}
+            </button>
+
             {/* Connection Status */}
             <div className="flex items-center gap-2">
               <div
@@ -433,15 +478,17 @@ export default function GamePage() {
 
       {/* Main Layout - use fixed positioning for reliable centering */}
       <div className="fixed inset-0 top-12 bottom-16 flex">
-        {/* Left Sidebar - Player Dashboard */}
-        <aside className="w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4 flex-shrink-0">
-          {currentPlayer && (
-            <PlayerDashboard
-              player={currentPlayer}
-              isActivePlayer={currentPlayer.id === gameState.activePlayerId}
-            />
-          )}
-        </aside>
+        {/* Left Sidebar - Player Dashboard (hidden in 3D station mode) */}
+        {!use3DPlayerStations && (
+          <aside className="w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4 flex-shrink-0">
+            {currentPlayer && (
+              <PlayerDashboard
+                player={currentPlayer}
+                isActivePlayer={currentPlayer.id === gameState.activePlayerId}
+              />
+            )}
+          </aside>
+        )}
 
         {/* Game Board - fills remaining space */}
         <main className="flex-1 overflow-hidden relative">
@@ -450,6 +497,7 @@ export default function GamePage() {
             currentPlayerId={currentPlayerId}
             onTileClick={handleTileClick}
             highlightedTiles={highlightedTiles}
+            showPlayerStations={use3DPlayerStations}
           />
 
           {/* System Selection Overlay */}
@@ -469,7 +517,65 @@ export default function GamePage() {
               </div>
             </div>
           )}
+
+          {/* Right Panel Toggle Button */}
+          <button
+            onClick={() => setShowGameLog(!showGameLog)}
+            className="absolute top-4 right-4 z-20 px-3 py-2 bg-gray-800/90 hover:bg-gray-700/90 text-gray-300 rounded-lg border border-gray-600 shadow-lg transition-colors"
+          >
+            {showGameLog ? 'Hide Panel' : 'Show Panel'}
+          </button>
         </main>
+
+        {/* Right Sidebar - Game Log & Chat */}
+        {showGameLog && (
+          <aside className="w-80 bg-gray-900 border-l border-gray-700 overflow-hidden flex-shrink-0 flex flex-col">
+            {/* Tab Buttons */}
+            <div className="flex border-b border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => setRightPanelTab('log')}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                  rightPanelTab === 'log'
+                    ? 'bg-gray-800 text-white border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                }`}
+              >
+                Game Log
+              </button>
+              <button
+                onClick={() => setRightPanelTab('chat')}
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors relative ${
+                  rightPanelTab === 'chat'
+                    ? 'bg-gray-800 text-white border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                }`}
+              >
+                Chat
+                {chatMessages.length > 0 && rightPanelTab !== 'chat' && (
+                  <span className="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                )}
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden">
+              {rightPanelTab === 'log' ? (
+                <GameLog
+                  entries={gameState.gameLog || []}
+                  maxHeight="100%"
+                  showTimestamps={false}
+                />
+              ) : (
+                <Chat
+                  messages={chatMessages}
+                  currentPlayerId={currentPlayerId}
+                  players={gameState.players}
+                  onSendMessage={sendChatMessage}
+                />
+              )}
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* Strategy Phase Panel */}
@@ -563,6 +669,19 @@ export default function GamePage() {
         />
       )}
 
+      {/* Transaction Modal */}
+      {showTransactionModal && currentPlayer && (
+        <TransactionModal
+          currentPlayer={currentPlayer}
+          allPlayers={gameState.players}
+          pendingTransaction={gameState.pendingTransaction}
+          onPropose={proposeTransaction}
+          onAccept={acceptTransaction}
+          onDecline={declineTransaction}
+          onClose={toggleTransactionModal}
+        />
+      )}
+
       {/* Player Info Bar */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 bg-gray-800/90 backdrop-blur border-t border-gray-700">
         <div className="flex items-center justify-between px-4 py-2">
@@ -610,6 +729,13 @@ export default function GamePage() {
                   {currentPlayer.commandTokens.strategy}
                 </span>
               </div>
+              {/* Trade Button */}
+              <button
+                onClick={toggleTransactionModal}
+                className="px-3 py-1 bg-yellow-600/30 text-yellow-400 rounded hover:bg-yellow-600/50 border border-yellow-600/50 transition-colors"
+              >
+                Trade
+              </button>
             </div>
           )}
         </div>

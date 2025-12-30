@@ -26,7 +26,7 @@ function createMockPlayer(id: string, overrides: Partial<PlayerState> = {}): Pla
   return {
     id,
     name: `Player ${id}`,
-    faction: 'sol',
+    faction: 'hacan', // Using hacan instead of sol to avoid Sol's Versatile ability (+1 token)
     color: 'blue',
     seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
@@ -39,6 +39,7 @@ function createMockPlayer(id: string, overrides: Partial<PlayerState> = {}): Pla
     scoredObjectives: [],
     promissoryNotesOwned: [],
     promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     planets: [],
     strategyCard: 1,
     strategyCardUsed: true,
@@ -151,8 +152,9 @@ function createMockGameState(playerCount: number = 4): GameState {
     laws: [],
     custodiansTaken: false,
     activeCombat: null,
-    timingWindows: [],
+    timingWindowStack: [], activeTimingWindow: null,
     winner: null,
+    gameLog: [],
     statusPhase: {
       currentStep: 1,
       scoringComplete: [],

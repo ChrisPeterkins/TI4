@@ -1,14 +1,15 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { CAMERA_CONFIG } from './constants';
+import { useCamera } from './CameraContext';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 interface CameraControlsProps {
-  /** Target position to focus on (optional override) */
+  /** Target position to focus on (optional override, falls back to context) */
   target?: THREE.Vector3;
   /** Enable controls */
   enabled?: boolean;
@@ -19,14 +20,20 @@ interface CameraControlsProps {
 /**
  * Orbital camera controls for the 3D board
  * Allows rotation, zoom, and pan
+ * Automatically syncs with CameraContext for focus changes
+ * Must be used inside CameraProvider
  */
 export function CameraControls({
-  target,
+  target: propTarget,
   enabled = true,
   onCameraChange,
 }: CameraControlsProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const { camera } = useThree();
+  const { orbitTargetRef, isAnimating } = useCamera();
+
+  // Disable controls during camera animation to prevent conflicts
+  const controlsEnabled = enabled && !isAnimating;
 
   // Set initial camera position
   useEffect(() => {
@@ -42,18 +49,21 @@ export function CameraControls({
     );
   }, [camera]);
 
-  // Update target if provided
-  useEffect(() => {
-    if (controlsRef.current && target) {
-      controlsRef.current.target.copy(target);
-      controlsRef.current.update();
+  // Sync OrbitControls target with context ref every frame
+  // This keeps OrbitControls in sync during animation without causing re-renders
+  useFrame(() => {
+    if (controlsRef.current) {
+      const target = propTarget ?? orbitTargetRef.current;
+      if (!controlsRef.current.target.equals(target)) {
+        controlsRef.current.target.copy(target);
+      }
     }
-  }, [target]);
+  });
 
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={enabled}
+      enabled={controlsEnabled}
       enablePan={true}
       enableZoom={true}
       enableRotate={true}

@@ -1,4 +1,6 @@
-import type { HexCoord, MapState, MapTile } from '@ti4/shared';
+import type { HexCoord, MapState, MapTile, GameState } from '@ti4/shared';
+import type { MovementModifiers } from '../abilities/ability-types.js';
+import { getMovementModifiers, areSystemsAdjacent as areSystemsAdjacentWithAbilities, getMovementCostToEnter } from '../abilities/movement-modifiers.js';
 
 /**
  * Axial coordinate directions for hex grids
@@ -207,6 +209,144 @@ export function generateStandardMapPositions(playerCount: number): HexCoord[] {
   }
 
   return positions;
+}
+
+/**
+ * Enhanced path-finding that accounts for faction abilities
+ * - Uses movement modifiers (Creuss Slipstream +1)
+ * - Uses faction-specific wormhole adjacency (Creuss Quantum Entanglement)
+ * - Uses faction-specific anomaly immunity (Muaat supernova, Empyrean nebula)
+ * - Accounts for nebula movement penalty (+1 cost to leave)
+ */
+export function findPathWithAbilities(
+  state: GameState,
+  playerId: string,
+  from: HexCoord,
+  to: HexCoord,
+  baseMovement: number
+): HexCoord[] | null {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return null;
+
+  const startTile = findTileAtPosition(state.map, from);
+  const modifiers = getMovementModifiers(state, playerId, startTile ?? null);
+
+  // Apply movement bonus from faction abilities
+  const effectiveMovement = baseMovement + modifiers.movementBonus;
+
+  // Create anomaly traversal function based on faction immunity
+  // Asteroid fields and supernovas block movement unless immune
+  const canTraverseAnomaly = (anomaly: string): boolean => {
+    // Check immunity first
+    if (modifiers.immuneToAnomalies.includes(anomaly)) {
+      return true;
+    }
+    // Supernova blocks movement (Muaat immune via faction ability)
+    if (anomaly === 'supernova') {
+      return false;
+    }
+    // Asteroid fields block movement (Antimass Deflectors grants immunity)
+    if (anomaly === 'asteroid') {
+      return false;
+    }
+    // Nebula and gravity rift don't block, but have other effects
+    return true;
+  };
+
+  // BFS pathfinding with faction-specific adjacency and variable movement costs
+  // Using Dijkstra-style approach to handle nebula movement costs
+  const queue: { position: HexCoord; path: HexCoord[]; movementUsed: number }[] = [
+    { position: from, path: [from], movementUsed: 0 },
+  ];
+  const visited = new Map<string, number>(); // Track best movement cost to reach each tile
+  visited.set(`${from.q},${from.r}`, 0);
+
+  while (queue.length > 0) {
+    // Sort by movement used (Dijkstra's algorithm)
+    queue.sort((a, b) => a.movementUsed - b.movementUsed);
+    const current = queue.shift()!;
+
+    if (current.position.q === to.q && current.position.r === to.r) {
+      return current.path;
+    }
+
+    if (current.movementUsed >= effectiveMovement) {
+      continue;
+    }
+
+    const currentTile = findTileAtPosition(state.map, current.position);
+    if (!currentTile) continue;
+
+    // Get all adjacent tiles using faction abilities (includes wormhole adjacency)
+    const adjacentTiles: MapTile[] = [];
+
+    for (const tile of state.map.tiles) {
+      if (tile.id === currentTile.id) continue;
+
+      // Use faction-specific adjacency checking
+      if (areSystemsAdjacentWithAbilities(state, playerId, currentTile, tile)) {
+        adjacentTiles.push(tile);
+      }
+    }
+
+    for (const tile of adjacentTiles) {
+      const key = `${tile.position.q},${tile.position.r}`;
+
+      // Check if we can traverse this tile
+      if (tile.anomaly && !canTraverseAnomaly(tile.anomaly)) {
+        continue;
+      }
+
+      // Calculate movement cost (accounts for nebula penalty)
+      const movementCost = getMovementCostToEnter(state, playerId, currentTile, tile);
+      const newMovementUsed = current.movementUsed + movementCost;
+
+      // Skip if we've found a better path to this tile
+      const previousBest = visited.get(key);
+      if (previousBest !== undefined && previousBest <= newMovementUsed) {
+        continue;
+      }
+
+      // Skip if we can't reach with available movement
+      if (newMovementUsed > effectiveMovement) {
+        continue;
+      }
+
+      visited.set(key, newMovementUsed);
+      queue.push({
+        position: tile.position,
+        path: [...current.path, tile.position],
+        movementUsed: newMovementUsed,
+      });
+    }
+  }
+
+  return null; // No path found
+}
+
+/**
+ * Find path and return detailed information including systems traversed
+ * Useful for gravity rift checks
+ */
+export function findPathWithDetails(
+  state: GameState,
+  playerId: string,
+  from: HexCoord,
+  to: HexCoord,
+  baseMovement: number
+): { path: HexCoord[]; tilesTraversed: MapTile[] } | null {
+  const path = findPathWithAbilities(state, playerId, from, to, baseMovement);
+  if (!path) return null;
+
+  const tilesTraversed: MapTile[] = [];
+  for (const pos of path) {
+    const tile = findTileAtPosition(state.map, pos);
+    if (tile) {
+      tilesTraversed.push(tile);
+    }
+  }
+
+  return { path, tilesTraversed };
 }
 
 /**

@@ -1,26 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { ActionCardData, ActionCardTargets } from '@ti4/shared';
+import type { ActionCardData, ActionCardTargets, TimingTrigger } from '@ti4/shared';
 import { ACTION_CARDS_BY_ID } from '@ti4/shared';
 import { getCardUrl } from '@/lib/assets';
 
-export type TimingWindowTrigger =
-  | 'action_card_played'
-  | 'combat_started'
-  | 'combat_round_start'
-  | 'hits_assigned'
-  | 'unit_destroyed'
-  | 'ship_used_sustain'
-  | 'agenda_revealed'
-  | 'agenda_voting'
-  | 'system_activated'
-  | 'movement_complete'
-  | 'production_complete';
-
 interface TimingWindowModalProps {
   isOpen: boolean;
-  trigger: TimingWindowTrigger;
+  trigger: TimingTrigger;
   description: string;
   eligibleCardIds: string[];
   timeoutSeconds?: number;
@@ -32,18 +19,37 @@ interface TimingWindowModalProps {
 }
 
 // Human-readable trigger descriptions
-const TRIGGER_DESCRIPTIONS: Record<TimingWindowTrigger, string> = {
+const TRIGGER_DESCRIPTIONS: Partial<Record<TimingTrigger, string>> = {
   action_card_played: 'An action card was played',
-  combat_started: 'Combat has started',
+  sabotage_played: 'Sabotage was played',
+  space_combat_start: 'Space combat has started',
+  ground_combat_start: 'Ground combat has started',
   combat_round_start: 'A combat round is starting',
+  combat_round_end: 'A combat round has ended',
+  before_combat_rolls: 'Before dice are rolled',
+  after_combat_rolls: 'Dice have been rolled',
   hits_assigned: 'Hits have been assigned',
   unit_destroyed: 'A unit was destroyed',
-  ship_used_sustain: 'A ship used SUSTAIN DAMAGE',
+  ship_sustains_damage: 'A ship used SUSTAIN DAMAGE',
+  before_afb: 'Before Anti-Fighter Barrage',
+  after_afb: 'After Anti-Fighter Barrage',
+  before_bombardment: 'Before bombardment',
+  after_bombardment: 'After bombardment',
+  before_space_cannon: 'Before space cannon fire',
+  after_space_cannon: 'After space cannon fire',
   agenda_revealed: 'An agenda has been revealed',
-  agenda_voting: 'Voting is about to begin',
+  after_agenda_revealed: 'After agenda revealed (riders)',
+  before_voting: 'Before voting begins',
+  after_voting: 'Voting is complete',
   system_activated: 'A system was activated',
-  movement_complete: 'Movement is complete',
-  production_complete: 'Production is complete',
+  movement_start: 'Movement is starting',
+  movement_end: 'Movement is complete',
+  production_start: 'Production is starting',
+  production_end: 'Production is complete',
+  invasion_start: 'Invasion is starting',
+  start_of_turn: 'Start of turn',
+  end_of_turn: 'End of turn',
+  strategy_card_played: 'A strategy card was played',
 };
 
 export function TimingWindowModal({

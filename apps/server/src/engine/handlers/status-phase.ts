@@ -14,6 +14,7 @@ import {
   getScorableObjectives,
 } from '../utils/objectives.js';
 import { systems } from '@ti4/game-data';
+import { getStatusPhaseTokenGain } from '../abilities/fleet-modifiers.js';
 
 // =============================================================================
 // STATUS PHASE STEP DEFINITIONS
@@ -174,7 +175,8 @@ export function handleDoneScoring(
 }
 
 /**
- * Handle redistributing command tokens after gaining 2
+ * Handle redistributing command tokens after gaining tokens
+ * Base is 2 tokens, but Sol Versatile gives +1
  */
 export function handleRedistributeTokens(
   state: GameState,
@@ -190,15 +192,18 @@ export function handleRedistributeTokens(
                        player.commandTokens.fleet +
                        player.commandTokens.strategy;
 
-  // New total should be current + 2
+  // Get tokens to gain (base 2, Sol Versatile +1)
+  const tokensToGain = getStatusPhaseTokenGain(state, action.playerId);
+
+  // New total should be current + tokens to gain
   const newTotal = action.distribution.tactics +
                    action.distribution.fleet +
                    action.distribution.strategy;
 
-  if (newTotal !== currentTotal + 2) {
+  if (newTotal !== currentTotal + tokensToGain) {
     return {
       success: false,
-      error: `Invalid token distribution. Expected ${currentTotal + 2} total, got ${newTotal}`
+      error: `Invalid token distribution. Expected ${currentTotal + tokensToGain} total, got ${newTotal}`
     };
   }
 
@@ -592,6 +597,14 @@ function applySpentResources(
       }
     }
   }
+}
+
+/**
+ * Get the number of tokens a player gains during status phase
+ * Base is 2, Sol Versatile grants +1
+ */
+export function getPlayerTokenGain(state: GameState, playerId: UUID): number {
+  return getStatusPhaseTokenGain(state, playerId);
 }
 
 /**

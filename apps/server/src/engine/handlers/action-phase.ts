@@ -9,20 +9,24 @@ import type {
   SkipProductionAction,
   UnitType,
   MapTile,
+  UnitInstance,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
-import { findTileAtPosition } from '../utils/hex.js';
+import { findTileAtPosition, findPathWithDetails } from '../utils/hex.js';
 import {
   hasEnemyShips,
   isShipType,
   isGroundUnit,
   createUnitInstance,
   calculateProductionCost,
+  getUnitMoveValue,
 } from '../utils/units.js';
 import { findDefenderId } from '../utils/combat.js';
 import { initializeCombat } from './combat.js';
 import { initializeInvasion, getInvadablePlanets, hasGroundForcesToLand } from './invasion.js';
-import { units } from '@ti4/game-data';
+import { units, systems } from '@ti4/game-data';
+import { hasGravityRiftDanger, rollGravityRift } from '../abilities/movement-modifiers.js';
+import { logPass, logTacticalAction, logStrategicAction, logUnitsProduced, logSystemActivated } from '../utils/game-log.js';
 
 /**
  * Handle pass action
@@ -34,6 +38,9 @@ export function handlePass(state: GameState, action: PassAction): HandlerResult 
   }
 
   player.passed = true;
+
+  // Log the action
+  logPass(state, action.playerId);
 
   // Find next non-passed player
   advanceToNextActivePlayer(state);
@@ -70,6 +77,16 @@ export function handleTacticalAction(
   // Track the activated system for this tactical action
   state.activatedSystem = action.systemPosition;
 
+  // Get system name for logging (use planet names or tile number)
+  const system = systems[targetTile.systemId];
+  let systemName = `Tile ${system?.tileNumber || targetTile.systemId}`;
+  if (system?.planets && system.planets.length > 0) {
+    systemName = system.planets.map(p => p.name).join('/');
+  }
+
+  // Log the action
+  logSystemActivated(state, action.playerId, targetTile.id, systemName);
+
   // Transition to movement sub-phase
   state.subPhase = 'tactical_movement';
 
@@ -99,6 +116,9 @@ export function handleStrategicAction(
   // Mark card as used
   player.strategyCardUsed = true;
   card.exhausted = true;
+
+  // Log the action
+  logStrategicAction(state, action.playerId, card.name, true);
 
   // Initialize strategic action tracking
   initializeStrategicActionState(state, action.playerId, action.cardNumber);
@@ -233,13 +253,21 @@ export function handleMoveUnits(
     return { success: false, error: 'Target system not found' };
   }
 
+  const player = state.players.find(p => p.id === action.playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Track gravity rift casualties
+  const gravityRiftResults: { unitId: string; unitType: UnitType; roll: number; destroyed: boolean }[] = [];
+
   // Process each move
   for (const move of action.moves) {
     const fromTile = findTileAtPosition(state.map, move.from.systemPosition);
     if (!fromTile) continue;
 
     // Find and remove the unit from source
-    let unit;
+    let unit: UnitInstance | undefined;
     if (move.from.planetId) {
       const planet = fromTile.planets.find(p => p.planetId === move.from.planetId);
       if (planet) {
@@ -257,6 +285,39 @@ export function handleMoveUnits(
 
     if (!unit) continue;
 
+    // Check for gravity rift danger on the path (for ships only)
+    let unitDestroyed = false;
+    if (isShipType(unit.type)) {
+      const moveValue = getUnitMoveValue(unit.type, player);
+      const pathDetails = findPathWithDetails(state, action.playerId, move.from.systemPosition, state.activatedSystem, moveValue);
+
+      if (pathDetails) {
+        // Check each tile in the path for gravity rifts (excluding start and end)
+        for (let i = 1; i < pathDetails.tilesTraversed.length - 1; i++) {
+          const tile = pathDetails.tilesTraversed[i];
+          if (hasGravityRiftDanger(state, action.playerId, tile)) {
+            const riftRoll = rollGravityRift();
+            gravityRiftResults.push({
+              unitId: unit.id,
+              unitType: unit.type,
+              roll: riftRoll.roll,
+              destroyed: !riftRoll.survived,
+            });
+
+            if (!riftRoll.survived) {
+              unitDestroyed = true;
+              break; // Unit destroyed, stop checking path
+            }
+          }
+        }
+      }
+    }
+
+    // If unit was destroyed by gravity rift, don't add it to destination
+    if (unitDestroyed) {
+      continue;
+    }
+
     // Add unit to destination
     if (move.to.planetId) {
       // Moving to a planet (ground units during invasion)
@@ -270,6 +331,16 @@ export function handleMoveUnits(
       unit.planetId = undefined;
       targetTile.units.push(unit);
     }
+  }
+
+  // Build event list
+  const events = ['units_moved'];
+  const eventData: Record<string, unknown> = {};
+
+  // Add gravity rift results to event data if any occurred
+  if (gravityRiftResults.length > 0) {
+    events.push('gravity_rift_rolls');
+    eventData.gravityRiftResults = gravityRiftResults;
   }
 
   // Check for combat - if enemy ships present, transition to space combat
@@ -288,14 +359,20 @@ export function handleMoveUnits(
 
       return {
         success: true,
-        triggeredEvents: ['units_moved', 'space_combat_initiated'],
-        data: { combatId: combat.id },
+        triggeredEvents: [...events, 'space_combat_initiated'],
+        data: { ...eventData, combatId: combat.id },
       };
     }
   }
 
   // No space combat - check for invasion opportunities
-  return checkForInvasion(state, targetTile, action.playerId, ['units_moved']);
+  const invasionResult = checkForInvasion(state, targetTile, action.playerId, events);
+  if (invasionResult.data) {
+    invasionResult.data = { ...eventData, ...invasionResult.data };
+  } else {
+    invasionResult.data = eventData;
+  }
+  return invasionResult;
 }
 
 /**

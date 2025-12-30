@@ -1,4 +1,4 @@
-import type { FactionData } from '@ti4/shared';
+import type { FactionData, AbilityImplementation } from '@ti4/shared';
 
 export const factions: Record<string, FactionData> = {
   // Base Game Factions
@@ -24,6 +24,24 @@ export const factions: Record<string, FactionData> = {
         name: 'Mitosis',
         description: 'Your space docks cannot produce infantry. At the start of the status phase, place 1 infantry from your reinforcements on any planet you control other than Mecatol Rex.',
         timing: 'status_phase_start',
+        implementation: {
+          timing: { type: 'phase', phase: 'status', moment: 'start' },
+          effectType: 'unit_placement',
+          handlerId: 'arborec_mitosis',
+          isOptional: false,
+          isPassive: false,
+        },
+      },
+      {
+        id: 'mitosis_restriction',
+        name: 'Mitosis (Production Restriction)',
+        description: 'Your space docks cannot produce infantry.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'production_restriction',
+          handlerId: 'arborec_mitosis_restriction',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -63,16 +81,34 @@ export const factions: Record<string, FactionData> = {
         id: 'quantum_entanglement',
         name: 'Quantum Entanglement',
         description: 'You treat all systems that contain either an alpha or beta wormhole as adjacent to each other. Game effects cannot prevent you from using this ability.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'adjacency_modifier',
+          handlerId: 'creuss_quantum_entanglement',
+          isPassive: true,
+        },
       },
       {
         id: 'slipstream',
         name: 'Slipstream',
         description: 'During your tactical actions, apply +1 to the move value of each of your ships that starts its movement in your home system or in a system that contains either an alpha or beta wormhole.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'movement_modifier',
+          handlerId: 'creuss_slipstream',
+          isPassive: true,
+        },
       },
       {
         id: 'creuss_gate',
         name: 'Creuss Gate',
         description: 'When you create the game board, place the Creuss Gate (tile 17) where your home system would normally be placed. The Creuss Gate system is not a home system. Then, place your home system (tile 51) in your play area.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'adjacency_modifier',
+          handlerId: 'creuss_gate',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -112,16 +148,34 @@ export const factions: Record<string, FactionData> = {
         id: 'masters_of_trade',
         name: 'Masters of Trade',
         description: 'You do not have to spend a command token to resolve the secondary ability of the "Trade" strategy card.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'cost_modifier',
+          handlerId: 'hacan_masters_of_trade',
+          isPassive: true,
+        },
       },
       {
         id: 'guild_ships',
         name: 'Guild Ships',
         description: 'You may negotiate transactions with players who are not your neighbors.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'limit_modifier',
+          handlerId: 'hacan_guild_ships',
+          isPassive: true,
+        },
       },
       {
         id: 'arbiters',
         name: 'Arbiters',
         description: 'When you are negotiating a transaction, action cards can be exchanged as part of that transaction.',
+        implementation: {
+          timing: { type: 'when', trigger: 'transaction' },
+          effectType: 'limit_modifier',
+          handlerId: 'hacan_arbiters',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -163,16 +217,35 @@ export const factions: Record<string, FactionData> = {
         id: 'fragile',
         name: 'Fragile',
         description: 'Apply -1 to the result of each of your unit\'s combat rolls.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'combat_modifier',
+          handlerId: 'jolnar_fragile',
+          isPassive: true,
+        },
       },
       {
         id: 'brilliant',
         name: 'Brilliant',
         description: 'When you spend a command token to resolve the secondary ability of the "Technology" strategy card, you may resolve the primary ability instead.',
+        implementation: {
+          timing: { type: 'when', trigger: 'research' },
+          effectType: 'tech_modifier',
+          handlerId: 'jolnar_brilliant',
+          isOptional: true,
+        },
       },
       {
         id: 'analytical',
         name: 'Analytical',
         description: 'When you research a technology that is not a unit upgrade technology, you may ignore 1 prerequisite.',
+        implementation: {
+          timing: { type: 'when', trigger: 'research' },
+          effectType: 'tech_modifier',
+          handlerId: 'jolnar_analytical',
+          isOptional: true,
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -259,11 +332,24 @@ export const factions: Record<string, FactionData> = {
         id: 'munitions_reserves',
         name: 'Munitions Reserves',
         description: 'At the start of each round of space combat, you may spend 2 trade goods; you may re-roll any number of your dice during that combat round.',
+        implementation: {
+          timing: { type: 'when', trigger: 'combat_round_start' },
+          effectType: 'reroll',
+          handlerId: 'letnev_munitions_reserves',
+          requirements: [{ type: 'spend_trade_good', amount: 2 }],
+          isOptional: true,
+        },
       },
       {
         id: 'armada',
         name: 'Armada',
         description: 'The maximum number of non-fighter ships you can have in each system is equal to 2 more than the number of tokens in your fleet pool.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'limit_modifier',
+          handlerId: 'letnev_armada',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -393,11 +479,24 @@ export const factions: Record<string, FactionData> = {
         id: 'telepathy',
         name: 'Telepathy',
         description: 'At the end of the strategy phase, place the Naalu "0" token on your strategy card; you are first in initiative order.',
+        implementation: {
+          timing: { type: 'phase', phase: 'strategy', moment: 'end' },
+          effectType: 'initiative_modifier',
+          handlerId: 'naalu_telepathy',
+          isOptional: false,
+        },
       },
       {
         id: 'foresight',
         name: 'Foresight',
         description: 'After another player moves ships into a system that contains 1 or more of your ships, you may place 1 token from your strategy pool in an adjacent system that does not contain another player\'s ships; move your ships from the active system into that system.',
+        implementation: {
+          timing: { type: 'after', trigger: 'movement_into_system' },
+          effectType: 'retreat',
+          handlerId: 'naalu_foresight',
+          requirements: [{ type: 'spend_token', tokenPool: 'strategy', amount: 1 }],
+          isOptional: true,
+        },
       },
     ],
     promissoryNote: {
@@ -487,11 +586,23 @@ export const factions: Record<string, FactionData> = {
         id: 'scavenge',
         name: 'Scavenge',
         description: 'After you gain control of a planet, gain 1 trade good.',
+        implementation: {
+          timing: { type: 'after', trigger: 'planet_control_gained' },
+          effectType: 'resource_gain',
+          handlerId: 'saar_scavenge',
+          isOptional: false,
+        },
       },
       {
         id: 'nomadic',
         name: 'Nomadic',
         description: 'Your space docks have "Production 5". Your space docks are placed in a space area instead of on a planet.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'production_modifier',
+          handlerId: 'saar_nomadic',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -532,6 +643,12 @@ export const factions: Record<string, FactionData> = {
         id: 'unrelenting',
         name: 'Unrelenting',
         description: 'Apply +1 to the result of each of your unit\'s combat rolls.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'combat_modifier',
+          handlerId: 'sardakk_unrelenting',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -571,11 +688,24 @@ export const factions: Record<string, FactionData> = {
         id: 'orbital_drop',
         name: 'Orbital Drop',
         description: 'ACTION: Spend 1 token from your strategy pool to place 2 infantry from your reinforcements on 1 planet you control.',
+        implementation: {
+          timing: { type: 'action' },
+          effectType: 'unit_placement',
+          handlerId: 'sol_orbital_drop',
+          requirements: [{ type: 'spend_token', tokenPool: 'strategy', amount: 1 }],
+          isOptional: true,
+        },
       },
       {
         id: 'versatile',
         name: 'Versatile',
         description: 'When you gain command tokens during the status phase, gain 1 additional command token.',
+        implementation: {
+          timing: { type: 'when', trigger: 'token_gain' },
+          effectType: 'token_gain',
+          handlerId: 'sol_versatile',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {
@@ -616,11 +746,23 @@ export const factions: Record<string, FactionData> = {
         id: 'blood_ties',
         name: 'Blood Ties',
         description: 'You do not have to spend influence to remove the custodians token from Mecatol Rex.',
+        implementation: {
+          timing: { type: 'when', trigger: 'custodians_removed' },
+          effectType: 'cost_modifier',
+          handlerId: 'winnu_blood_ties',
+          isPassive: true,
+        },
       },
       {
         id: 'reclamation',
         name: 'Reclamation',
         description: 'After you resolve a tactical action during which you gained control of Mecatol Rex, you may place 1 PDS and 1 space dock from your reinforcements on Mecatol Rex.',
+        implementation: {
+          timing: { type: 'after', trigger: 'mecatol_control_gained' },
+          effectType: 'unit_placement',
+          handlerId: 'winnu_reclamation',
+          isOptional: true,
+        },
       },
     ],
     promissoryNote: {
@@ -752,16 +894,35 @@ export const factions: Record<string, FactionData> = {
         id: 'stall_tactics',
         name: 'Stall Tactics',
         description: 'ACTION: Discard 1 action card from your hand.',
+        implementation: {
+          timing: { type: 'action' },
+          effectType: 'discard',
+          handlerId: 'yssaril_stall_tactics',
+          requirements: [{ type: 'discard_card', cardType: 'action', amount: 1 }],
+          isOptional: true,
+        },
       },
       {
         id: 'scheming',
         name: 'Scheming',
         description: 'When you draw 1 or more action cards, draw 1 additional action card. Then, choose 1 of your action cards and discard it.',
+        implementation: {
+          timing: { type: 'when', trigger: 'action_cards_drawn' },
+          effectType: 'resource_gain',
+          handlerId: 'yssaril_scheming',
+          isOptional: false,
+        },
       },
       {
         id: 'crafty',
         name: 'Crafty',
         description: 'You can have any number of action cards in your hand. Game effects cannot prevent you from using this ability.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'limit_modifier',
+          handlerId: 'yssaril_crafty',
+          isPassive: true,
+        },
       },
     ],
     promissoryNote: {

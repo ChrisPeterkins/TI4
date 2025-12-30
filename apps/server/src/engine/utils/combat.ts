@@ -9,6 +9,7 @@ import type {
   HexCoord,
 } from '@ti4/shared';
 import { getUnitStats, isShipType, isGroundUnit } from './units.js';
+import { getCombatModifiers } from '../abilities/index.js';
 
 // Number of dice each unit type rolls in combat
 // Most units roll 1, but War Sun rolls 3
@@ -233,9 +234,25 @@ export function calculateCombatModifiers(
   const descriptions: string[] = [];
   let total = 0;
 
+  // Determine combat type based on unit
+  const combatType = isGroundUnit(unit.type) ? 'ground' : 'space';
+
+  // Get faction combat modifiers
+  const factionModifiers = getCombatModifiers(state, player.id, combatType);
+
+  // Apply hit modifier (positive = better, lowers target number)
+  if (factionModifiers.hitModifier !== 0) {
+    total += factionModifiers.hitModifier;
+    descriptions.push(...factionModifiers.descriptions);
+  }
+
   // Morale Boost tech (+1 to combat during a round)
+  if (player.technologies.includes('morale_boost')) {
+    // Morale Boost is an action card effect, not a tech - skip for now
+  }
+
   // Plasma Scoring tech (+1 to bombardment and space cannon)
-  // etc. - implement as needed
+  // This is handled separately in bombardment/space cannon rolls
 
   return { total, descriptions };
 }

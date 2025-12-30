@@ -35,6 +35,106 @@ export interface FactionAbility {
   name: string;
   description: string;
   timing?: string;
+  // Structured timing for runtime implementation
+  implementation?: AbilityImplementation;
+}
+
+// Structured ability implementation details
+export interface AbilityImplementation {
+  // When the ability triggers
+  timing: AbilityTiming;
+  // What kind of effect it has
+  effectType: AbilityEffectType;
+  // Requirements to use the ability
+  requirements?: AbilityRequirement[];
+  // Handler identifier for ability execution
+  handlerId: string;
+  // Whether using the ability is optional
+  isOptional?: boolean;
+  // Whether this ability is always active (passive)
+  isPassive?: boolean;
+}
+
+// When abilities trigger
+export type AbilityTiming =
+  | { type: 'action' }
+  | { type: 'passive' }
+  | { type: 'when'; trigger: AbilityTrigger }
+  | { type: 'after'; trigger: AbilityTrigger }
+  | { type: 'phase'; phase: AbilityPhase; moment: 'start' | 'end' | 'during' };
+
+// Game phases for phase-triggered abilities
+export type AbilityPhase =
+  | 'strategy'
+  | 'action'
+  | 'status'
+  | 'agenda';
+
+// What events can trigger abilities
+export type AbilityTrigger =
+  | 'combat_start'
+  | 'space_combat_start'
+  | 'ground_combat_start'
+  | 'combat_round_start'
+  | 'combat_round_end'
+  | 'space_combat_round_end'
+  | 'ground_combat_round_end'
+  | 'unit_destroyed'
+  | 'ship_destroyed'
+  | 'ground_unit_destroyed'
+  | 'combat_win'
+  | 'combat_loss'
+  | 'planet_control_gained'
+  | 'movement_into_system'
+  | 'system_activated'
+  | 'agenda_revealed'
+  | 'agenda_outcome'
+  | 'trade_goods_gained'
+  | 'commodities_gained'
+  | 'action_cards_drawn'
+  | 'production'
+  | 'research'
+  | 'exploration'
+  | 'transaction'
+  | 'diplomacy_resolved'
+  | 'custodians_removed'
+  | 'mecatol_control_gained'
+  | 'token_gain';
+
+// What kind of effect the ability has
+export type AbilityEffectType =
+  | 'combat_modifier'
+  | 'combat_roll'
+  | 'movement_modifier'
+  | 'adjacency_modifier'
+  | 'production_modifier'
+  | 'production_restriction'
+  | 'resource_gain'
+  | 'unit_placement'
+  | 'unit_conversion'
+  | 'unit_capture'
+  | 'tech_gain'
+  | 'tech_modifier'
+  | 'token_manipulation'
+  | 'token_gain'
+  | 'vote_modifier'
+  | 'agenda_manipulation'
+  | 'limit_modifier'
+  | 'cost_modifier'
+  | 'initiative_modifier'
+  | 'retreat'
+  | 'reroll'
+  | 'steal'
+  | 'discard';
+
+// Requirements to activate an ability
+export interface AbilityRequirement {
+  type: 'spend_resource' | 'spend_token' | 'spend_trade_good' | 'have_unit' | 'control_planet' | 'discard_card';
+  amount?: number;
+  resource?: 'influence' | 'resources' | 'trade_goods';
+  tokenPool?: 'strategy' | 'tactics' | 'fleet' | 'reinforcements';
+  unitType?: UnitType;
+  cardType?: 'action';
 }
 
 export interface FactionLeaders {

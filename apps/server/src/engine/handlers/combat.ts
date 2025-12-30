@@ -6,6 +6,7 @@ import type {
   AnnounceRetreatAction,
   DiceRoll,
   HexCoord,
+  TimingTrigger,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { findTileAtPosition } from '../utils/hex.js';
@@ -25,6 +26,7 @@ import {
   findDefenderId,
   getValidRetreatSystems,
 } from '../utils/combat.js';
+import { checkTimingTrigger } from './timing-windows.js';
 
 /**
  * Initialize a new combat instance
@@ -70,6 +72,63 @@ export function initializeCombat(
   };
 
   return combat;
+}
+
+/**
+ * Trigger timing windows at combat start
+ * Call this after combat is initialized and before first AFB
+ */
+export function triggerCombatStartWindow(state: GameState): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: true };
+  }
+
+  const trigger: TimingTrigger = combat.type === 'space' ? 'space_combat_start' : 'ground_combat_start';
+
+  return checkTimingTrigger(state, trigger, {
+    combatId: combat.id,
+    systemPosition: findCombatSystemPosition(state, combat.systemId),
+  });
+}
+
+/**
+ * Trigger timing windows before combat dice are rolled
+ */
+export function triggerBeforeCombatRolls(state: GameState): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: true };
+  }
+
+  return checkTimingTrigger(state, 'before_combat_rolls', {
+    combatId: combat.id,
+    systemPosition: findCombatSystemPosition(state, combat.systemId),
+  });
+}
+
+/**
+ * Trigger timing windows at start of a combat round
+ */
+export function triggerCombatRoundStart(state: GameState): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: true };
+  }
+
+  return checkTimingTrigger(state, 'combat_round_start', {
+    combatId: combat.id,
+    systemPosition: findCombatSystemPosition(state, combat.systemId),
+    additionalData: { roundNumber: combat.roundNumber },
+  });
+}
+
+/**
+ * Helper to find the system position from a combat system ID
+ */
+function findCombatSystemPosition(state: GameState, systemId: string): HexCoord | undefined {
+  const tile = state.map.tiles.find(t => t.id === systemId);
+  return tile?.position;
 }
 
 /**

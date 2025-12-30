@@ -266,8 +266,10 @@ const FACTION_ICON_NAMES: Record<string, string> = {
   nekro: 'nekro',
   nomad: 'nomad',
   norr: 'norr',
+  sardakk: 'norr', // Sardakk N'orr - maps to norr
   saar: 'saar',
   sol: 'sol',
+  titans: 'ul', // Titans of Ul - maps to ul
   ul: 'ul',
   vuilraith: 'vuilraith',
   winnu: 'winnu',
@@ -293,11 +295,24 @@ export function getFactionSheetUrl(factionId: string, side: 'face' | 'back' = 'f
 }
 
 /**
+ * Command token filename mapping
+ * Command tokens use faction IDs directly (sardakk.png, titans.png)
+ * unlike faction sheets which use shortened names (norr, ul)
+ */
+const COMMAND_TOKEN_NAMES: Record<string, string> = {
+  // Handle alternate faction ID formats
+  norr: 'sardakk', // norr maps back to sardakk for command tokens
+  ul: 'titans', // ul maps back to titans for command tokens
+  naazrokha: 'nazrokha', // Different spelling in token files
+  empyrean: 'empyrian', // Different spelling in token files
+};
+
+/**
  * Get command token URL for a faction
  */
 export function getCommandTokenUrl(factionId: string): string {
-  const iconName = FACTION_ICON_NAMES[factionId] || factionId;
-  return `${COMMAND_TOKENS_PATH}/${iconName}.png`;
+  const tokenName = COMMAND_TOKEN_NAMES[factionId] || factionId;
+  return `${COMMAND_TOKENS_PATH}/${tokenName}.png`;
 }
 
 // =============================================================================
@@ -363,8 +378,30 @@ export type CardType =
 /**
  * Get game card image URL
  */
+/**
+ * Player colors that may be suffixed to promissory note IDs
+ */
+const PLAYER_COLOR_SUFFIXES = [
+  '_blue', '_red', '_yellow', '_green', '_purple', '_orange', '_pink', '_black'
+];
+
+/**
+ * Strip player color suffix from a promissory note ID
+ * e.g., "support_for_the_throne_blue" -> "support_for_the_throne"
+ */
+function stripColorSuffix(cardId: string): string {
+  for (const suffix of PLAYER_COLOR_SUFFIXES) {
+    if (cardId.endsWith(suffix)) {
+      return cardId.slice(0, -suffix.length);
+    }
+  }
+  return cardId;
+}
+
 export function getCardUrl(cardType: CardType, cardId: string): string {
-  return `${CARDS_PATH}/${cardType}/${cardId}.jpg`;
+  // Promissory notes have color suffixes in game data but not in image filenames
+  const imageId = cardType === 'promissory' ? stripColorSuffix(cardId) : cardId;
+  return `${CARDS_PATH}/${cardType}/${imageId}.jpg`;
 }
 
 // =============================================================================
@@ -467,4 +504,132 @@ export function getFighterTokenUrl(): string {
  */
 export function getInfantryTokenUrl(): string {
   return `${TOKENS_PATH}/infantry_1_c.png`;
+}
+
+// =============================================================================
+// 3D MODEL ASSETS
+// =============================================================================
+
+const MODELS_BASE = '/models';
+const TOKEN_MODELS_PATH = `${MODELS_BASE}/tokens`;
+const MAT_MODELS_PATH = `${MODELS_BASE}/mats`;
+const UNIT_MODELS_PATH = `${MODELS_BASE}/units`;
+
+/**
+ * Get command token 3D model URL
+ */
+export function getCommandTokenModelUrl(): string {
+  return `${TOKEN_MODELS_PATH}/command_token.obj`;
+}
+
+/**
+ * Get round token 3D model URL (for TG, commodities, etc.)
+ */
+export function getRoundTokenModelUrl(): string {
+  return `${TOKEN_MODELS_PATH}/round_token.obj`;
+}
+
+/**
+ * Get scoreboard 3D model URL
+ */
+export function getScoreboardModelUrl(): string {
+  return `${TOKEN_MODELS_PATH}/scoreboard.obj`;
+}
+
+/**
+ * Get unit 3D model URL
+ */
+export function getUnitModelUrl(unitType: UnitAssetType): string {
+  const modelFilenames: Record<UnitAssetType, string> = {
+    fighter: 'fighter',
+    infantry: 'infantry',
+    mech: 'infantry', // Fallback until mech model exists
+    destroyer: 'destroyer',
+    carrier: 'carrier',
+    cruiser: 'cruiser',
+    dreadnought: 'dreadnought',
+    war_sun: 'warsun',
+    flagship: 'flagship',
+    pds: 'pds',
+    space_dock: 'spacedock',
+  };
+  const filename = modelFilenames[unitType];
+  return `${UNIT_MODELS_PATH}/${filename}.obj`;
+}
+
+// =============================================================================
+// PLAYMAT TEXTURE ASSETS
+// =============================================================================
+
+const MATS_PATH = `${IMAGES_BASE}/mats`;
+
+export type PlaymatType = 'build_area' | 'tech_board' | 'planet_board' | 'secrets_mat' | 'exploration_mat';
+
+/**
+ * Get playmat texture URL
+ */
+export function getPlaymatTextureUrl(type: PlaymatType): string {
+  const extensions: Record<PlaymatType, string> = {
+    build_area: 'png',
+    tech_board: 'jpg',
+    planet_board: 'jpg',
+    secrets_mat: 'jpg',
+    exploration_mat: 'jpg',
+  };
+  return `${MATS_PATH}/${type}.${extensions[type]}`;
+}
+
+// =============================================================================
+// PLANET CARD ASSETS
+// =============================================================================
+
+/**
+ * Get planet card image URL
+ */
+export function getPlanetCardUrl(planetId: string): string {
+  return `${CARDS_PATH}/planet/${planetId}.jpg`;
+}
+
+// =============================================================================
+// SECRET OBJECTIVE ASSETS
+// =============================================================================
+
+/**
+ * Get secret objective card image URL
+ */
+export function getSecretObjectiveCardUrl(objectiveId: string): string {
+  return `${CARDS_PATH}/objective/${objectiveId}.jpg`;
+}
+
+// =============================================================================
+// LEADER CARD ASSETS (PoK)
+// =============================================================================
+
+/**
+ * Get leader card image URL
+ */
+export function getLeaderCardUrl(leaderId: string): string {
+  return `${CARDS_PATH}/leader/${leaderId}.jpg`;
+}
+
+// =============================================================================
+// EXPLORATION CARD ASSETS (PoK)
+// =============================================================================
+
+/**
+ * Get exploration card image URL
+ */
+export function getExplorationCardUrl(cardId: string): string {
+  return `${CARDS_PATH}/exploration/${cardId}.jpg`;
+}
+
+// =============================================================================
+// RELIC CARD ASSETS (PoK)
+// =============================================================================
+
+/**
+ * Get relic card image URL
+ */
+export function getRelicCardUrl(relicId: string): string {
+  return `${CARDS_PATH}/relic/${relicId}.jpg`;
 }

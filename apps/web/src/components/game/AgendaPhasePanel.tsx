@@ -7,7 +7,7 @@ import type {
   AgendaPhaseState,
   CastVoteAction,
 } from '@ti4/shared';
-import { AGENDAS_BY_ID } from '@ti4/shared';
+import { AGENDAS_BY_ID, ACTION_CARDS_BY_ID, isRiderCard } from '@ti4/shared';
 
 interface AgendaPhasePanelProps {
   gameState: GameState;
@@ -16,6 +16,7 @@ interface AgendaPhasePanelProps {
   onRevealAgenda: () => void;
   onCastVote: (outcome: string, exhaustedPlanets: string[], abstain?: boolean) => void;
   onSpeakerTiebreak: (chosenOutcome: string) => void;
+  onPlayRider?: (cardId: string, prediction: string) => void;
 }
 
 // Step labels for display
@@ -35,6 +36,7 @@ export function AgendaPhasePanel({
   onRevealAgenda,
   onCastVote,
   onSpeakerTiebreak,
+  onPlayRider,
 }: AgendaPhasePanelProps) {
   const agendaPhase = gameState.agendaPhase;
   const currentStep = (gameState.subPhase as AgendaPhaseState) || 'reveal_agenda';
@@ -56,6 +58,17 @@ export function AgendaPhasePanel({
             gameState={gameState}
             isMyTurn={isMyTurn}
             onRevealAgenda={onRevealAgenda}
+          />
+        );
+      case 'when_revealed':
+      case 'after_revealed':
+        return (
+          <RiderStep
+            gameState={gameState}
+            currentPlayer={currentPlayer}
+            agenda={agenda}
+            step={currentStep}
+            onPlayRider={onPlayRider}
           />
         );
       case 'voting':
@@ -167,6 +180,197 @@ function RevealAgendaStep({
       >
         Reveal Agenda
       </button>
+    </div>
+  );
+}
+
+// =============================================================================
+// RIDER STEP (When Revealed / After Revealed)
+// =============================================================================
+
+interface RiderStepProps {
+  gameState: GameState;
+  currentPlayer: PlayerState | null;
+  agenda: { name: string; type: string; electionType: string; description: string } | null;
+  step: 'when_revealed' | 'after_revealed';
+  onPlayRider?: (cardId: string, prediction: string) => void;
+}
+
+function RiderStep({
+  gameState,
+  currentPlayer,
+  agenda,
+  step,
+  onPlayRider,
+}: RiderStepProps) {
+  const [selectedRider, setSelectedRider] = useState<string | null>(null);
+  const [selectedPrediction, setSelectedPrediction] = useState<string | null>(null);
+
+  const agendaPhase = gameState.agendaPhase;
+  if (!agendaPhase || !agenda) return null;
+
+  // Get rider cards in current player's hand
+  const riderCards = useMemo(() => {
+    if (!currentPlayer) return [];
+    return currentPlayer.actionCards
+      .filter(cardId => isRiderCard(cardId))
+      .map(cardId => ({
+        id: cardId,
+        data: ACTION_CARDS_BY_ID[cardId],
+      }))
+      .filter(card => card.data);
+  }, [currentPlayer]);
+
+  // Get valid outcomes/predictions
+  const predictions = useMemo(() => {
+    switch (agendaPhase.currentElectionType) {
+      case 'for_against':
+        return [
+          { id: 'for', label: 'For' },
+          { id: 'against', label: 'Against' },
+        ];
+      case 'player':
+        return gameState.players.map(p => ({
+          id: p.id,
+          label: p.name,
+        }));
+      default:
+        return [];
+    }
+  }, [agendaPhase.currentElectionType, gameState.players]);
+
+  // Check if current player already has a rider played on this agenda
+  const hasPlayedRider = agendaPhase.riders.some(
+    r => r.playerId === currentPlayer?.id && !r.resolved
+  );
+
+  const handlePlayRider = () => {
+    if (selectedRider && selectedPrediction && onPlayRider) {
+      onPlayRider(selectedRider, selectedPrediction);
+      setSelectedRider(null);
+      setSelectedPrediction(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h3 className="text-lg font-medium text-white">
+          {step === 'when_revealed' ? 'When Agenda Revealed' : 'After Agenda Revealed'}
+        </h3>
+        <p className="text-gray-400 text-sm mt-1">
+          Players may play abilities or rider cards
+        </p>
+      </div>
+
+      {/* Active Riders */}
+      {agendaPhase.riders.length > 0 && (
+        <div className="bg-purple-900/20 rounded-lg p-4 border border-purple-500/30">
+          <h4 className="text-sm font-medium text-purple-300 mb-2">Active Riders</h4>
+          <div className="space-y-2">
+            {agendaPhase.riders.map((rider, i) => {
+              const player = gameState.players.find(p => p.id === rider.playerId);
+              const cardData = ACTION_CARDS_BY_ID[rider.cardId];
+              const predictionLabel = rider.prediction === 'for' ? 'For' :
+                rider.prediction === 'against' ? 'Against' :
+                gameState.players.find(p => p.id === rider.prediction)?.name || rider.prediction;
+              return (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-white">
+                    <span className="text-yellow-400">{player?.name}</span> played{' '}
+                    <span className="text-purple-300">{cardData?.name || rider.cardId}</span>
+                  </span>
+                  <span className="text-gray-400">
+                    predicting <span className="text-blue-300">{predictionLabel}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Play Rider Section */}
+      {riderCards.length > 0 && !hasPlayedRider && onPlayRider && (
+        <div className="bg-gray-800 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-300 mb-3">Play a Rider Card</h4>
+
+          {/* Card Selection */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {riderCards.map(card => (
+              <button
+                key={card.id}
+                onClick={() => setSelectedRider(card.id)}
+                className={`p-3 rounded-lg border text-left transition-colors ${
+                  selectedRider === card.id
+                    ? 'bg-purple-600/20 border-purple-500'
+                    : 'bg-gray-700 border-gray-600 hover:border-gray-500'
+                }`}
+              >
+                <div className="font-medium text-white text-sm">{card.data?.name}</div>
+                <div className="text-xs text-gray-400 mt-1 line-clamp-2">
+                  {card.data?.description}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Prediction Selection */}
+          {selectedRider && (
+            <div className="mb-4">
+              <h5 className="text-sm text-gray-400 mb-2">Predict the outcome:</h5>
+              <div className="flex flex-wrap gap-2">
+                {predictions.map(pred => (
+                  <button
+                    key={pred.id}
+                    onClick={() => setSelectedPrediction(pred.id)}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      selectedPrediction === pred.id
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    }`}
+                  >
+                    {pred.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Play Button */}
+          <button
+            onClick={handlePlayRider}
+            disabled={!selectedRider || !selectedPrediction}
+            className={`w-full py-2 rounded-lg font-medium transition-colors ${
+              selectedRider && selectedPrediction
+                ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            Play Rider
+          </button>
+
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            If your prediction is correct, you gain the rider's reward but cannot vote on this agenda.
+          </p>
+        </div>
+      )}
+
+      {hasPlayedRider && (
+        <div className="text-center py-4 text-gray-400">
+          You have already played a rider on this agenda.
+        </div>
+      )}
+
+      {riderCards.length === 0 && !hasPlayedRider && (
+        <div className="text-center py-4 text-gray-500">
+          You have no rider cards to play.
+        </div>
+      )}
+
+      <p className="text-center text-gray-500 text-sm">
+        Waiting for all players to finish responding...
+      </p>
     </div>
   );
 }

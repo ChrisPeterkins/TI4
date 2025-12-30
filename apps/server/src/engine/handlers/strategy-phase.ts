@@ -1,5 +1,6 @@
 import type { GameState, PickStrategyCardAction } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
+import { logStrategyCardPicked } from '../utils/game-log.js';
 
 /**
  * Handle strategy card selection
@@ -21,6 +22,9 @@ export function handlePickStrategyCard(
   // Assign card to player
   player.strategyCard = action.cardNumber;
   card.pickedBy = action.playerId;
+
+  // Log the action
+  logStrategyCardPicked(state, action.playerId, action.cardNumber, card.name);
 
   // Advance to next player in pick order
   advanceStrategyPickOrder(state);

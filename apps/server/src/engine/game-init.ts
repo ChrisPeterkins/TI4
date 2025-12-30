@@ -17,6 +17,7 @@ import {
   STAGE_I_OBJECTIVES,
   STAGE_II_OBJECTIVES,
   SECRET_OBJECTIVES,
+  getGenericNoteIdsForColor,
 } from '@ti4/shared';
 import { factions, systems, strategyCards } from '@ti4/game-data';
 import { getHomeSystemPositions, generateStandardMapPositions } from './utils/hex.js';
@@ -87,8 +88,10 @@ export function createGame(options: GameSetupOptions): GameState {
     laws: [],
     custodiansTaken: false,
     activeCombat: null,
-    timingWindows: [],
+    timingWindowStack: [],
+    activeTimingWindow: null,
     winner: null,
+    gameLog: [],
   };
 
   // Place starting units for each player
@@ -114,6 +117,13 @@ function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
     throw new Error(`Unknown faction: ${setup.factionId}`);
   }
 
+  // Get generic promissory notes for this player's color
+  // Base game: Support for Throne, Ceasefire, Trade Agreement, Political Secret
+  const genericNotes = getGenericNoteIdsForColor(setup.color, ['base']);
+
+  // All promissory notes this player owns (faction + generic)
+  const allOwnedNotes = [faction.promissoryNote.id, ...genericNotes];
+
   return {
     id: uuidv4(),
     name: setup.name,
@@ -132,8 +142,9 @@ function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
     actionCards: [],
     secretObjectives: [],
     scoredObjectives: [],
-    promissoryNotesOwned: [faction.promissoryNote.id],
-    promissoryNotesInHand: [faction.promissoryNote.id],
+    promissoryNotesOwned: allOwnedNotes,
+    promissoryNotesInHand: [...allOwnedNotes], // Start with all notes in hand
+    promissoryNotesInPlay: [], // No notes in play initially
     planets: [],
     strategyCard: null,
     strategyCardUsed: false,

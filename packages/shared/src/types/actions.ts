@@ -386,6 +386,16 @@ export interface DeclineTransactionAction extends BaseAction {
   transactionId: UUID;
 }
 
+// Promissory Note Actions
+export interface PlayPromissoryNoteAction extends BaseAction {
+  type: 'play_promissory_note';
+  noteId: string;
+  targetPlayerId?: UUID;
+  targetPlanetId?: string;
+  targetTechId?: string;
+  targetCardId?: string;
+}
+
 // Timing Window Responses
 export interface TimingWindowResponseAction extends BaseAction {
   type: 'timing_window_response';
@@ -488,6 +498,7 @@ export type GameAction =
   | ProposeTransactionAction
   | AcceptTransactionAction
   | DeclineTransactionAction
+  | PlayPromissoryNoteAction
   | TimingWindowResponseAction
   | ResearchTechnologyAction
   | ExhaustPlanetAction

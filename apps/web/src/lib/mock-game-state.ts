@@ -89,8 +89,10 @@ export function createMockGameState(playerCount: number = 6): GameState {
     laws: [],
     custodiansTaken: false,
     activeCombat: null,
-    timingWindows: [],
+    timingWindowStack: [],
+    activeTimingWindow: null,
     winner: null,
+    gameLog: [],
   };
 }
 
@@ -114,6 +116,7 @@ function createMockPlayers(count: number, factions: string[]): PlayerState[] {
     scoredObjectives: [],
     promissoryNotesOwned: [],
     promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     planets: [],
     strategyCard: i + 1,
     strategyCardUsed: false,

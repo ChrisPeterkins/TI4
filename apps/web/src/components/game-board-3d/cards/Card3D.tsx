@@ -2,9 +2,10 @@
 
 import { useRef, useState, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
-import { useLoader, ThreeEvent, useFrame } from '@react-three/fiber';
+import { useLoader, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { animated, useSpring } from '@react-spring/three';
+import { configureHighQualityTexture } from '../textureUtils';
 
 // Standard playing card ratio: 2.5" x 3.5" = 0.714
 const CARD_WIDTH = 0.714;
@@ -47,21 +48,26 @@ export function Card3D({
 }: Card3DProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const { gl } = useThree();
+
+  // Get max anisotropy supported by the GPU
+  const maxAnisotropy = useMemo(
+    () => gl.capabilities.getMaxAnisotropy(),
+    [gl]
+  );
 
   // Load textures
   const frontTex = useLoader(TextureLoader, frontTexture);
   const backTex = useLoader(TextureLoader, backTexture);
 
-  // Configure textures
+  // Configure textures for high quality
   useEffect(() => {
     [frontTex, backTex].forEach((tex) => {
       if (tex) {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.minFilter = THREE.LinearFilter;
-        tex.magFilter = THREE.LinearFilter;
+        configureHighQualityTexture(tex, maxAnisotropy);
       }
     });
-  }, [frontTex, backTex]);
+  }, [frontTex, backTex, maxAnisotropy]);
 
   // Spring animation for flip and hover
   const { rotationY, positionY, emissiveIntensity } = useSpring({

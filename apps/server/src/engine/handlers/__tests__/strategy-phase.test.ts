@@ -19,6 +19,7 @@ function createMockPlayer(id: string, overrides: Partial<PlayerState> = {}): Pla
     scoredObjectives: [],
     promissoryNotesOwned: [],
     promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     planets: [],
     strategyCard: null,
     strategyCardUsed: false,
@@ -83,8 +84,9 @@ function createMockGameState(playerCount: number = 4): GameState {
     laws: [],
     custodiansTaken: false,
     activeCombat: null,
-    timingWindows: [],
+    timingWindowStack: [], activeTimingWindow: null,
     winner: null,
+    gameLog: [],
   };
 }
 

@@ -10,6 +10,7 @@ import {
   getStrategyCardUrl,
   getTechnologyCardUrl,
 } from '@/lib/assets';
+import { PromissoryNotesPanel } from './PromissoryNotesPanel';
 
 interface PlayerDashboardProps {
   player: PlayerState;
@@ -280,7 +281,7 @@ export function PlayerDashboard({ player, isActivePlayer }: PlayerDashboardProps
 
       {/* Technologies - Display card images */}
       {player.technologies.length > 0 && (
-        <div>
+        <div className="mb-4">
           <div className="text-xs text-gray-500 mb-2">Technologies ({player.technologies.length})</div>
           <div className="grid grid-cols-2 gap-2">
             {player.technologies.map((tech) => (
@@ -289,6 +290,9 @@ export function PlayerDashboard({ player, isActivePlayer }: PlayerDashboardProps
           </div>
         </div>
       )}
+
+      {/* Promissory Notes */}
+      <PromissoryNotesPanel player={player} compact />
 
       {/* Tech card modal */}
       {selectedTech && (

@@ -11,7 +11,7 @@ import type {
   UnitType,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
-import { findTileAtPosition, getAdjacentPositions, findPath, hexDistance } from '../utils/hex.js';
+import { findTileAtPosition, getAdjacentPositions, findPath, hexDistance, findPathWithAbilities } from '../utils/hex.js';
 import {
   isShipType,
   isGroundUnit,
@@ -19,13 +19,16 @@ import {
   getUnitMoveValue,
   getUnitCapacity,
   calculateFleetSupply,
+  calculateFleetSupplyWithAbilities,
   countFleetSupplyUnits,
   calculateCapacityInSystem,
   calculateProductionCapacity,
+  calculateProductionCapacityWithAbilities,
   calculateAvailableResources,
   calculateProductionCost,
   calculateProductionCount,
   countsTowardsFleetSupply,
+  canProduceUnit,
 } from '../utils/units.js';
 
 /**
@@ -277,10 +280,10 @@ export function validateMoveUnits(
     if (isShipType(unit.type)) {
       const moveValue = getUnitMoveValue(unit.type, player);
 
-      // Check if path exists within movement range
-      const path = findPath(state.map, move.from.systemPosition, state.activatedSystem, moveValue);
+      // Check if path exists within movement range (uses faction abilities for movement bonus, wormhole adjacency, anomaly immunity)
+      const path = findPathWithAbilities(state, action.playerId, move.from.systemPosition, state.activatedSystem, moveValue);
       if (!path) {
-        return { valid: false, error: `${unit.type} cannot reach destination (movement: ${moveValue})` };
+        return { valid: false, error: `${unit.type} cannot reach destination (base movement: ${moveValue})` };
       }
 
       movingShips.push(unit.type);
@@ -304,10 +307,10 @@ export function validateMoveUnits(
     }
   }
 
-  // Check fleet supply at destination
+  // Check fleet supply at destination (uses faction abilities like Letnev Armada +2)
   const currentFleetSupply = countFleetSupplyUnits(targetTile.units, action.playerId);
   const newShipsCountingSupply = movingShips.filter(t => countsTowardsFleetSupply(t)).length;
-  const maxFleetSupply = calculateFleetSupply(player);
+  const maxFleetSupply = calculateFleetSupplyWithAbilities(state, action.playerId);
 
   if (currentFleetSupply + newShipsCountingSupply > maxFleetSupply) {
     return {
@@ -405,8 +408,8 @@ export function validateProduceUnits(
     return { valid: false, error: 'No space dock in this system' };
   }
 
-  // Calculate production capacity
-  const productionCapacity = calculateProductionCapacity(tile, player);
+  // Calculate production capacity (uses faction abilities like Saar Production 5)
+  const productionCapacity = calculateProductionCapacityWithAbilities(state, tile, action.playerId);
   const unitCount = calculateProductionCount(action.units);
 
   if (unitCount > productionCapacity) {
@@ -414,6 +417,16 @@ export function validateProduceUnits(
       valid: false,
       error: `Production capacity exceeded: ${unitCount}/${productionCapacity}`,
     };
+  }
+
+  // Check if player can produce each unit type (faction restrictions like Arborec no infantry)
+  for (const prod of action.units) {
+    if (!canProduceUnit(state, action.playerId, prod.type, tile.id)) {
+      return {
+        valid: false,
+        error: `Cannot produce ${prod.type} - blocked by faction ability`,
+      };
+    }
   }
 
   // Calculate cost
@@ -427,12 +440,12 @@ export function validateProduceUnits(
     };
   }
 
-  // Check fleet supply for new ships
+  // Check fleet supply for new ships (uses faction abilities like Letnev Armada +2)
   const newShips = action.units
     .filter(u => countsTowardsFleetSupply(u.type))
     .reduce((sum, u) => sum + u.count, 0);
   const currentFleetSupply = countFleetSupplyUnits(tile.units, action.playerId);
-  const maxFleetSupply = calculateFleetSupply(player);
+  const maxFleetSupply = calculateFleetSupplyWithAbilities(state, action.playerId);
 
   if (currentFleetSupply + newShips > maxFleetSupply) {
     return {

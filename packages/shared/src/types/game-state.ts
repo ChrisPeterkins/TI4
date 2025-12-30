@@ -5,6 +5,7 @@ import type {
   HexCoord,
   WormholeType,
   AnomalyType,
+  TimingTrigger,
 } from './common.js';
 
 // Game Phases
@@ -57,6 +58,137 @@ export type InvasionState =
   | 'ground_combat'
   | 'establish_control';
 
+// =============================================================================
+// GAME LOG TYPES
+// =============================================================================
+
+export type GameLogEntryType =
+  // Phase transitions
+  | 'phase_change'
+  | 'round_start'
+  // Strategy phase
+  | 'strategy_card_picked'
+  // Action phase
+  | 'turn_start'
+  | 'tactical_action'
+  | 'strategic_action'
+  | 'component_action'
+  | 'pass'
+  // Movement
+  | 'units_moved'
+  | 'system_activated'
+  // Combat
+  | 'combat_start'
+  | 'combat_round'
+  | 'dice_rolled'
+  | 'hits_assigned'
+  | 'unit_destroyed'
+  | 'combat_end'
+  | 'retreat'
+  // Production
+  | 'units_produced'
+  // Invasion
+  | 'bombardment'
+  | 'invasion_start'
+  | 'planet_taken'
+  // Cards
+  | 'action_card_played'
+  | 'action_card_drawn'
+  | 'sabotage'
+  | 'rider_played'
+  | 'rider_resolved'
+  // Technology
+  | 'technology_researched'
+  // Objectives
+  | 'objective_scored'
+  | 'objective_revealed'
+  // Agenda
+  | 'agenda_revealed'
+  | 'vote_cast'
+  | 'agenda_resolved'
+  // Trade
+  | 'transaction_completed'
+  | 'commodities_refreshed'
+  // Other
+  | 'promissory_note_played'
+  | 'ability_triggered'
+  | 'game_won';
+
+export interface GameLogEntry {
+  id: string;
+  timestamp: number;
+  type: GameLogEntryType;
+  playerId?: UUID;
+  playerName?: string;
+  playerFaction?: string;
+  round: number;
+  phase: GamePhase;
+  message: string;
+  details?: GameLogDetails;
+}
+
+export interface GameLogDetails {
+  // Combat details
+  attackerId?: UUID;
+  defenderId?: UUID;
+  systemId?: string;
+  systemName?: string;
+  rolls?: number[];
+  hits?: number;
+  unitType?: UnitType;
+  unitCount?: number;
+  winnerId?: UUID;
+
+  // Card details
+  cardId?: string;
+  cardName?: string;
+
+  // Technology details
+  techId?: string;
+  techName?: string;
+
+  // Objective details
+  objectiveId?: string;
+  objectiveName?: string;
+  points?: number;
+
+  // Agenda details
+  agendaId?: string;
+  agendaName?: string;
+  outcome?: string;
+  votes?: number;
+
+  // Strategy card details
+  strategyCardNumber?: number;
+  strategyCardName?: string;
+
+  // Planet details
+  planetId?: string;
+  planetName?: string;
+
+  // Transaction details
+  fromPlayerId?: UUID;
+  toPlayerId?: UUID;
+  tradeGoods?: number;
+  commodities?: number;
+
+  // Production details
+  unitsProduced?: Array<{ type: UnitType; count: number }>;
+  totalCost?: number;
+
+  // Movement details
+  fromSystem?: string;
+  toSystem?: string;
+  unitsMoved?: Array<{ type: UnitType; count: number }>;
+
+  // Generic additional data
+  [key: string]: unknown;
+}
+
+// =============================================================================
+// GAME STATE
+// =============================================================================
+
 // Full Game State
 export interface GameState {
   id: UUID;
@@ -79,7 +211,10 @@ export interface GameState {
   laws: ActiveLaw[];
   custodiansTaken: boolean;
   activeCombat: CombatInstance | null;
-  timingWindows: TimingWindow[];
+  /** Stack of timing windows - newest at end, resolve LIFO */
+  timingWindowStack: TimingWindow[];
+  /** The currently active timing window (top of stack) */
+  activeTimingWindow: TimingWindow | null;
   winner: UUID | null;
   // Tactical action tracking
   activatedSystem?: HexCoord;
@@ -91,6 +226,30 @@ export interface GameState {
   invasionPhase?: InvasionTracking;
   // Strategic action tracking
   strategicActionState?: StrategicActionTracking;
+  // Pending transaction (for async accept/decline)
+  pendingTransaction?: PendingTransaction;
+  // Game event log
+  gameLog: GameLogEntry[];
+}
+
+// Pending Transaction State
+export interface PendingTransaction {
+  id: UUID;
+  initiatorId: UUID;
+  targetId: UUID;
+  initiatorOffer: {
+    tradeGoods?: number;
+    commodities?: number;
+    promissoryNotes?: string[]; // Max 1 per transaction
+    actionCards?: string[];
+  };
+  requestedOffer: {
+    tradeGoods?: number;
+    commodities?: number;
+    promissoryNotes?: string[]; // Max 1 per transaction
+    actionCards?: string[];
+  };
+  createdAt: number; // Timestamp
 }
 
 // Player State
@@ -114,6 +273,7 @@ export interface PlayerState {
   scoredObjectives: string[];
   promissoryNotesOwned: string[];
   promissoryNotesInHand: string[];
+  promissoryNotesInPlay: PromissoryNoteInPlay[];
   planets: PlanetState[];
   strategyCard: number | null;
   strategyCardUsed: boolean;
@@ -136,6 +296,14 @@ export interface LeaderState {
   agent: { unlocked: boolean; exhausted: boolean };
   commander: { unlocked: boolean };
   hero: { unlocked: boolean; purged: boolean };
+}
+
+// Promissory Note in Play Area
+export interface PromissoryNoteInPlay {
+  noteId: string; // The promissory note ID (e.g., 'support_for_the_throne_red')
+  originalOwnerId: UUID; // The player who originally owns this note
+  receivedFrom?: UUID; // The player who gave this note (may differ from owner if traded)
+  placedRound: number; // Which round the note was placed in play area
 }
 
 // Map State
@@ -257,11 +425,45 @@ export interface CombatInstance {
 // Timing Windows for Action Cards
 export interface TimingWindow {
   id: UUID;
-  trigger: string;
+  trigger: TimingTrigger;
   eligiblePlayers: UUID[];
-  responses: Map<UUID, 'pass' | 'pending'>;
-  playedCards: { playerId: UUID; cardId: string }[];
+  responses: Record<UUID, 'pass' | 'pending' | 'played'>;
+  playedCards: TimingWindowCard[];
   expiresAt: number;
+  /** Optional parent window ID for nested windows (e.g., Sabotage on Sabotage) */
+  parentWindowId?: UUID;
+  /** Context data for this timing window */
+  context?: TimingWindowContext;
+  /** Whether this window has been resolved */
+  resolved: boolean;
+}
+
+export interface TimingWindowCard {
+  playerId: UUID;
+  cardId: string;
+  targets?: {
+    playerId?: UUID;
+    systemPosition?: HexCoord;
+    planetId?: string;
+    unitIds?: UUID[];
+  };
+}
+
+export interface TimingWindowContext {
+  /** The action card that triggered this window (for Sabotage) */
+  sourceCardId?: string;
+  /** The player who played the triggering card */
+  sourcePlayerId?: UUID;
+  /** System position for location-based triggers */
+  systemPosition?: HexCoord;
+  /** Planet ID for planet-based triggers */
+  planetId?: string;
+  /** Combat ID for combat triggers */
+  combatId?: UUID;
+  /** Agenda ID for agenda triggers */
+  agendaId?: string;
+  /** Any additional data needed for card effects */
+  additionalData?: Record<string, unknown>;
 }
 
 // Status Phase Tracking

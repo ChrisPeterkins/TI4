@@ -8,6 +8,7 @@ import type {
   RedistributeTokensAction,
   CastVoteAction,
   SpeakerTiebreakAction,
+  PlayRiderAction,
   SelectInvasionTargetsAction,
   CommitGroundForcesAction,
   RollBombardmentAction,
@@ -20,6 +21,11 @@ import type {
   ResearchTechnologyAction,
   StrategicPrimaryAction,
   StrategicSecondaryAction,
+  ProposeTransactionAction,
+  AcceptTransactionAction,
+  DeclineTransactionAction,
+  PlayPromissoryNoteAction,
+  TimingWindowResponseAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -46,6 +52,7 @@ import {
   handleRevealAgenda,
   handleCastVote,
   handleSpeakerTiebreak,
+  handlePlayRider,
 } from './agenda-phase.js';
 import {
   handleSelectInvasionTargets,
@@ -65,6 +72,13 @@ import {
   handleStrategicPrimary,
   handleStrategicSecondary,
 } from './strategy-cards.js';
+import {
+  handleProposeTransaction,
+  handleAcceptTransaction,
+  handleDeclineTransaction,
+} from './transactions.js';
+import { handlePlayPromissoryNote } from './promissory-notes.js';
+import { handleTimingWindowResponse } from './timing-windows.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -135,6 +149,9 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
     case 'speaker_tiebreak':
       return handleSpeakerTiebreak(state, action as SpeakerTiebreakAction);
 
+    case 'play_rider':
+      return handlePlayRider(state, action as PlayRiderAction);
+
     // Invasion
     case 'select_invasion_targets':
       return handleSelectInvasionTargets(state, action as SelectInvasionTargetsAction);
@@ -167,6 +184,24 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
     // Technology
     case 'research_technology':
       return handleResearchTechnology(state, action as ResearchTechnologyAction);
+
+    // Transactions
+    case 'propose_transaction':
+      return handleProposeTransaction(state, action as ProposeTransactionAction);
+
+    case 'accept_transaction':
+      return handleAcceptTransaction(state, action as AcceptTransactionAction);
+
+    case 'decline_transaction':
+      return handleDeclineTransaction(state, action as DeclineTransactionAction);
+
+    // Promissory Notes
+    case 'play_promissory_note':
+      return handlePlayPromissoryNote(state, action as PlayPromissoryNoteAction);
+
+    // Timing Windows
+    case 'timing_window_response':
+      return handleTimingWindowResponse(state, action as TimingWindowResponseAction);
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };
