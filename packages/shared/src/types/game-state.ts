@@ -31,13 +31,39 @@ export type CombatState =
   | 'combat_round_assign'
   | 'combat_complete';
 
+export type StatusPhaseState =
+  | 'score_objectives'
+  | 'reveal_public_objective'
+  | 'draw_action_cards'
+  | 'remove_command_tokens'
+  | 'gain_redistribute_tokens'
+  | 'ready_cards'
+  | 'repair_units'
+  | 'return_strategy_cards';
+
+export type AgendaPhaseState =
+  | 'reveal_agenda'
+  | 'when_revealed'
+  | 'after_revealed'
+  | 'voting'
+  | 'speaker_tiebreak'
+  | 'resolve_outcome';
+
+export type InvasionState =
+  | 'select_planets'
+  | 'bombardment'
+  | 'commit_ground_forces'
+  | 'space_cannon_defense'
+  | 'ground_combat'
+  | 'establish_control';
+
 // Full Game State
 export interface GameState {
   id: UUID;
   version: number;
   round: number;
   phase: GamePhase;
-  subPhase?: ActionPhaseState | CombatState;
+  subPhase?: ActionPhaseState | CombatState | StatusPhaseState | AgendaPhaseState | InvasionState;
   activePlayerId: UUID;
   speakerId: UUID;
   initiativeOrder: UUID[];
@@ -57,6 +83,12 @@ export interface GameState {
   winner: UUID | null;
   // Tactical action tracking
   activatedSystem?: HexCoord;
+  // Status phase tracking
+  statusPhase?: StatusPhaseTracking;
+  // Agenda phase tracking
+  agendaPhase?: AgendaPhaseTracking;
+  // Invasion phase tracking
+  invasionPhase?: InvasionTracking;
 }
 
 // Player State
@@ -228,4 +260,97 @@ export interface TimingWindow {
   responses: Map<UUID, 'pass' | 'pending'>;
   playedCards: { playerId: UUID; cardId: string }[];
   expiresAt: number;
+}
+
+// Status Phase Tracking
+export interface StatusPhaseTracking {
+  /** Current step (1-8) */
+  currentStep: number;
+  /** Players who have completed scoring (step 1) */
+  scoringComplete: UUID[];
+  /** What each player scored this phase */
+  scoredThisPhase: {
+    playerId: UUID;
+    publicObjective?: string;
+    secretObjective?: string;
+  }[];
+  /** Players who have redistributed tokens (step 5) */
+  redistributionComplete: UUID[];
+  /** The objective that was revealed this phase (if any) */
+  revealedObjective?: string;
+}
+
+// Agenda Phase Tracking
+export interface AgendaPhaseTracking {
+  /** Current step in the agenda resolution */
+  currentStep: AgendaPhaseState;
+  /** Which agenda we're on (1 or 2) */
+  agendaNumber: 1 | 2;
+  /** ID of the current agenda card */
+  currentAgendaId: string | null;
+  /** Type of current agenda */
+  currentAgendaType: 'law' | 'directive' | null;
+  /** Election type of current agenda */
+  currentElectionType: 'for_against' | 'player' | 'planet' | 'scored_secret' | 'law' | 'strategy_card' | 'custom' | null;
+  /** Voting order: player IDs from left of speaker clockwise, speaker last */
+  votingOrder: UUID[];
+  /** Index into votingOrder for current voter */
+  currentVoterIndex: number;
+  /** Players who have finished voting this agenda */
+  votingComplete: UUID[];
+  /** Map of playerId to their vote details */
+  votes: Record<UUID, AgendaVoteRecord>;
+  /** Vote tallies by outcome */
+  voteTallies: Record<string, number>;
+  /** Active riders for this agenda */
+  riders: RiderRecord[];
+  /** Whether the current agenda was vetoed */
+  vetoed: boolean;
+  /** The winning outcome */
+  electedOutcome: string | null;
+  /** For player elections, the elected player */
+  electedPlayer: UUID | null;
+  /** For planet elections, the elected planet */
+  electedPlanet: string | null;
+}
+
+export interface AgendaVoteRecord {
+  /** The outcome voted for */
+  outcome: string;
+  /** Base votes from planet influence */
+  votes: number;
+  /** Extra votes from abilities/cards */
+  extraVotes: number;
+  /** Whether player abstained */
+  abstained: boolean;
+  /** Planets exhausted for this vote */
+  exhaustedPlanets: string[];
+}
+
+export interface RiderRecord {
+  playerId: UUID;
+  cardId: string;
+  prediction: string;
+  resolved: boolean;
+  success: boolean;
+}
+
+// Invasion Phase Tracking
+export interface InvasionTracking {
+  /** Current step in the invasion process */
+  currentStep: InvasionState;
+  /** Planet IDs being invaded */
+  targetPlanets: string[];
+  /** Index of current planet being resolved */
+  currentPlanetIndex: number;
+  /** Whether bombardment has been completed for current planet */
+  bombardmentComplete: boolean;
+  /** Map of planetId to committed unit IDs */
+  groundForcesCommitted: Record<string, string[]>;
+  /** Whether space cannon defense has been completed for current planet */
+  spaceCannonComplete: boolean;
+  /** Pending bombardment hits to assign */
+  pendingBombardmentHits: number;
+  /** Pending space cannon hits to assign */
+  pendingSpaceCannonHits: number;
 }

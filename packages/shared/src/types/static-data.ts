@@ -198,7 +198,7 @@ export interface AgendaCardData {
   id: string;
   name: string;
   type: 'law' | 'directive';
-  electionType: 'player' | 'planet' | 'for_against' | 'secret_objective' | 'strategy_card' | 'custom';
+  electionType: 'player' | 'planet' | 'for_against' | 'scored_secret' | 'law' | 'strategy_card' | 'custom';
   description: string;
   expansion: Expansion;
 }

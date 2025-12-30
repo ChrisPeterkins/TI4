@@ -9,6 +9,7 @@ import type {
   DraftPlayerInfo,
 } from '@ti4/shared';
 import { useSocketStore } from './socket-store';
+import { toast } from './toast-store';
 
 interface LobbyState {
   // Current lobby
@@ -84,7 +85,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
   createLobby: async (settings: LobbySettings) => {
     const { socket } = useSocketStore.getState();
     if (!socket) {
-      set({ error: 'Not connected to server' });
+      toast.error('Not connected to server');
       return;
     }
 
@@ -110,7 +111,8 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
           } else {
             // Error response
             const error = response as ErrorEvent;
-            set({ error: error.message, isLoading: false });
+            toast.error(error.message);
+            set({ isLoading: false });
             reject(new Error(error.message));
           }
         }
@@ -121,7 +123,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
   joinLobby: async (codeOrId: string) => {
     const { socket } = useSocketStore.getState();
     if (!socket) {
-      set({ error: 'Not connected to server' });
+      toast.error('Not connected to server');
       return;
     }
 
@@ -149,7 +151,8 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
         } else {
           // Error response
           const error = response as ErrorEvent;
-          set({ error: error.message, isLoading: false });
+          toast.error(error.message);
+          set({ isLoading: false });
           reject(new Error(error.message));
         }
       });
@@ -209,7 +212,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     const { lobbyId } = get();
 
     if (!socket || !lobbyId) {
-      set({ error: 'Not in a lobby' });
+      toast.error('Not in a lobby');
       return;
     }
 
@@ -221,7 +224,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
         } else {
           // Error
           const error = response as ErrorEvent;
-          set({ error: error.message });
+          toast.error(error.message);
           reject(new Error(error.message));
         }
       });
@@ -260,7 +263,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     const { lobbyId } = get();
 
     if (!socket || !lobbyId) {
-      set({ error: 'Not in a lobby' });
+      toast.error('Not in a lobby');
       return;
     }
 
@@ -277,7 +280,8 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
           resolve();
         } else {
           const error = response as ErrorEvent;
-          set({ error: error.message, isLoading: false });
+          toast.error(error.message);
+          set({ isLoading: false });
           reject(new Error(error.message));
         }
       });
@@ -289,7 +293,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     const { lobbyId } = get();
 
     if (!socket || !lobbyId) {
-      set({ error: 'Not in a lobby' });
+      toast.error('Not in a lobby');
       return;
     }
 
@@ -304,7 +308,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
           resolve();
         } else {
           const error = response as ErrorEvent;
-          set({ error: error.message });
+          toast.error(error.message);
           reject(new Error(error.message));
         }
       });
@@ -361,7 +365,7 @@ export const useLobbyStore = create<LobbyState>((set, get) => ({
     });
 
     socket.on('error', (error) => {
-      set({ error: error.message });
+      toast.error(error.message);
     });
   },
 

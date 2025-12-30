@@ -1,12 +1,19 @@
 import { create } from 'zustand';
-import type { GameState, GameAction } from '@ti4/shared';
+import type { GameState, GameAction, DiceRoll } from '@ti4/shared';
 import { useSocketStore } from './socket-store';
+import { toast } from './toast-store';
 
 interface GameStore {
   // Game state
   gameId: string | null;
   gameState: GameState | null;
   currentPlayerId: string | null; // The player ID for the current user in this game
+
+  // Combat state
+  pendingDiceRolls: {
+    attackerRolls: DiceRoll[];
+    defenderRolls: DiceRoll[];
+  } | null;
 
   // UI state
   isLoading: boolean;
@@ -33,6 +40,10 @@ const initialState = {
   gameId: null,
   gameState: null,
   currentPlayerId: null as string | null,
+  pendingDiceRolls: null as {
+    attackerRolls: DiceRoll[];
+    defenderRolls: DiceRoll[];
+  } | null,
   isLoading: false,
   error: null,
   isConnected: false,
@@ -44,7 +55,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   joinGame: (gameId: string) => {
     const { socket } = useSocketStore.getState();
     if (!socket) {
-      set({ error: 'Not connected to server' });
+      toast.error('Not connected to server');
       return;
     }
 
@@ -76,12 +87,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { gameId, gameState, currentPlayerId } = get();
 
     if (!socket || !gameId || !gameState) {
-      set({ error: 'Cannot send action: not in game' });
+      toast.error('Cannot send action: not in game');
       return;
     }
 
     if (!currentPlayerId) {
-      set({ error: 'Cannot send action: player ID not set' });
+      toast.error('Cannot send action: player ID not set');
       return;
     }
 
@@ -127,7 +138,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         get().setCurrentPlayerId(data.playerId);
         get().setGameState(data.gameState);
       } else if (data.error) {
-        set({ error: data.error, isLoading: false });
+        toast.error(data.error);
+        set({ isLoading: false });
       }
     });
 
@@ -137,7 +149,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     socket.on('action_result', (data) => {
       if (!data.result.success) {
-        set({ error: data.result.error || 'Action failed' });
+        toast.error(data.result.error || 'Action failed');
       }
     });
 
@@ -153,8 +165,39 @@ export const useGameStore = create<GameStore>((set, get) => ({
       console.log('Player reconnected:', data.playerId);
     });
 
+    // Combat events
+    socket.on('dice_rolled', (data: { attackerRolls?: DiceRoll[]; defenderRolls?: DiceRoll[]; rolls?: DiceRoll[] }) => {
+      console.log('Dice rolled:', data);
+      set({
+        pendingDiceRolls: {
+          attackerRolls: data.attackerRolls || [],
+          defenderRolls: data.defenderRolls || [],
+        },
+      });
+    });
+
+    socket.on('combat_started', (data) => {
+      console.log('Combat started:', data);
+      toast.info('Space combat initiated!');
+    });
+
+    socket.on('combat_updated', (data) => {
+      console.log('Combat updated:', data);
+    });
+
+    socket.on('combat_ended', (data) => {
+      console.log('Combat ended:', data);
+      set({ pendingDiceRolls: null });
+      if (data.winnerId) {
+        toast.success('Combat complete!');
+      } else {
+        toast.info('Combat ended in a draw!');
+      }
+    });
+
     socket.on('error', (error) => {
-      set({ error: error.message, isLoading: false });
+      toast.error(error.message);
+      set({ isLoading: false });
     });
   },
 
@@ -168,6 +211,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.off('player_joined');
     socket.off('player_left');
     socket.off('player_reconnected');
+    socket.off('dice_rolled');
+    socket.off('combat_started');
+    socket.off('combat_updated');
+    socket.off('combat_ended');
   },
 
   reset: () => {

@@ -1,4 +1,17 @@
-import type { GameState, GameAction } from '@ti4/shared';
+import type {
+  GameState,
+  GameAction,
+  RevealAgendaAction,
+  CastVoteAction,
+  SpeakerTiebreakAction,
+  SelectInvasionTargetsAction,
+  CommitGroundForcesAction,
+  RollBombardmentAction,
+  SkipBombardmentAction,
+  AssignBombardmentHitsAction,
+  AssignSpaceCannonHitsAction,
+  SkipInvasionAction,
+} from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
 import {
@@ -10,6 +23,30 @@ import {
   validateProduceUnits,
   validateSkipProduction,
 } from './action-phase.js';
+import {
+  validateAssignHits,
+  validateAnnounceRetreat,
+  validateAdvanceCombat,
+} from './combat.js';
+import {
+  validateScoreObjective,
+  validateSkipScoring,
+  validateRedistributeTokens,
+} from './status-phase.js';
+import {
+  validateRevealAgenda,
+  validateCastVote,
+  validateSpeakerTiebreak,
+} from './agenda-phase.js';
+import {
+  validateSelectInvasionTargets,
+  validateCommitGroundForces,
+  validateRollBombardment,
+  validateSkipBombardment,
+  validateAssignBombardmentHits,
+  validateAssignSpaceCannonHits,
+  validateSkipInvasion,
+} from './invasion.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -56,9 +93,50 @@ export function validateAction(state: GameState, action: GameAction): Validation
     case 'announce_retreat':
       return validateAnnounceRetreat(state, action);
 
-    // Agenda
-    case 'vote':
-      return validateVote(state, action);
+    case 'advance_combat':
+      return validateAdvanceCombat(state, action);
+
+    // Status Phase
+    case 'score_objective':
+      return validateScoreObjective(state, action);
+
+    case 'skip_scoring':
+      return validateSkipScoring(state, action);
+
+    case 'redistribute_tokens':
+      return validateRedistributeTokens(state, action);
+
+    // Agenda Phase
+    case 'reveal_agenda':
+      return validateRevealAgenda(state, action as RevealAgendaAction);
+
+    case 'cast_vote':
+      return validateCastVote(state, action as CastVoteAction);
+
+    case 'speaker_tiebreak':
+      return validateSpeakerTiebreak(state, action as SpeakerTiebreakAction);
+
+    // Invasion
+    case 'select_invasion_targets':
+      return validateSelectInvasionTargets(state, action as SelectInvasionTargetsAction);
+
+    case 'commit_ground_forces':
+      return validateCommitGroundForces(state, action as CommitGroundForcesAction);
+
+    case 'roll_bombardment':
+      return validateRollBombardment(state, action as RollBombardmentAction);
+
+    case 'skip_bombardment':
+      return validateSkipBombardment(state, action as SkipBombardmentAction);
+
+    case 'assign_bombardment_hits':
+      return validateAssignBombardmentHits(state, action as AssignBombardmentHitsAction);
+
+    case 'assign_space_cannon_hits':
+      return validateAssignSpaceCannonHits(state, action as AssignSpaceCannonHitsAction);
+
+    case 'skip_invasion':
+      return validateSkipInvasion(state, action as SkipInvasionAction);
 
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };
@@ -69,47 +147,16 @@ export function validateAction(state: GameState, action: GameAction): Validation
  * Check if it's the player's turn
  */
 function isPlayersTurn(state: GameState, action: GameAction): boolean {
-  // Some actions can be taken out of turn (e.g., timing window responses)
-  const outOfTurnActions = ['timing_window_response', 'assign_hits'];
+  // Some actions can be taken out of turn (e.g., timing window responses, hit assignment)
+  const outOfTurnActions = [
+    'timing_window_response',
+    'assign_hits',
+    'assign_bombardment_hits',  // Defender assigns during attacker's turn
+    'assign_space_cannon_hits', // Attacker assigns, but could be out of turn context
+  ];
   if (outOfTurnActions.includes(action.type)) {
     return true;
   }
 
   return state.activePlayerId === action.playerId;
-}
-
-/**
- * Placeholder validators - to be implemented
- */
-function validateAssignHits(state: GameState, action: GameAction): ValidationResult {
-  if (!state.activeCombat) {
-    return { valid: false, error: 'No active combat' };
-  }
-
-  // TODO: Validate hit assignment
-  return { valid: true };
-}
-
-function validateAnnounceRetreat(state: GameState, action: GameAction): ValidationResult {
-  if (!state.activeCombat) {
-    return { valid: false, error: 'No active combat' };
-  }
-
-  if (state.activeCombat.state !== 'announce_retreat') {
-    return { valid: false, error: 'Cannot announce retreat at this time' };
-  }
-
-  return { valid: true };
-}
-
-function validateVote(state: GameState, action: GameAction): ValidationResult {
-  if (state.phase !== 'agenda') {
-    return { valid: false, error: 'Not in agenda phase' };
-  }
-
-  if (!state.agendas.currentAgenda) {
-    return { valid: false, error: 'No active agenda' };
-  }
-
-  return { valid: true };
 }

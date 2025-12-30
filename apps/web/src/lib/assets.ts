@@ -368,6 +368,76 @@ export function getCardUrl(cardType: CardType, cardId: string): string {
 }
 
 // =============================================================================
+// CARD BACK ASSETS
+// =============================================================================
+
+const CARD_BACKS_PATH = `${IMAGES_BASE}/card-backs`;
+
+/**
+ * Get action card back URL
+ */
+export function getActionCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/action.png`;
+}
+
+/**
+ * Get agenda card back URL
+ */
+export function getAgendaCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/agenda.png`;
+}
+
+/**
+ * Get objective card back URL
+ * @param tier - 'stage1' or 'stage2' for different tiers
+ */
+export function getObjectiveCardBackUrl(tier: 'stage1' | 'stage2' = 'stage1'): string {
+  return `${CARD_BACKS_PATH}/objective_${tier}.png`;
+}
+
+/**
+ * Get exploration card back URL
+ * @param type - 'cultural', 'hazardous', 'industrial', or 'frontier'
+ */
+export function getExplorationCardBackUrl(
+  type: 'cultural' | 'hazardous' | 'industrial' | 'frontier' = 'cultural'
+): string {
+  return `${CARD_BACKS_PATH}/exploration_${type}.png`;
+}
+
+/**
+ * Get relic card back URL
+ */
+export function getRelicCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/relic.png`;
+}
+
+/**
+ * Get promissory note back URL
+ * @param factionId - faction ID for faction-specific backs, or 'generic' for standard
+ */
+export function getPromissoryCardBackUrl(factionId?: string): string {
+  if (factionId) {
+    return `${CARD_BACKS_PATH}/promissory_${factionId}.png`;
+  }
+  return `${CARD_BACKS_PATH}/promissory.png`;
+}
+
+/**
+ * Get secret objective card back URL
+ */
+export function getSecretObjectiveCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/secret_objective.png`;
+}
+
+/**
+ * Generic card back for fallback
+ */
+export function getGenericCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/generic.png`;
+}
+
+// =============================================================================
 // TOKEN ASSETS
 // =============================================================================
 

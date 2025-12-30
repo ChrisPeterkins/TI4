@@ -19,7 +19,6 @@ export default function LobbyRoomPage() {
     settings,
     players,
     isLoading,
-    error,
     isGameStarting,
     gameId,
     countdown,
@@ -114,22 +113,7 @@ export default function LobbyRoomPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-lg mb-4">Error</div>
-          <div className="text-gray-400 mb-6">{error}</div>
-          <button
-            onClick={() => router.push('/lobby')}
-            className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700"
-          >
-            Back to Lobby List
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Errors are now handled via toast notifications
 
   if (!settings || !currentUserId) {
     return (
@@ -180,11 +164,6 @@ export default function LobbyRoomPage() {
               <div className="text-xl text-red-400 mb-4">
                 Failed to start game. There may have been a server error.
               </div>
-              {error && (
-                <div className="text-sm text-red-300 mb-4 max-w-md">
-                  {error}
-                </div>
-              )}
               <button
                 onClick={() => router.push('/lobby')}
                 className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 text-white"

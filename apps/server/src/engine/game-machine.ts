@@ -8,6 +8,7 @@ import type {
 } from '@ti4/shared';
 import { validateAction } from './validators/index.js';
 import { handleAction } from './handlers/index.js';
+import { initializeAgendaPhase } from './handlers/agenda-phase.js';
 
 /**
  * Valid phase transitions in TI4
@@ -192,35 +193,25 @@ export class GameMachine {
   }
 
   private enterStatusPhase(): void {
-    // Increment round counter when entering status phase
-    this.state.round++;
-    this.state.subPhase = undefined;
+    // Initialize status phase tracking
+    this.state.phase = 'status';
+    this.state.subPhase = 'score_objectives';
+    this.state.statusPhase = {
+      currentStep: 1,
+      scoringComplete: [],
+      scoredThisPhase: [],
+      redistributionComplete: [],
+    };
 
-    // Clear command tokens from the board
-    for (const tile of this.state.map.tiles) {
-      tile.commandTokens = [];
-    }
-
-    // Ready all exhausted planets
-    for (const player of this.state.players) {
-      for (const planet of player.planets) {
-        planet.exhausted = false;
-      }
+    // Set first player in initiative order as active for scoring
+    if (this.state.initiativeOrder.length > 0) {
+      this.state.activePlayerId = this.state.initiativeOrder[0];
     }
   }
 
   private enterAgendaPhase(): void {
-    // Reset agenda state
-    this.state.agendas = {
-      currentAgenda: null,
-      currentAgendaNumber: 1,
-      votes: new Map(),
-      outcome: null,
-      riders: [],
-    };
-
-    // Speaker controls agenda phase
-    this.state.activePlayerId = this.state.speakerId;
+    // Initialize agenda phase with tracking structure
+    initializeAgendaPhase(this.state);
   }
 
   /**
@@ -248,10 +239,8 @@ export class GameMachine {
         break;
 
       case 'agenda':
-        // Both agendas resolved
-        if (this.state.agendas.currentAgendaNumber > 2) {
-          this.transitionTo('strategy');
-        }
+        // Phase completion is handled by agenda handlers when both agendas are resolved
+        // No auto-transition needed here
         break;
     }
   }
@@ -352,4 +341,5 @@ export interface HandlerResult {
   success: boolean;
   error?: string;
   triggeredEvents?: string[];
+  data?: unknown; // Additional data to return (e.g., dice rolls)
 }

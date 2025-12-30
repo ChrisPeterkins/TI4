@@ -147,13 +147,71 @@ export interface CancelHitAction extends BaseAction {
 }
 
 // Ground Combat / Invasion
+export interface SelectInvasionTargetsAction extends BaseAction {
+  type: 'select_invasion_targets';
+  /** Planet IDs to invade in this system */
+  targetPlanets: string[];
+}
+
 export interface CommitGroundForcesAction extends BaseAction {
   type: 'commit_ground_forces';
+  /** Assignments of ground units to planets */
+  assignments: { unitId: UUID; planetId: string }[];
+}
+
+export interface RollBombardmentAction extends BaseAction {
+  type: 'roll_bombardment';
+  /** Planet being bombarded */
   planetId: string;
-  unitIds: UUID[];
+}
+
+export interface SkipBombardmentAction extends BaseAction {
+  type: 'skip_bombardment';
+}
+
+export interface AssignBombardmentHitsAction extends BaseAction {
+  type: 'assign_bombardment_hits';
+  /** Unit assignments for bombardment hits */
+  assignments: HitAssignment[];
+}
+
+export interface AssignSpaceCannonHitsAction extends BaseAction {
+  type: 'assign_space_cannon_hits';
+  /** Unit assignments for space cannon hits */
+  assignments: HitAssignment[];
+}
+
+export interface SkipInvasionAction extends BaseAction {
+  type: 'skip_invasion';
 }
 
 // Agenda Phase Actions
+export interface RevealAgendaAction extends BaseAction {
+  type: 'reveal_agenda';
+}
+
+export interface CastVoteAction extends BaseAction {
+  type: 'cast_vote';
+  /** The outcome to vote for ('for'/'against' or player/planet id) */
+  outcome: string;
+  /** Planet IDs to exhaust for influence votes */
+  exhaustedPlanets: string[];
+  /** Whether to abstain (cast 0 votes) */
+  abstain?: boolean;
+}
+
+export interface SpeakerTiebreakAction extends BaseAction {
+  type: 'speaker_tiebreak';
+  /** The tied outcome the speaker chooses */
+  chosenOutcome: string;
+}
+
+export interface PlayRiderAction extends BaseAction {
+  type: 'play_rider';
+  cardId: string;
+  prediction: string;
+}
+
 export interface VoteAction extends BaseAction {
   type: 'vote';
   agendaId: string;
@@ -161,12 +219,6 @@ export interface VoteAction extends BaseAction {
   outcome: string;
   extraVotes?: number;
   abstain?: boolean;
-}
-
-export interface PlayRiderAction extends BaseAction {
-  type: 'play_rider';
-  cardId: string;
-  prediction: string;
 }
 
 export interface ResolveAgendaAction extends BaseAction {
@@ -181,6 +233,38 @@ export interface ResolveAgendaAction extends BaseAction {
 export interface ScoreObjectiveAction extends BaseAction {
   type: 'score_objective';
   objectiveId: string;
+  objectiveType: 'public' | 'secret';
+  /** For "spend X" objectives, specify what is being spent */
+  spentResources?: SpentResources;
+}
+
+export interface SpentResources {
+  /** Planet IDs to exhaust for resources/influence */
+  exhaustedPlanets?: string[];
+  /** Trade goods to spend */
+  tradeGoods?: number;
+  /** Command tokens to spend from tactic pool */
+  tacticTokens?: number;
+  /** Command tokens to spend from strategy pool */
+  strategyTokens?: number;
+  /** Action cards to discard */
+  actionCardIds?: string[];
+}
+
+export interface SkipScoringAction extends BaseAction {
+  type: 'skip_scoring';
+  /** Which objective type(s) to skip */
+  skipType: 'public' | 'secret' | 'both';
+}
+
+export interface RedistributeTokensAction extends BaseAction {
+  type: 'redistribute_tokens';
+  /** New distribution after gaining 2 tokens */
+  distribution: {
+    tactics: number;
+    fleet: number;
+    strategy: number;
+  };
 }
 
 export interface ReadyCardsAction extends BaseAction {
@@ -287,6 +371,11 @@ export interface PurgeHeroAction extends BaseAction {
   targets?: ComponentActionTargets;
 }
 
+// Combat Flow Actions
+export interface AdvanceCombatAction extends BaseAction {
+  type: 'advance_combat';
+}
+
 // Union of all action types
 export type GameAction =
   | PickStrategyCardAction
@@ -303,11 +392,22 @@ export type GameAction =
   | AssignHitsAction
   | AnnounceRetreatAction
   | CancelHitAction
+  | SelectInvasionTargetsAction
   | CommitGroundForcesAction
+  | RollBombardmentAction
+  | SkipBombardmentAction
+  | AssignBombardmentHitsAction
+  | AssignSpaceCannonHitsAction
+  | SkipInvasionAction
+  | RevealAgendaAction
+  | CastVoteAction
+  | SpeakerTiebreakAction
   | VoteAction
   | PlayRiderAction
   | ResolveAgendaAction
   | ScoreObjectiveAction
+  | SkipScoringAction
+  | RedistributeTokensAction
   | ReadyCardsAction
   | RepairUnitsAction
   | ReturnStrategyCardAction
@@ -323,7 +423,8 @@ export type GameAction =
   | PurgeRelicFragmentsAction
   | UnlockCommanderAction
   | UseAgentAction
-  | PurgeHeroAction;
+  | PurgeHeroAction
+  | AdvanceCombatAction;
 
 // Action result
 export interface ActionResult {

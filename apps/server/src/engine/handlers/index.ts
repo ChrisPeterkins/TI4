@@ -1,4 +1,21 @@
-import type { GameState, GameAction } from '@ti4/shared';
+import type {
+  GameState,
+  GameAction,
+  AssignHitsAction,
+  AnnounceRetreatAction,
+  ScoreObjectiveAction,
+  SkipScoringAction,
+  RedistributeTokensAction,
+  CastVoteAction,
+  SpeakerTiebreakAction,
+  SelectInvasionTargetsAction,
+  CommitGroundForcesAction,
+  RollBombardmentAction,
+  SkipBombardmentAction,
+  AssignBombardmentHitsAction,
+  AssignSpaceCannonHitsAction,
+  SkipInvasionAction,
+} from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
 import {
@@ -10,6 +27,30 @@ import {
   handleProduceUnits,
   handleSkipProduction,
 } from './action-phase.js';
+import {
+  handleAssignHits,
+  handleAnnounceRetreat,
+  advanceCombatState,
+} from './combat.js';
+import {
+  handleScoreObjective,
+  handleSkipScoring,
+  handleRedistributeTokens,
+} from './status-phase.js';
+import {
+  handleRevealAgenda,
+  handleCastVote,
+  handleSpeakerTiebreak,
+} from './agenda-phase.js';
+import {
+  handleSelectInvasionTargets,
+  handleCommitGroundForces,
+  handleRollBombardment,
+  handleSkipBombardment,
+  handleAssignBombardmentHits,
+  handleAssignSpaceCannonHits,
+  handleSkipInvasion,
+} from './invasion.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -46,34 +87,57 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     // Combat
     case 'assign_hits':
-      return handleAssignHits(state, action);
+      return handleAssignHits(state, action as AssignHitsAction);
 
     case 'announce_retreat':
-      return handleAnnounceRetreat(state, action);
+      return handleAnnounceRetreat(state, action as AnnounceRetreatAction);
 
-    // Agenda
-    case 'vote':
-      return handleVote(state, action);
+    case 'advance_combat':
+      return advanceCombatState(state);
+
+    // Status Phase
+    case 'score_objective':
+      return handleScoreObjective(state, action as ScoreObjectiveAction);
+
+    case 'skip_scoring':
+      return handleSkipScoring(state, action as SkipScoringAction);
+
+    case 'redistribute_tokens':
+      return handleRedistributeTokens(state, action as RedistributeTokensAction);
+
+    // Agenda Phase
+    case 'reveal_agenda':
+      return handleRevealAgenda(state, action.playerId);
+
+    case 'cast_vote':
+      return handleCastVote(state, action as CastVoteAction);
+
+    case 'speaker_tiebreak':
+      return handleSpeakerTiebreak(state, action as SpeakerTiebreakAction);
+
+    // Invasion
+    case 'select_invasion_targets':
+      return handleSelectInvasionTargets(state, action as SelectInvasionTargetsAction);
+
+    case 'commit_ground_forces':
+      return handleCommitGroundForces(state, action as CommitGroundForcesAction);
+
+    case 'roll_bombardment':
+      return handleRollBombardment(state, action as RollBombardmentAction);
+
+    case 'skip_bombardment':
+      return handleSkipBombardment(state, action as SkipBombardmentAction);
+
+    case 'assign_bombardment_hits':
+      return handleAssignBombardmentHits(state, action as AssignBombardmentHitsAction);
+
+    case 'assign_space_cannon_hits':
+      return handleAssignSpaceCannonHits(state, action as AssignSpaceCannonHitsAction);
+
+    case 'skip_invasion':
+      return handleSkipInvasion(state, action as SkipInvasionAction);
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };
   }
-}
-
-/**
- * Placeholder handlers - to be fully implemented
- */
-function handleAssignHits(state: GameState, action: GameAction): HandlerResult {
-  // TODO: Implement hit assignment
-  return { success: true, triggeredEvents: ['hits_assigned'] };
-}
-
-function handleAnnounceRetreat(state: GameState, action: GameAction): HandlerResult {
-  // TODO: Implement retreat announcement
-  return { success: true, triggeredEvents: ['retreat_announced'] };
-}
-
-function handleVote(state: GameState, action: GameAction): HandlerResult {
-  // TODO: Implement voting
-  return { success: true, triggeredEvents: ['vote_cast'] };
 }

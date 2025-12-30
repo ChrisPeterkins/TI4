@@ -5,3 +5,6 @@ export { TurnIndicator } from './TurnIndicator';
 export { StatusPhasePanel } from './StatusPhasePanel';
 export { MovementPanel, type UnitMoveSelection } from './MovementPanel';
 export { ProductionPanel } from './ProductionPanel';
+export { CombatPanel } from './CombatPanel';
+export { AgendaPhasePanel } from './AgendaPhasePanel';
+export { InvasionPanel } from './InvasionPanel';

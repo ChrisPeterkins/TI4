@@ -8,7 +8,7 @@ import { useGameStore } from '@/stores/game-store';
 import { useLobbyStore } from '@/stores/lobby-store';
 import { GameBoard } from '@/components/game-board';
 import dynamic from 'next/dynamic';
-import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel } from '@/components/game';
+import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel } from '@/components/game';
 import type { UnitMoveSelection } from '@/components/game';
 
 // Dynamically import 3D board to avoid SSR issues with Three.js
@@ -32,9 +32,26 @@ import type {
   SkipMovementAction,
   ProduceUnitsAction,
   SkipProductionAction,
+  ScoreObjectiveAction,
+  SkipScoringAction,
+  RedistributeTokensAction,
+  SpentResources,
   MapTile,
   HexCoord,
   UnitType,
+  HitAssignment,
+  AssignHitsAction,
+  AnnounceRetreatAction,
+  RevealAgendaAction,
+  CastVoteAction,
+  SpeakerTiebreakAction,
+  SelectInvasionTargetsAction,
+  CommitGroundForcesAction,
+  RollBombardmentAction,
+  SkipBombardmentAction,
+  AssignBombardmentHitsAction,
+  AssignSpaceCannonHitsAction,
+  SkipInvasionAction,
 } from '@ti4/shared';
 
 type TacticalUIState = 'idle' | 'selecting_system';
@@ -49,8 +66,8 @@ export default function GamePage() {
     gameId,
     gameState,
     currentPlayerId,
+    pendingDiceRolls,
     isLoading,
-    error,
     isConnected,
     joinGame,
     leaveGame,
@@ -115,22 +132,7 @@ export default function GamePage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-xl mb-4">Error</div>
-          <div className="text-gray-400 mb-6">{error}</div>
-          <button
-            onClick={() => router.push('/lobby')}
-            className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 text-white"
-          >
-            Back to Lobby
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Errors are now handled via toast notifications
 
   if (!gameState) {
     return (
@@ -243,18 +245,132 @@ export default function GamePage() {
   };
 
   // Handle score objective
-  const handleScoreObjective = (objectiveId: string) => {
+  const handleScoreObjective = (objectiveId: string, objectiveType: 'public' | 'secret', spentResources?: SpentResources) => {
     sendAction({
       type: 'score_objective',
       objectiveId,
+      objectiveType,
+      spentResources,
+    } as Omit<ScoreObjectiveAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle skip scoring
+  const handleSkipScoring = (skipType: 'public' | 'secret' | 'both') => {
+    sendAction({
+      type: 'skip_scoring',
+      skipType,
+    } as Omit<SkipScoringAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle redistribute tokens
+  const handleRedistributeTokens = (distribution: { tactics: number; fleet: number; strategy: number }) => {
+    sendAction({
+      type: 'redistribute_tokens',
+      distribution,
+    } as Omit<RedistributeTokensAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle assign hits in combat
+  const handleAssignHits = (assignments: HitAssignment[]) => {
+    sendAction({
+      type: 'assign_hits',
+      assignments,
+    } as Omit<AssignHitsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle retreat announcement
+  const handleAnnounceRetreat = (retreating: boolean, retreatSystem?: HexCoord) => {
+    sendAction({
+      type: 'announce_retreat',
+      retreating,
+      retreatSystem,
+    } as Omit<AnnounceRetreatAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle advancing combat state
+  const handleAdvanceCombat = () => {
+    sendAction({
+      type: 'advance_combat',
     } as any); // TODO: Add proper type
   };
 
-  // Handle confirm status
-  const handleConfirmStatus = () => {
+  // Handle reveal agenda
+  const handleRevealAgenda = () => {
     sendAction({
-      type: 'confirm_status',
-    } as any); // TODO: Add proper type
+      type: 'reveal_agenda',
+    } as Omit<RevealAgendaAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle cast vote
+  const handleCastVote = (outcome: string, exhaustedPlanets: string[], abstain?: boolean) => {
+    sendAction({
+      type: 'cast_vote',
+      outcome,
+      exhaustedPlanets,
+      abstain,
+    } as Omit<CastVoteAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle speaker tiebreak
+  const handleSpeakerTiebreak = (chosenOutcome: string) => {
+    sendAction({
+      type: 'speaker_tiebreak',
+      chosenOutcome,
+    } as Omit<SpeakerTiebreakAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle select invasion targets
+  const handleSelectInvasionTargets = (targetPlanets: string[]) => {
+    sendAction({
+      type: 'select_invasion_targets',
+      targetPlanets,
+    } as Omit<SelectInvasionTargetsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle commit ground forces
+  const handleCommitGroundForces = (assignments: { unitId: string; planetId: string }[]) => {
+    sendAction({
+      type: 'commit_ground_forces',
+      assignments,
+    } as Omit<CommitGroundForcesAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle roll bombardment
+  const handleRollBombardment = (planetId: string) => {
+    sendAction({
+      type: 'roll_bombardment',
+      planetId,
+    } as Omit<RollBombardmentAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle skip bombardment
+  const handleSkipBombardment = () => {
+    sendAction({
+      type: 'skip_bombardment',
+    } as Omit<SkipBombardmentAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle assign bombardment hits
+  const handleAssignBombardmentHits = (assignments: HitAssignment[]) => {
+    sendAction({
+      type: 'assign_bombardment_hits',
+      assignments,
+    } as Omit<AssignBombardmentHitsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle assign space cannon hits
+  const handleAssignSpaceCannonHits = (assignments: HitAssignment[]) => {
+    sendAction({
+      type: 'assign_space_cannon_hits',
+      assignments,
+    } as Omit<AssignSpaceCannonHitsAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle skip invasion
+  const handleSkipInvasion = () => {
+    sendAction({
+      type: 'skip_invasion',
+    } as Omit<SkipInvasionAction, 'playerId' | 'timestamp'>);
   };
 
   return (
@@ -387,7 +503,52 @@ export default function GamePage() {
           currentPlayer={currentPlayer}
           isMyTurn={isMyTurn}
           onScoreObjective={handleScoreObjective}
-          onConfirmStatus={handleConfirmStatus}
+          onSkipScoring={handleSkipScoring}
+          onRedistributeTokens={handleRedistributeTokens}
+        />
+      )}
+
+      {/* Agenda Phase Panel */}
+      {gameState.phase === 'agenda' && (
+        <AgendaPhasePanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          isMyTurn={isMyTurn}
+          onRevealAgenda={handleRevealAgenda}
+          onCastVote={handleCastVote}
+          onSpeakerTiebreak={handleSpeakerTiebreak}
+        />
+      )}
+
+      {/* Combat Panel - renders as overlay when combat is active */}
+      {gameState.activeCombat && (
+        <CombatPanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          currentPlayerId={currentPlayerId}
+          onAssignHits={handleAssignHits}
+          onAnnounceRetreat={handleAnnounceRetreat}
+          onAdvanceCombat={handleAdvanceCombat}
+          diceRolls={pendingDiceRolls ?? undefined}
+        />
+      )}
+
+      {/* Invasion Panel - renders during tactical invasion sub-phase */}
+      {gameState.subPhase === 'tactical_invasion' && gameState.invasionPhase && (
+        <InvasionPanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          currentPlayerId={currentPlayerId}
+          onSelectTargets={handleSelectInvasionTargets}
+          onCommitGroundForces={handleCommitGroundForces}
+          onRollBombardment={handleRollBombardment}
+          onSkipBombardment={handleSkipBombardment}
+          onAssignBombardmentHits={handleAssignBombardmentHits}
+          onAssignSpaceCannonHits={handleAssignSpaceCannonHits}
+          onSkipInvasion={handleSkipInvasion}
+          onAdvanceCombat={handleAdvanceCombat}
+          onAssignGroundCombatHits={handleAssignHits}
+          diceRolls={pendingDiceRolls ?? undefined}
         />
       )}
 

@@ -185,6 +185,19 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {/* Dev Tools */}
+        <section className="mt-12 pt-8 border-t border-gray-800">
+          <h2 className="text-sm font-medium text-gray-500 mb-3">Dev Tools</h2>
+          <div className="flex gap-3">
+            <Link
+              href="/test/combat"
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Combat Tester
+            </Link>
+          </div>
+        </section>
       </main>
     </div>
   );

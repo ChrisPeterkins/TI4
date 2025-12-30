@@ -5,3 +5,6 @@ export { SpaceBackground, SpaceDust } from './SpaceBackground';
 export { Unit3D, UnitGroup3D, TileUnits3D } from './Unit3D';
 export * from './constants';
 export * from './hex3d';
+
+// 3D Card components
+export * from './cards';

@@ -8,6 +8,7 @@ import type {
   ProduceUnitsAction,
   SkipProductionAction,
   UnitType,
+  MapTile,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { findTileAtPosition } from '../utils/hex.js';
@@ -18,6 +19,9 @@ import {
   createUnitInstance,
   calculateProductionCost,
 } from '../utils/units.js';
+import { findDefenderId } from '../utils/combat.js';
+import { initializeCombat } from './combat.js';
+import { initializeInvasion, getInvadablePlanets, hasGroundForcesToLand } from './invasion.js';
 import { units } from '@ti4/game-data';
 
 /**
@@ -228,36 +232,56 @@ export function handleMoveUnits(
 
   // Check for combat - if enemy ships present, transition to space combat
   if (hasEnemyShips(targetTile, action.playerId)) {
-    state.subPhase = 'tactical_space_combat';
-    return {
-      success: true,
-      triggeredEvents: ['units_moved', 'space_combat_initiated'],
-    };
+    const defenderId = findDefenderId(targetTile, action.playerId);
+    if (defenderId) {
+      // Initialize combat
+      const combat = initializeCombat(
+        state,
+        state.activatedSystem,
+        action.playerId,
+        defenderId
+      );
+      state.activeCombat = combat;
+      state.subPhase = 'tactical_space_combat';
+
+      return {
+        success: true,
+        triggeredEvents: ['units_moved', 'space_combat_initiated'],
+        data: { combatId: combat.id },
+      };
+    }
   }
 
-  // No combat - transition to production
-  state.subPhase = 'tactical_production';
-
-  return {
-    success: true,
-    triggeredEvents: ['units_moved'],
-  };
+  // No space combat - check for invasion opportunities
+  return checkForInvasion(state, targetTile, action.playerId, ['units_moved']);
 }
 
 /**
- * Handle skip_movement action - skips movement and goes to production
+ * Handle skip_movement action - skips movement, checks for invasion, then production
  */
 export function handleSkipMovement(
   state: GameState,
   action: SkipMovementAction
 ): HandlerResult {
-  // Transition directly to production phase
-  state.subPhase = 'tactical_production';
+  if (!state.activatedSystem) {
+    state.subPhase = 'tactical_production';
+    return {
+      success: true,
+      triggeredEvents: ['movement_skipped'],
+    };
+  }
 
-  return {
-    success: true,
-    triggeredEvents: ['movement_skipped'],
-  };
+  const tile = findTileAtPosition(state.map, state.activatedSystem);
+  if (!tile) {
+    state.subPhase = 'tactical_production';
+    return {
+      success: true,
+      triggeredEvents: ['movement_skipped'],
+    };
+  }
+
+  // Check for invasion opportunities
+  return checkForInvasion(state, tile, action.playerId, ['movement_skipped']);
 }
 
 /**
@@ -384,4 +408,64 @@ function findPlanetData(planetId: string): { resources: number; influence: numbe
     }
   }
   return null;
+}
+
+/**
+ * Check if invasion is possible and transition to invasion or production
+ */
+function checkForInvasion(
+  state: GameState,
+  tile: MapTile,
+  playerId: string,
+  existingEvents: string[]
+): HandlerResult {
+  // Check if there are invadable planets
+  const invadablePlanets = getInvadablePlanets(tile, playerId);
+
+  // Check if player has ground forces to land
+  const hasGroundForces = hasGroundForcesToLand(tile, playerId);
+
+  if (invadablePlanets.length > 0 && hasGroundForces) {
+    // Initialize invasion phase
+    const result = initializeInvasion(state);
+    if (result.success) {
+      return {
+        success: true,
+        triggeredEvents: [...existingEvents, 'invasion_started'],
+        data: result.data,
+      };
+    }
+  }
+
+  // No invasion - go to production
+  state.subPhase = 'tactical_production';
+
+  return {
+    success: true,
+    triggeredEvents: existingEvents,
+  };
+}
+
+/**
+ * Transition from space combat to invasion (called after space combat ends)
+ */
+export function transitionToInvasionAfterSpaceCombat(state: GameState): HandlerResult {
+  if (!state.activatedSystem) {
+    state.subPhase = 'tactical_production';
+    return {
+      success: true,
+      triggeredEvents: ['space_combat_complete'],
+    };
+  }
+
+  const tile = findTileAtPosition(state.map, state.activatedSystem);
+  if (!tile) {
+    state.subPhase = 'tactical_production';
+    return {
+      success: true,
+      triggeredEvents: ['space_combat_complete'],
+    };
+  }
+
+  return checkForInvasion(state, tile, state.activePlayerId, ['space_combat_complete']);
 }
