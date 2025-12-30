@@ -555,15 +555,16 @@ describe('Status Phase Handlers', () => {
   });
 
   describe('drawActionCards', () => {
-    it('should give each player 1 action card in initiative order', () => {
+    it('should give each player 2 action cards in initiative order', () => {
       const state = createMockGameState();
 
       drawActionCards(state);
 
-      expect(state.players[0].actionCards).toHaveLength(1);
-      expect(state.players[1].actionCards).toHaveLength(1);
-      expect(state.players[2].actionCards).toHaveLength(1);
-      expect(state.players[3].actionCards).toHaveLength(1);
+      // Per TI4 rules, each player draws 2 action cards during Status Phase
+      expect(state.players[0].actionCards).toHaveLength(2);
+      expect(state.players[1].actionCards).toHaveLength(2);
+      expect(state.players[2].actionCards).toHaveLength(2);
+      expect(state.players[3].actionCards).toHaveLength(2);
     });
 
     it('should draw from the action card deck', () => {
@@ -572,20 +573,27 @@ describe('Status Phase Handlers', () => {
 
       drawActionCards(state);
 
-      expect(state.actionCardDeck).toHaveLength(initialDeckSize - 4);
+      // 2 cards per player × 4 players = 8 cards drawn
+      expect(state.actionCardDeck).toHaveLength(initialDeckSize - 8);
     });
 
     it('should give cards in initiative order', () => {
       const state = createMockGameState();
       state.initiativeOrder = ['player3', 'player1', 'player4', 'player2'];
-      state.actionCardDeck = ['card1', 'card2', 'card3', 'card4'];
+      // Need 8 cards for 4 players × 2 cards each
+      state.actionCardDeck = ['card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'card7', 'card8'];
 
       drawActionCards(state);
 
+      // player3 gets cards 1-2, player1 gets cards 3-4, etc.
       expect(state.players[2].actionCards).toContain('card1'); // player3
-      expect(state.players[0].actionCards).toContain('card2'); // player1
-      expect(state.players[3].actionCards).toContain('card3'); // player4
-      expect(state.players[1].actionCards).toContain('card4'); // player2
+      expect(state.players[2].actionCards).toContain('card2'); // player3
+      expect(state.players[0].actionCards).toContain('card3'); // player1
+      expect(state.players[0].actionCards).toContain('card4'); // player1
+      expect(state.players[3].actionCards).toContain('card5'); // player4
+      expect(state.players[3].actionCards).toContain('card6'); // player4
+      expect(state.players[1].actionCards).toContain('card7'); // player2
+      expect(state.players[1].actionCards).toContain('card8'); // player2
     });
   });
 

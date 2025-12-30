@@ -65,6 +65,11 @@ export interface ServerToClientEvents {
   timing_window_opened: (data: TimingWindowOpenedEvent) => void;
   timing_window_closed: (data: TimingWindowClosedEvent) => void;
 
+  // Action Cards
+  action_card_played: (data: ActionCardPlayedEvent) => void;
+  action_cards_drawn: (data: ActionCardsDrawnEvent) => void;
+  action_cards_discarded: (data: ActionCardsDiscardedEvent) => void;
+
   // Chat
   chat_message: (data: ChatMessageEvent) => void;
 
@@ -236,6 +241,29 @@ export interface TimingWindowOpenedEvent {
 export interface TimingWindowClosedEvent {
   windowId: UUID;
   playedCards: { playerId: UUID; cardId: string }[];
+}
+
+export interface ActionCardPlayedEvent {
+  playerId: UUID;
+  cardId: string;
+  cardName: string;
+  targets?: {
+    playerId?: UUID;
+    systemPosition?: { q: number; r: number };
+    planetId?: string;
+    unitIds?: UUID[];
+  };
+}
+
+export interface ActionCardsDrawnEvent {
+  playerId: UUID;
+  drawnCount: number;
+  drawnCards?: string[]; // Only included for the drawing player
+}
+
+export interface ActionCardsDiscardedEvent {
+  playerId: UUID;
+  discardedCount: number;
 }
 
 export interface ChatMessageEvent {

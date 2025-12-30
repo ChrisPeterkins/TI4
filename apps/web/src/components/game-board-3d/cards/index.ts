@@ -34,3 +34,7 @@ export type {
   OpponentHand3DProps,
   HandCard,
 } from './PlayerHand3D';
+
+// Objective display
+export { ObjectiveDisplay3D } from './ObjectiveDisplay3D';
+export type { ObjectiveDisplay3DProps } from './ObjectiveDisplay3D';

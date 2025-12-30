@@ -62,6 +62,11 @@ export interface PlayActionCardAction extends BaseAction {
   targets?: ActionCardTargets;
 }
 
+export interface DiscardActionCardsAction extends BaseAction {
+  type: 'discard_action_cards';
+  cardIds: string[];
+}
+
 export interface ActionCardTargets {
   playerId?: UUID;
   systemPosition?: HexCoord;
@@ -97,29 +102,86 @@ export interface StrategicSecondaryAction extends BaseAction {
 }
 
 export interface StrategicSecondaryChoices {
-  // Leadership
+  // Leadership - influence spending, token distribution (no token cost!)
+  influenceSpent?: number;
   commandTokenDistribution?: {
     tactics: number;
     fleet: number;
     strategy: number;
   };
-  // Diplomacy
+
+  // Diplomacy - planets to ready (up to 2)
   readiedPlanets?: string[];
-  // Politics
-  actionCardsDrawn?: number;
-  // Construction
+
+  // Politics - just draws 2 cards, no choices needed
+  // (actionCardsDrawn is auto-set to 2)
+
+  // Construction - system token placement and structure
+  systemPosition?: HexCoord;
   structureBuilt?: {
     type: 'pds' | 'space_dock';
     planetId: string;
   };
-  // Trade
-  refreshCommodities?: boolean;
-  // Warfare
-  tokenPlacement?: 'tactics' | 'fleet' | 'strategy';
-  // Technology
-  techResearched?: string;
-  // Imperial
-  objectiveScored?: string;
+
+  // Trade - just refreshes commodities, no choices needed
+
+  // Warfare - production in home system (+2 capacity)
+  unitsProduced?: { type: UnitType; count: number }[];
+  exhaustedPlanets?: string[];
+
+  // Technology - tech and resources (1 token + 4 resources)
+  techId?: string;
+
+  // Imperial - just draws secret objective, no choices needed
+}
+
+// Strategic Primary Action (resolving primary ability)
+export interface StrategicPrimaryAction extends BaseAction {
+  type: 'strategic_primary';
+  cardNumber: number;
+  choices: StrategicPrimaryChoices;
+}
+
+export interface StrategicPrimaryChoices {
+  // Leadership - gain 3 tokens + optional influence spending
+  influenceSpent?: number;
+  tokenDistribution?: {
+    tactics: number;
+    fleet: number;
+    strategy: number;
+  };
+
+  // Diplomacy - choose system to lock + ready up to 2 planets
+  targetSystemPosition?: HexCoord;
+  planetsToReady?: string[];
+
+  // Politics - new speaker + agenda arrangement
+  newSpeakerId?: UUID;
+  agendaArrangement?: { cardId: string; position: 'top' | 'bottom' }[];
+
+  // Construction - place up to 2 structures (1 any type + 1 PDS)
+  firstStructure?: { type: 'pds' | 'space_dock'; planetId: string };
+  secondStructure?: { type: 'pds'; planetId: string };
+
+  // Trade - choose players for free secondary
+  freeSecondaryPlayers?: UUID[];
+
+  // Warfare - remove token from board + redistribute all tokens
+  removedTokenSystem?: HexCoord;
+  newTokenDistribution?: {
+    tactics: number;
+    fleet: number;
+    strategy: number;
+  };
+
+  // Technology - research 1 free tech + optional 2nd for 6 resources
+  firstTechId?: string;
+  secondTechId?: string;
+  exhaustedPlanets?: string[];
+
+  // Imperial - score objective + Mecatol VP or token placement
+  scoredObjectiveId?: string;
+  placeMecatolToken?: boolean;
 }
 
 // Combat Actions
@@ -257,6 +319,14 @@ export interface SkipScoringAction extends BaseAction {
   skipType: 'public' | 'secret' | 'both';
 }
 
+export interface SelectSecretObjectiveAction extends BaseAction {
+  type: 'select_secret_objective';
+  /** The secret objective to keep */
+  selectedObjectiveId: string;
+  /** The secret objective to discard back to deck */
+  discardedObjectiveId: string;
+}
+
 export interface RedistributeTokensAction extends BaseAction {
   type: 'redistribute_tokens';
   /** New distribution after gaining 2 tokens */
@@ -386,8 +456,10 @@ export type GameAction =
   | SkipMovementAction
   | SkipProductionAction
   | PlayActionCardAction
+  | DiscardActionCardsAction
   | ComponentAction
   | StrategicAction
+  | StrategicPrimaryAction
   | StrategicSecondaryAction
   | AssignHitsAction
   | AnnounceRetreatAction
@@ -407,6 +479,7 @@ export type GameAction =
   | ResolveAgendaAction
   | ScoreObjectiveAction
   | SkipScoringAction
+  | SelectSecretObjectiveAction
   | RedistributeTokensAction
   | ReadyCardsAction
   | RepairUnitsAction

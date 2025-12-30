@@ -78,7 +78,7 @@ function createMockTile(position: { q: number; r: number }, overrides: Partial<M
   return {
     id: `tile-${position.q}-${position.r}`,
     position,
-    systemId: 'test-system',
+    systemId: 0,
     rotation: 0,
     planets: [],
     wormhole: null,
@@ -379,7 +379,7 @@ describe('Invasion Handlers', () => {
       const result = handleRollBombardment(state, action);
 
       expect(result.success).toBe(true);
-      expect(result.data?.rolls).toBeDefined();
+      expect((result.data as { rolls?: unknown })?.rolls).toBeDefined();
     });
 
     it('should skip bombardment if planetary shield is present', () => {

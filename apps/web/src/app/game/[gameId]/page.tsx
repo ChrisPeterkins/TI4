@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/stores/game-store';
 import { useLobbyStore } from '@/stores/lobby-store';
-import { GameBoard } from '@/components/game-board';
 import dynamic from 'next/dynamic';
-import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel } from '@/components/game';
+import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel } from '@/components/game';
 import type { UnitMoveSelection } from '@/components/game';
 
 // Dynamically import 3D board to avoid SSR issues with Three.js
@@ -52,6 +51,10 @@ import type {
   AssignBombardmentHitsAction,
   AssignSpaceCannonHitsAction,
   SkipInvasionAction,
+  StrategicPrimaryAction,
+  StrategicSecondaryAction,
+  StrategicPrimaryChoices,
+  StrategicSecondaryChoices,
 } from '@ti4/shared';
 
 type TacticalUIState = 'idle' | 'selecting_system';
@@ -59,7 +62,6 @@ type TacticalUIState = 'idle' | 'selecting_system';
 export default function GamePage() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const { isConnected: socketConnected, isLoading: socketLoading } = useSocket();
   const {
@@ -77,9 +79,6 @@ export default function GamePage() {
 
   const urlGameId = params.gameId as string;
   const currentUserId = session?.user?.id;
-
-  // 3D mode toggle (via URL param ?3d=true)
-  const [use3D, setUse3D] = useState(() => searchParams.get('3d') === 'true');
 
   // UI state for tactical action flow
   const [tacticalUIState, setTacticalUIState] = useState<TacticalUIState>('idle');
@@ -373,6 +372,27 @@ export default function GamePage() {
     } as Omit<SkipInvasionAction, 'playerId' | 'timestamp'>);
   };
 
+  // Handle strategic primary ability
+  const handleStrategicPrimary = (choices: StrategicPrimaryChoices) => {
+    if (!gameState.strategicActionState) return;
+    sendAction({
+      type: 'strategic_primary',
+      cardNumber: gameState.strategicActionState.cardNumber,
+      choices,
+    } as Omit<StrategicPrimaryAction, 'playerId' | 'timestamp'>);
+  };
+
+  // Handle strategic secondary ability
+  const handleStrategicSecondary = (choices: StrategicSecondaryChoices, declined: boolean) => {
+    if (!gameState.strategicActionState) return;
+    sendAction({
+      type: 'strategic_secondary',
+      cardNumber: gameState.strategicActionState.cardNumber,
+      choices,
+      declined,
+    } as Omit<StrategicSecondaryAction, 'playerId' | 'timestamp'>);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -384,18 +404,6 @@ export default function GamePage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* 2D/3D Toggle */}
-            <button
-              onClick={() => setUse3D(!use3D)}
-              className={`px-3 py-1 text-sm rounded transition-colors ${
-                use3D
-                  ? 'bg-purple-600/30 text-purple-300 border border-purple-500/50'
-                  : 'bg-gray-700/50 text-gray-400 hover:bg-gray-700'
-              }`}
-            >
-              {use3D ? '3D' : '2D'}
-            </button>
-
             {/* Connection Status */}
             <div className="flex items-center gap-2">
               <div
@@ -437,19 +445,12 @@ export default function GamePage() {
 
         {/* Game Board - fills remaining space */}
         <main className="flex-1 overflow-hidden relative">
-          {use3D ? (
-            <GameBoard3D
-              gameState={gameState}
-              onTileClick={handleTileClick}
-              highlightedTiles={highlightedTiles}
-            />
-          ) : (
-            <GameBoard
-              gameState={gameState}
-              onTileClick={handleTileClick}
-              highlightedTiles={highlightedTiles}
-            />
-          )}
+          <GameBoard3D
+            gameState={gameState}
+            currentPlayerId={currentPlayerId}
+            onTileClick={handleTileClick}
+            highlightedTiles={highlightedTiles}
+          />
 
           {/* System Selection Overlay */}
           {tacticalUIState === 'selecting_system' && (
@@ -549,6 +550,16 @@ export default function GamePage() {
           onAdvanceCombat={handleAdvanceCombat}
           onAssignGroundCombatHits={handleAssignHits}
           diceRolls={pendingDiceRolls ?? undefined}
+        />
+      )}
+
+      {/* Strategy Action Panel - renders during strategic primary/secondary sub-phases */}
+      {(gameState.subPhase === 'strategic_primary' || gameState.subPhase === 'strategic_secondary') && (
+        <StrategyActionPanel
+          gameState={gameState}
+          currentPlayer={currentPlayer}
+          onSubmitPrimary={handleStrategicPrimary}
+          onSubmitSecondary={handleStrategicSecondary}
         />
       )}
 

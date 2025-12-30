@@ -11,6 +11,11 @@ import type {
   AssignBombardmentHitsAction,
   AssignSpaceCannonHitsAction,
   SkipInvasionAction,
+  PlayActionCardAction,
+  DiscardActionCardsAction,
+  ResearchTechnologyAction,
+  StrategicPrimaryAction,
+  StrategicSecondaryAction,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
@@ -47,6 +52,15 @@ import {
   validateAssignSpaceCannonHits,
   validateSkipInvasion,
 } from './invasion.js';
+import {
+  validatePlayActionCard,
+  validateDiscardActionCards,
+} from './action-cards.js';
+import { validateResearchTechnology } from './technology.js';
+import {
+  validateStrategicPrimary,
+  validateStrategicSecondary,
+} from './strategy-cards.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -72,6 +86,12 @@ export function validateAction(state: GameState, action: GameAction): Validation
 
     case 'strategic_action':
       return validateStrategicAction(state, action);
+
+    case 'strategic_primary':
+      return validateStrategicPrimary(state, action as StrategicPrimaryAction);
+
+    case 'strategic_secondary':
+      return validateStrategicSecondary(state, action as StrategicSecondaryAction);
 
     // Tactical Sub-phases
     case 'move_units':
@@ -138,6 +158,17 @@ export function validateAction(state: GameState, action: GameAction): Validation
     case 'skip_invasion':
       return validateSkipInvasion(state, action as SkipInvasionAction);
 
+    // Action Cards
+    case 'play_action_card':
+      return validatePlayActionCard(state, action as PlayActionCardAction);
+
+    case 'discard_action_cards':
+      return validateDiscardActionCards(state, action as DiscardActionCardsAction);
+
+    // Technology
+    case 'research_technology':
+      return validateResearchTechnology(state, action as ResearchTechnologyAction);
+
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };
   }
@@ -153,6 +184,9 @@ function isPlayersTurn(state: GameState, action: GameAction): boolean {
     'assign_hits',
     'assign_bombardment_hits',  // Defender assigns during attacker's turn
     'assign_space_cannon_hits', // Attacker assigns, but could be out of turn context
+    'play_action_card',         // Some action cards can be played in response (e.g., Sabotage)
+    'discard_action_cards',     // Discard to hand limit can happen during status phase
+    'strategic_secondary',      // Secondary abilities are resolved by non-active players
   ];
   if (outOfTurnActions.includes(action.type)) {
     return true;

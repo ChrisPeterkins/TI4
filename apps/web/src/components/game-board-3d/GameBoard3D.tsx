@@ -7,15 +7,28 @@ import { HexTile3D } from './HexTile3D';
 import { TileUnits3D } from './Unit3D';
 import { SpaceBackground, SpaceDust } from './SpaceBackground';
 import { CameraControls } from './CameraControls';
+import { Deck3D, DiscardPile3D } from './cards/Deck3D';
+import { ObjectiveDisplay3D } from './cards/ObjectiveDisplay3D';
+import { PlayerStations3D } from './PlayerStation3D';
 import { getHexBounds3D, hexToWorld3D } from './hex3d';
+import { getActionCardBackUrl, getCardUrl } from '@/lib/assets';
 import * as THREE from 'three';
 
 interface GameBoard3DProps {
   gameState: GameState;
+  currentPlayerId?: string | null;
   onTileClick?: (tile: MapTile) => void;
   onTileHover?: (tile: MapTile | null) => void;
   highlightedTiles?: { q: number; r: number }[];
   className?: string;
+  // Action card deck props
+  onActionCardDeckClick?: () => void;
+  showActionCardDeck?: boolean;
+  showPlayerStations?: boolean;
+  // Objective display props
+  showObjectives?: boolean;
+  onObjectiveClick?: (objectiveId: string, type: 'stage1' | 'stage2') => void;
+  canScoreObjective?: (objectiveId: string) => boolean;
 }
 
 /**
@@ -154,12 +167,31 @@ function HexGrid({
  */
 export function GameBoard3D({
   gameState,
+  currentPlayerId,
   onTileClick,
   onTileHover,
   highlightedTiles,
   className,
+  onActionCardDeckClick,
+  showActionCardDeck = true,
+  showPlayerStations = true,
+  showObjectives = true,
+  onObjectiveClick,
+  canScoreObjective,
 }: GameBoard3DProps) {
   const [hoveredTile, setHoveredTile] = useState<MapTile | null>(null);
+
+  // Action card deck position (offset from center)
+  const actionCardDeckPosition: [number, number, number] = [-12, 0.1, 8];
+  const actionCardDiscardPosition: [number, number, number] = [-12, 0.1, 5];
+
+  // Prepare discard pile cards for display
+  const discardPileCards = useMemo(() => {
+    return gameState.actionCardDiscard.map(cardId => ({
+      id: cardId,
+      frontTexture: getCardUrl('action', cardId),
+    }));
+  }, [gameState.actionCardDiscard]);
 
   // Build player color map
   const playerColors = useMemo(() => {
@@ -230,6 +262,49 @@ export function GameBoard3D({
             onTileHover={handleTileHover}
             highlightedTiles={highlightedTiles}
           />
+
+          {/* Player Stations */}
+          {showPlayerStations && (
+            <PlayerStations3D
+              gameState={gameState}
+              currentPlayerId={currentPlayerId ?? null}
+            />
+          )}
+
+          {/* Action Card Deck */}
+          {showActionCardDeck && (
+            <group>
+              <Deck3D
+                cardCount={gameState.actionCardDeck?.length ?? 0}
+                backTexture={getActionCardBackUrl()}
+                position={actionCardDeckPosition}
+                rotation={[0, 0, 0]}
+                label="Action Cards"
+                onDraw={onActionCardDeckClick}
+                highlightTop={gameState.phase === 'status' && gameState.subPhase === 'draw_action_cards'}
+              />
+              <DiscardPile3D
+                cards={discardPileCards}
+                backTexture={getActionCardBackUrl()}
+                position={actionCardDiscardPosition}
+                rotation={[0, 0, 0]}
+                label="Discard"
+              />
+            </group>
+          )}
+
+          {/* Objective Display */}
+          {showObjectives && gameState.objectives && (
+            <ObjectiveDisplay3D
+              objectives={gameState.objectives}
+              players={gameState.players}
+              position={[12, 0.1, 6]}
+              rotation={[0, -Math.PI / 6, 0]}
+              currentPlayerId={currentPlayerId ?? undefined}
+              onObjectiveClick={onObjectiveClick}
+              canScoreObjective={canScoreObjective}
+            />
+          )}
         </Suspense>
       </Canvas>
 

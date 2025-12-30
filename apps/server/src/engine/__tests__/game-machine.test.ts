@@ -281,7 +281,7 @@ describe('GameMachine', () => {
     });
 
     describe('enterStatusPhase', () => {
-      it('should increment round counter', () => {
+      it('should initialize status phase tracking', () => {
         const state = createMockGameState({
           phase: 'action',
           round: 1,
@@ -294,10 +294,15 @@ describe('GameMachine', () => {
         machine = new GameMachine(state);
         machine.transitionTo('status');
 
-        expect(machine.getState().round).toBe(2);
+        const newState = machine.getState();
+        expect(newState.statusPhase).toBeDefined();
+        expect(newState.statusPhase!.currentStep).toBe(1);
+        expect(newState.statusPhase!.scoringComplete).toEqual([]);
+        expect(newState.statusPhase!.scoredThisPhase).toEqual([]);
+        expect(newState.statusPhase!.redistributionComplete).toEqual([]);
       });
 
-      it('should clear command tokens from tiles', () => {
+      it('should set subPhase to score_objectives', () => {
         const state = createMockGameState({
           phase: 'action',
           players: [
@@ -305,51 +310,30 @@ describe('GameMachine', () => {
             createMockPlayer('player2', { strategyCard: 2, seatIndex: 1 }),
           ],
           initiativeOrder: ['player1', 'player2'],
-          map: {
-            tiles: [
-              {
-                id: 'tile1',
-                systemId: 1,
-                position: { q: 0, r: 0 },
-                rotation: 0,
-                planets: [],
-                wormhole: null,
-                anomaly: null,
-                units: [],
-                commandTokens: ['player1'],
-              },
-            ],
-            playerCount: 2,
-          },
         });
         machine = new GameMachine(state);
         machine.transitionTo('status');
 
-        expect(machine.getState().map.tiles[0].commandTokens).toEqual([]);
+        expect(machine.getState().subPhase).toBe('score_objectives');
       });
 
-      it('should ready all exhausted planets', () => {
+      it('should set first player in initiative order as active', () => {
         const state = createMockGameState({
           phase: 'action',
           players: [
-            createMockPlayer('player1', {
-              strategyCard: 1,
-              planets: [
-                { planetId: 'jord', exhausted: true, attachments: [] },
-                { planetId: 'mars', exhausted: true, attachments: [] },
-              ],
-            }),
+            createMockPlayer('player1', { strategyCard: 1 }),
             createMockPlayer('player2', { strategyCard: 2, seatIndex: 1 }),
           ],
-          initiativeOrder: ['player1', 'player2'],
+          initiativeOrder: ['player2', 'player1'], // player2 is first
         });
         machine = new GameMachine(state);
         machine.transitionTo('status');
 
-        const newState = machine.getState();
-        expect(newState.players[0].planets[0].exhausted).toBe(false);
-        expect(newState.players[0].planets[1].exhausted).toBe(false);
+        expect(machine.getActivePlayer()).toBe('player2');
       });
+
+      // Note: Command tokens are cleared and planets are readied during status phase steps,
+      // not immediately on phase entry. Those are tested in status-phase.test.ts.
     });
   });
 

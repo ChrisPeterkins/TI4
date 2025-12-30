@@ -15,6 +15,11 @@ import type {
   AssignBombardmentHitsAction,
   AssignSpaceCannonHitsAction,
   SkipInvasionAction,
+  PlayActionCardAction,
+  DiscardActionCardsAction,
+  ResearchTechnologyAction,
+  StrategicPrimaryAction,
+  StrategicSecondaryAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -51,6 +56,15 @@ import {
   handleAssignSpaceCannonHits,
   handleSkipInvasion,
 } from './invasion.js';
+import {
+  handlePlayActionCard,
+  handleDiscardActionCards,
+} from './action-cards.js';
+import { handleResearchTechnology } from './technology.js';
+import {
+  handleStrategicPrimary,
+  handleStrategicSecondary,
+} from './strategy-cards.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -71,6 +85,12 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'strategic_action':
       return handleStrategicAction(state, action);
+
+    case 'strategic_primary':
+      return handleStrategicPrimary(state, action as StrategicPrimaryAction);
+
+    case 'strategic_secondary':
+      return handleStrategicSecondary(state, action as StrategicSecondaryAction);
 
     // Tactical Sub-phases
     case 'move_units':
@@ -136,6 +156,17 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'skip_invasion':
       return handleSkipInvasion(state, action as SkipInvasionAction);
+
+    // Action Cards
+    case 'play_action_card':
+      return handlePlayActionCard(state, action as PlayActionCardAction);
+
+    case 'discard_action_cards':
+      return handleDiscardActionCards(state, action as DiscardActionCardsAction);
+
+    // Technology
+    case 'research_technology':
+      return handleResearchTechnology(state, action as ResearchTechnologyAction);
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };

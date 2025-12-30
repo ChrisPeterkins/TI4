@@ -89,6 +89,8 @@ export interface GameState {
   agendaPhase?: AgendaPhaseTracking;
   // Invasion phase tracking
   invasionPhase?: InvasionTracking;
+  // Strategic action tracking
+  strategicActionState?: StrategicActionTracking;
 }
 
 // Player State
@@ -353,4 +355,20 @@ export interface InvasionTracking {
   pendingBombardmentHits: number;
   /** Pending space cannon hits to assign */
   pendingSpaceCannonHits: number;
+}
+
+// Strategic Action Tracking
+export interface StrategicActionTracking {
+  /** Which strategy card is being resolved */
+  cardNumber: number;
+  /** Whether the primary ability has been resolved */
+  primaryResolved: boolean;
+  /** Player IDs in secondary resolution order (clockwise from active player) */
+  secondaryOrder: UUID[];
+  /** Index into secondaryOrder for current player resolving */
+  currentSecondaryIndex: number;
+  /** Each player's response to the secondary ability */
+  secondaryResponses: Record<UUID, 'pending' | 'used' | 'declined'>;
+  /** For Trade card: players who were granted free secondary */
+  freeSecondaryPlayers?: UUID[];
 }

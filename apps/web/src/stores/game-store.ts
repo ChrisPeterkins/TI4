@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GameState, GameAction, DiceRoll } from '@ti4/shared';
+import type { GameState, GameAction, DiceRoll, ActionCardTargets } from '@ti4/shared';
 import { useSocketStore } from './socket-store';
 import { toast } from './toast-store';
 
@@ -15,6 +15,15 @@ interface GameStore {
     defenderRolls: DiceRoll[];
   } | null;
 
+  // Action Card UI state
+  showActionCardPanel: boolean;
+  selectedActionCard: string | null;
+  actionCardTargetMode: boolean; // True when selecting targets for a card
+  pendingCardPlay: {
+    cardId: string;
+    requiresTarget: 'player' | 'system' | 'planet' | 'unit' | null;
+  } | null;
+
   // UI state
   isLoading: boolean;
   error: string | null;
@@ -27,6 +36,14 @@ interface GameStore {
   leaveGame: () => void;
   sendAction: (action: Omit<GameAction, 'playerId' | 'timestamp'>) => void;
   requestState: () => void;
+
+  // Action Card actions
+  toggleActionCardPanel: () => void;
+  selectActionCard: (cardId: string | null) => void;
+  playActionCard: (cardId: string, targets?: ActionCardTargets) => void;
+  discardActionCards: (cardIds: string[]) => void;
+  cancelCardPlay: () => void;
+  setCardTargetMode: (cardId: string, targetType: 'player' | 'system' | 'planet' | 'unit') => void;
 
   // Internal
   setGameState: (state: GameState) => void;
@@ -43,6 +60,14 @@ const initialState = {
   pendingDiceRolls: null as {
     attackerRolls: DiceRoll[];
     defenderRolls: DiceRoll[];
+  } | null,
+  // Action Card UI state
+  showActionCardPanel: false,
+  selectedActionCard: null as string | null,
+  actionCardTargetMode: false,
+  pendingCardPlay: null as {
+    cardId: string;
+    requiresTarget: 'player' | 'system' | 'planet' | 'unit' | null;
   } | null,
   isLoading: false,
   error: null,
@@ -114,6 +139,56 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.emit('request_state', {
       gameId,
       fromVersion: gameState?.version
+    });
+  },
+
+  // Action Card actions
+  toggleActionCardPanel: () => {
+    set((state) => ({ showActionCardPanel: !state.showActionCardPanel }));
+  },
+
+  selectActionCard: (cardId: string | null) => {
+    set({ selectedActionCard: cardId });
+  },
+
+  playActionCard: (cardId: string, targets?: ActionCardTargets) => {
+    const { sendAction } = get();
+    sendAction({
+      type: 'play_action_card',
+      cardId,
+      targets,
+    } as Omit<GameAction, 'playerId' | 'timestamp'>);
+    // Reset UI state
+    set({
+      selectedActionCard: null,
+      actionCardTargetMode: false,
+      pendingCardPlay: null,
+    });
+  },
+
+  discardActionCards: (cardIds: string[]) => {
+    const { sendAction } = get();
+    sendAction({
+      type: 'discard_action_cards',
+      cardIds,
+    } as Omit<GameAction, 'playerId' | 'timestamp'>);
+  },
+
+  cancelCardPlay: () => {
+    set({
+      selectedActionCard: null,
+      actionCardTargetMode: false,
+      pendingCardPlay: null,
+    });
+  },
+
+  setCardTargetMode: (cardId: string, targetType: 'player' | 'system' | 'planet' | 'unit') => {
+    set({
+      actionCardTargetMode: true,
+      pendingCardPlay: {
+        cardId,
+        requiresTarget: targetType,
+      },
     });
   },
 
@@ -199,6 +274,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
       toast.error(error.message);
       set({ isLoading: false });
     });
+
+    // Action card events
+    socket.on('action_card_played', (data: { playerId: string; cardId: string; cardName: string }) => {
+      const { currentPlayerId } = get();
+      if (data.playerId !== currentPlayerId) {
+        toast.info(`${data.cardName} was played!`);
+      }
+    });
+
+    socket.on('action_cards_drawn', (data: { playerId: string; drawnCount: number; drawnCards?: string[] }) => {
+      const { currentPlayerId } = get();
+      if (data.playerId === currentPlayerId && data.drawnCards) {
+        toast.success(`Drew ${data.drawnCount} action card${data.drawnCount > 1 ? 's' : ''}`);
+      }
+    });
+
+    socket.on('action_cards_discarded', (data: { playerId: string; discardedCount: number }) => {
+      console.log('Action cards discarded:', data);
+    });
   },
 
   cleanupListeners: () => {
@@ -215,6 +309,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     socket.off('combat_started');
     socket.off('combat_updated');
     socket.off('combat_ended');
+    socket.off('action_card_played');
+    socket.off('action_cards_drawn');
+    socket.off('action_cards_discarded');
   },
 
   reset: () => {

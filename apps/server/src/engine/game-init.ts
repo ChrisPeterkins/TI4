@@ -7,10 +7,16 @@ import type {
   PlanetInstance,
   StrategyCardState,
   ObjectiveState,
+  ObjectiveInstance,
   AgendaState,
   PlayerColor,
   UnitInstance,
   UnitType,
+} from '@ti4/shared';
+import {
+  STAGE_I_OBJECTIVES,
+  STAGE_II_OBJECTIVES,
+  SECRET_OBJECTIVES,
 } from '@ti4/shared';
 import { factions, systems, strategyCards } from '@ti4/game-data';
 import { getHomeSystemPositions, generateStandardMapPositions } from './utils/hex.js';
@@ -58,7 +64,7 @@ export function createGame(options: GameSetupOptions): GameState {
   const strategyCardStates = createStrategyCards();
 
   // Create objectives
-  const objectives = createObjectives();
+  const objectives = createObjectives(options.expansions || ['base']);
 
   // Create initial game state
   const gameState: GameState = {
@@ -90,11 +96,11 @@ export function createGame(options: GameSetupOptions): GameState {
     placeStartingUnits(gameState, player);
   }
 
+  // Deal secret objectives to each player (2 cards, they'll keep 1 later)
+  dealSecretObjectives(gameState);
+
   // Deal starting action cards (not implemented yet - just placeholder)
   // dealStartingActionCards(gameState);
-
-  // Deal secret objectives (not implemented yet)
-  // dealSecretObjectives(gameState);
 
   return gameState;
 }
@@ -268,15 +274,71 @@ function createStrategyCards(): StrategyCardState[] {
 
 /**
  * Create initial objectives state
+ * - Shuffles Stage I and Stage II objective decks
+ * - Reveals 2 Stage I objectives at start
+ * - Creates shuffled secret objective deck
  */
-function createObjectives(): ObjectiveState {
-  // TODO: Properly shuffle and deal objectives
+function createObjectives(expansions: string[] = ['base']): ObjectiveState {
+  // Filter objectives by expansion
+  const stageI = STAGE_I_OBJECTIVES.filter(obj =>
+    expansions.includes(obj.expansion)
+  );
+  const stageII = STAGE_II_OBJECTIVES.filter(obj =>
+    expansions.includes(obj.expansion)
+  );
+  const secrets = SECRET_OBJECTIVES.filter(obj =>
+    expansions.includes(obj.expansion)
+  );
+
+  // Shuffle the decks
+  const shuffledStageI = shuffleArray(stageI);
+  const shuffledStageII = shuffleArray(stageII);
+  const shuffledSecrets = shuffleArray(secrets);
+
+  // Create objective instances for Stage I (5 objectives)
+  // First 2 are revealed at start
+  const publicStageI: ObjectiveInstance[] = shuffledStageI.slice(0, 5).map((obj, index) => ({
+    id: obj.id,
+    revealed: index < 2, // First 2 are revealed
+    scoredBy: [],
+  }));
+
+  // Create objective instances for Stage II (5 objectives)
+  // None revealed at start
+  const publicStageII: ObjectiveInstance[] = shuffledStageII.slice(0, 5).map(obj => ({
+    id: obj.id,
+    revealed: false,
+    scoredBy: [],
+  }));
+
+  // Secret deck is just IDs
+  const secretDeck = shuffledSecrets.map(obj => obj.id);
+
   return {
-    publicStageI: [],
-    publicStageII: [],
-    revealedCount: 0,
-    secretDeck: [],
+    publicStageI,
+    publicStageII,
+    revealedCount: 2, // 2 Stage I objectives revealed at start
+    secretDeck,
   };
+}
+
+/**
+ * Deal 2 secret objectives to each player
+ * In TI4, players keep 1 and discard 1 during setup
+ * For now, we store both in their secretObjectives array
+ * A later action will let them choose which to keep
+ */
+function dealSecretObjectives(state: GameState): void {
+  const deck = state.objectives.secretDeck;
+
+  for (const player of state.players) {
+    // Deal 2 secret objectives to each player
+    if (deck.length >= 2) {
+      const secret1 = deck.shift()!;
+      const secret2 = deck.shift()!;
+      player.secretObjectives = [secret1, secret2];
+    }
+  }
 }
 
 /**

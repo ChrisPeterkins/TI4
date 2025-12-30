@@ -100,6 +100,9 @@ export function handleStrategicAction(
   player.strategyCardUsed = true;
   card.exhausted = true;
 
+  // Initialize strategic action tracking
+  initializeStrategicActionState(state, action.playerId, action.cardNumber);
+
   // Enter strategic primary sub-phase
   state.subPhase = 'strategic_primary';
 
@@ -107,6 +110,45 @@ export function handleStrategicAction(
     success: true,
     triggeredEvents: ['strategic_action_started'],
   };
+}
+
+/**
+ * Initialize strategic action state when a player uses their strategy card
+ */
+function initializeStrategicActionState(
+  state: GameState,
+  playerId: string,
+  cardNumber: number
+): void {
+  // Build secondary order: all players except the active one, clockwise from active player
+  const secondaryOrder: string[] = [];
+
+  // Find player's position in initiative order
+  const activeIndex = state.initiativeOrder.indexOf(playerId);
+
+  // Add players clockwise from active player
+  for (let i = 1; i < state.players.length; i++) {
+    const index = (activeIndex + i) % state.players.length;
+    const pid = state.initiativeOrder[index];
+    // Only include non-passed players
+    const p = state.players.find(pl => pl.id === pid);
+    if (p && !p.passed) {
+      secondaryOrder.push(pid);
+    }
+  }
+
+  state.strategicActionState = {
+    cardNumber,
+    primaryResolved: false,
+    secondaryOrder,
+    currentSecondaryIndex: 0,
+    secondaryResponses: {},
+  };
+
+  // Initialize all secondary responses as pending
+  for (const pid of secondaryOrder) {
+    state.strategicActionState.secondaryResponses[pid] = 'pending';
+  }
 }
 
 /**

@@ -296,19 +296,41 @@ export function revealPublicObjective(state: GameState): string | null {
 
 /**
  * Draw action cards for all players
- * Each player draws 1 action card in initiative order
+ * Each player draws 2 action cards in initiative order
  */
 export function drawActionCards(state: GameState): void {
+  const CARDS_TO_DRAW = 2;
+
   for (const playerId of state.initiativeOrder) {
     const player = state.players.find(p => p.id === playerId);
     if (!player) continue;
 
-    // Draw 1 card from the deck
-    if (state.actionCardDeck.length > 0) {
-      const drawnCard = state.actionCardDeck.shift()!;
-      player.actionCards.push(drawnCard);
+    for (let i = 0; i < CARDS_TO_DRAW; i++) {
+      // Reshuffle discard if deck is empty
+      if (state.actionCardDeck.length === 0 && state.actionCardDiscard.length > 0) {
+        state.actionCardDeck = shuffleDeck([...state.actionCardDiscard]);
+        state.actionCardDiscard = [];
+      }
+
+      // Draw a card from the deck
+      if (state.actionCardDeck.length > 0) {
+        const drawnCard = state.actionCardDeck.shift()!;
+        player.actionCards.push(drawnCard);
+      }
     }
   }
+}
+
+/**
+ * Fisher-Yates shuffle for deck reshuffling
+ */
+function shuffleDeck<T>(cards: T[]): T[] {
+  const shuffled = [...cards];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 /**
