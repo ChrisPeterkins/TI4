@@ -5,6 +5,7 @@ import { strategyCards } from '@ti4/game-data';
 import type { GameState, PlayerState, HexCoord, UnitType } from '@ti4/shared';
 import { MovementPanel, type UnitMoveSelection } from './MovementPanel';
 import { ProductionPanel } from './ProductionPanel';
+import { WaitingNotification } from './GameNotification';
 
 interface ActionPhasePanelProps {
   gameState: GameState;
@@ -79,43 +80,29 @@ export function ActionPhasePanel({
     };
 
     return (
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-20">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 px-6 py-3 shadow-xl">
-          <div className="text-center">
-            <span className="text-gray-400">Waiting for </span>
-            <span className="text-yellow-400 font-bold">{activePlayer?.name}</span>
-            <span className="text-gray-400"> to complete </span>
-            <span className="text-blue-400">{subPhaseNames[subPhase] || subPhase}</span>
-            <span className="text-gray-400">...</span>
-          </div>
-        </div>
-      </div>
+      <WaitingNotification
+        playerName={activePlayer?.name || 'player'}
+        action={subPhaseNames[subPhase] || subPhase}
+      />
     );
   }
 
   if (!isMyTurn) {
     return (
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-20">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 px-6 py-3 shadow-xl">
-          <div className="text-center">
-            <span className="text-gray-400">Waiting for </span>
-            <span className="text-yellow-400 font-bold">{activePlayer?.name}</span>
-            <span className="text-gray-400"> to take an action...</span>
-          </div>
-        </div>
-      </div>
+      <WaitingNotification
+        playerName={activePlayer?.name || 'player'}
+        action="to take an action"
+      />
     );
   }
 
   if (hasPassed) {
     return (
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-20">
-        <div className="bg-gray-800 rounded-lg border border-gray-700 px-6 py-3 shadow-xl">
-          <div className="text-center text-gray-400">
-            You have passed. Waiting for other players...
-          </div>
-        </div>
-      </div>
+      <WaitingNotification
+        playerName="others"
+        action="to finish"
+        subText="You passed"
+      />
     );
   }
 

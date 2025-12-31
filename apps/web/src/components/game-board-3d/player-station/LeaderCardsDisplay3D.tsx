@@ -9,11 +9,11 @@ import { animated, useSpring } from '@react-spring/three';
 import { getLeaderCardUrl, getLeaderCardBackUrl } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
 
-// Leader card dimensions (similar to action cards but slightly larger)
-const CARD_WIDTH = 0.7;
+// Leader card dimensions (wider aspect ratio)
+const CARD_WIDTH = 1.4;
 const CARD_HEIGHT = 1.05;
 const CARD_DEPTH = 0.008;
-const CARD_SPACING = 0.75;
+const CARD_SPACING = 1.5;
 
 // Leader types
 export type LeaderType = 'agent' | 'commander' | 'hero';

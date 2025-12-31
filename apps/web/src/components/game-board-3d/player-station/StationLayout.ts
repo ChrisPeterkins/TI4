@@ -20,12 +20,12 @@ export const RAW_DIMENSIONS = {
   strategyCard: { width: 0.8, height: 0.8 },
   vpTrack: { width: 1.2, height: 0.4 },
   passButton: { width: 0.4, height: 0.6 }, // Based on panel_pass texture aspect ratio
-  leaderCards: { width: 2.25, height: 1.05 }, // 3 cards × 0.75 spacing
+  leaderCards: { width: 5.5, height: 1.2 }, // 3 wider cards
   techBoard: { width: 5.7, height: 3.07 },
   actionCards: { width: 7.2, height: 1.26 }, // ~8 cards spread
   secretsMat: { width: 2.1, height: 1.0 }, // 3 cards × 0.6 + gaps, side by side
   promissoryCards: { width: 4.5, height: 1.26 }, // ~5 cards spread
-  unitSupply: { width: 6.0, height: 2.0 },
+  unitSupply: { width: 8.0, height: 2.75 },
   // Stack layouts (less width)
   actionCardsStack: { width: 1.2, height: 1.26 },
   promissoryCardsStack: { width: 1.0, height: 1.26 },
@@ -40,13 +40,13 @@ export const RAW_DIMENSIONS = {
 // ============================================================================
 
 export const DEFAULT_SCALES = {
-  factionSheet: 0.8,
+  factionSheet: 1.15, // 25% larger than previous 0.92
   commandSheet: 0.9,
-  strategyCard: 0.9,
+  strategyCard: 1.2, // Larger for better visibility
   vpTrack: 0.9,
-  passButton: 1.0,
+  passButton: 1.5,
   leaderCards: 0.7,
-  techBoard: 0.55,
+  techBoard: 0.7, // Scaled up for better readability
   actionCards: 0.7,
   secretsMat: 0.7,
   promissoryCards: 0.6,
@@ -150,16 +150,16 @@ export interface StationLayoutPositions {
 
 /**
  * Calculate non-overlapping positions for all player station components.
- * Uses a two-column layout to better utilize space:
+ * Three-column layout:
  *
  * ┌─────────────────────────────────────────────────────────────────────┐
- * │  LEFT COLUMN           │  RIGHT COLUMN                     │[Pass] │
- * │  [Faction Sheet]       │  [Strat][Leaders][Frags][Secrets] │       │
- * │                        │  [Command] [VP]                   │       │
- * │  [Tech Board]          │  [Promissory]                     │       │
- * │                        │  [Unit Supply]                    │       │
- * ├────────────────────────┴───────────────────────────────────┴───────┤
- * │  [Action Cards] [Relics]                                           │
+ * │  LEFT COLUMN      │  MIDDLE COLUMN    │  RIGHT COLUMN              │
+ * │  [Faction Sheet]  │  [Tech Board]     │  [Strat][Secrets][Pass]    │
+ * │                   │                   │                             │
+ * │  [Unit Supply]    │  [Leaders]        │  [Promissory]               │
+ * │                   │  [Command Sheet]  │  [Action Cards]             │
+ * │                   │                   │  [Relics]                   │
+ * │                   │                   │  [Relic Frags]              │
  * └─────────────────────────────────────────────────────────────────────┘
  */
 export function calculateStationLayout(
@@ -185,117 +185,78 @@ export function calculateStationLayout(
     relics: getScaledDimensions(isCurrentPlayer ? 'relics' : 'relicsStack'),
   };
 
-  const columnGap = horizontalGap * 2; // Gap between left and right columns
-
   // ========================================
-  // TWO-COLUMN ZONE (TOP)
-  // Left: Faction Sheet + Tech Board below
-  // Right: Leaders/Fragments + Command/Controls below
+  // THREE-COLUMN LAYOUT
   // ========================================
 
-  // LEFT COLUMN dimensions
-  const leftColumnWidth = Math.max(dims.factionSheet.width, dims.techBoard.width);
+  const zone1Z = 0;
+  const topRowZ = zone1Z + rowGap;
 
-  // RIGHT COLUMN dimensions
-  // Strategy card + Leaders + Fragments + Secrets on top, command sheet + VP below
-  const topRowWidth = dims.strategyCard.width + horizontalGap +
-                      dims.leaderCards.width + horizontalGap +
-                      dims.relicFragments.width + horizontalGap +
-                      dims.secretsMat.width;
-  const controlsRowWidth = dims.commandSheet.width + horizontalGap +
-                           dims.vpTrack.width;
-  const rightColumnWidth = Math.max(topRowWidth, controlsRowWidth);
+  // LEFT COLUMN: Faction Sheet + Unit Supply
+  const factionSheetLeftEdge = -dims.factionSheet.width / 2 - 4;
+  const factionSheetX = factionSheetLeftEdge + dims.factionSheet.width / 2;
+  const factionSheetZ = topRowZ + dims.factionSheet.height / 2;
+  const factionSheetRightEdge = factionSheetLeftEdge + dims.factionSheet.width;
 
-  // Total width of two-column zone
-  const twoColumnWidth = leftColumnWidth + columnGap + rightColumnWidth;
+  // Unit Supply below faction sheet
+  const unitSupplyZ = factionSheetZ + dims.factionSheet.height / 2 + rowGap + dims.unitSupply.height / 2;
+  const unitSupplyX = factionSheetX;
 
-  // Column X positions (centered overall)
-  const leftColumnCenterX = -twoColumnWidth / 2 + leftColumnWidth / 2;
-  const rightColumnCenterX = twoColumnWidth / 2 - rightColumnWidth / 2;
+  // MIDDLE COLUMN: Tech Board + Leaders + Command Sheet
+  const middleColumnLeftEdge = factionSheetRightEdge + horizontalGap;
+  const techBoardX = middleColumnLeftEdge + dims.techBoard.width / 2;
+  const techBoardZ = topRowZ + dims.techBoard.height / 2;
+  const techBoardRightEdge = middleColumnLeftEdge + dims.techBoard.width;
 
-  // Z positions for two-column zone
-  const zone1Z = 0; // Start at 0
+  // Leaders below tech board
+  const leadersRowZ = techBoardZ + dims.techBoard.height / 2 + rowGap + dims.leaderCards.height / 2;
+  const leadersX = techBoardX;
 
-  // Left column offset - push faction sheet + tech board down so they're within bounds
-  const leftColumnStartZ = zone1Z + dims.factionSheet.height / 2 + rowGap;
+  // Command Sheet below leaders
+  const commandSheetZ = leadersRowZ + dims.leaderCards.height / 2 + rowGap + dims.commandSheet.height / 2;
+  const commandSheetX = techBoardX;
 
-  // LEFT COLUMN: Faction Sheet
-  const factionSheetX = leftColumnCenterX;
-  const factionSheetZ = leftColumnStartZ;
+  // RIGHT COLUMN: Strategy card, Secrets, Pass button on top row
+  const rightColumnLeftEdge = techBoardRightEdge + horizontalGap;
+  const strategyCardX = rightColumnLeftEdge + dims.strategyCard.width / 2;
+  const strategyCardZ = topRowZ + dims.strategyCard.height / 2;
 
-  // RIGHT COLUMN: Strategy Card + Leaders + Fragments + Secrets (top row)
-  let topRowX = rightColumnCenterX - topRowWidth / 2;
-  const strategyCardX = topRowX + dims.strategyCard.width / 2;
-  topRowX += dims.strategyCard.width + horizontalGap;
-  const leadersX = topRowX + dims.leaderCards.width / 2;
-  topRowX += dims.leaderCards.width + horizontalGap;
-  const relicFragmentsX = topRowX + dims.relicFragments.width / 2;
-  topRowX += dims.relicFragments.width + horizontalGap;
-  const secretsMatX = topRowX + dims.secretsMat.width / 2;
-  const topRowZ = zone1Z + Math.max(dims.leaderCards.height, dims.secretsMat.height) / 2 + rowGap;
+  const secretsMatX = strategyCardX + dims.strategyCard.width / 2 + horizontalGap + dims.secretsMat.width / 2;
+  const secretsMatZ = strategyCardZ;
 
-  // RIGHT COLUMN: Controls row below top row
-  const controlsRowZ = topRowZ + Math.max(dims.leaderCards.height, dims.secretsMat.height) / 2 + rowGap + dims.commandSheet.height / 2;
+  const passButtonX = secretsMatX + dims.secretsMat.width / 2 + horizontalGap + dims.passButton.width / 2;
+  const passButtonZ = strategyCardZ;
 
-  // Position controls left to right within right column
-  let controlsX = rightColumnCenterX - controlsRowWidth / 2;
+  // Center X for right column cards
+  const rightColumnCenterX = (strategyCardX + passButtonX) / 2;
 
-  const commandSheetX = controlsX + dims.commandSheet.width / 2;
-  controlsX += dims.commandSheet.width + horizontalGap;
-
-  const vpTrackX = controlsX + dims.vpTrack.width / 2;
-
-  // PASS BUTTON: Top right corner of the station (above the top row)
-  const passButtonX = twoColumnWidth / 2 + horizontalGap + dims.passButton.width / 2;
-  const passButtonZ = zone1Z + dims.passButton.height / 2;
-
-  // RIGHT COLUMN: Promissory row (below controls)
-  const promissoryRowZ = controlsRowZ + dims.commandSheet.height / 2 + rowGap + dims.promissoryCards.height / 2;
+  // Promissory below strategy card area
+  const promissoryRowZ = strategyCardZ + dims.strategyCard.height / 2 + rowGap + dims.promissoryCards.height / 2;
   const promissoryCardsX = rightColumnCenterX;
 
-  // RIGHT COLUMN: Unit Supply (below promissory)
-  const unitSupplyZ = promissoryRowZ + dims.promissoryCards.height / 2 + rowGap + dims.unitSupply.height / 2;
-  const unitSupplyX = rightColumnCenterX;
+  // Action Cards below promissory
+  const actionCardsZ = promissoryRowZ + dims.promissoryCards.height / 2 + rowGap + dims.actionCards.height / 2;
+  const actionCardsX = rightColumnCenterX;
 
-  // LEFT COLUMN: Tech Board (below faction sheet)
-  const techBoardZ = factionSheetZ + dims.factionSheet.height / 2 + rowGap + dims.techBoard.height / 2;
-  const techBoardX = leftColumnCenterX;
+  // Relics below action cards
+  const relicsZ = actionCardsZ + dims.actionCards.height / 2 + rowGap + dims.relics.height / 2;
+  const relicsX = rightColumnCenterX;
 
-  // Calculate end of two-column zone
-  const leftColumnBottom = techBoardZ + dims.techBoard.height / 2;
-  const rightColumnBottom = unitSupplyZ + dims.unitSupply.height / 2;
-  const twoColumnZoneEnd = Math.max(leftColumnBottom, rightColumnBottom);
+  // Relic Fragments below relics
+  const relicFragmentsZ = relicsZ + dims.relics.height / 2 + rowGap + dims.relicFragments.height / 2;
+  const relicFragmentsX = rightColumnCenterX;
 
-  // Alias for backwards compatibility in return statement
-  const leadersFragmentsZ = topRowZ;
-
-  // ========================================
-  // CARDS ROW (below two-column zone)
-  // [Action Cards] [Relics]
-  // ========================================
-  const cardsRowHeight = Math.max(
-    dims.actionCards.height,
-    dims.relics.height
-  );
-  const cardsRowZ = twoColumnZoneEnd + rowGap + cardsRowHeight / 2;
-
-  // Calculate cards row total width
-  const cardsRowWidth = dims.actionCards.width + dims.relics.width + horizontalGap;
-  let cardsX = -cardsRowWidth / 2;
-
-  const actionCardsX = cardsX + dims.actionCards.width / 2;
-  cardsX += dims.actionCards.width + horizontalGap;
-
-  const relicsX = cardsX + dims.relics.width / 2;
-
-  // ========================================
   // Calculate bounds
-  // ========================================
-  // Include pass button in width calculation (it's in top right corner)
-  const stationWidthWithPassButton = twoColumnWidth + horizontalGap + dims.passButton.width;
-  const maxWidth = Math.max(stationWidthWithPassButton, cardsRowWidth);
-  const totalHeight = cardsRowZ + cardsRowHeight / 2;
+  const leftColumnBottom = unitSupplyZ + dims.unitSupply.height / 2;
+  const middleColumnBottom = commandSheetZ + dims.commandSheet.height / 2;
+  const rightColumnBottom = relicFragmentsZ + dims.relicFragments.height / 2;
+  const totalHeight = Math.max(leftColumnBottom, middleColumnBottom, rightColumnBottom);
+
+  const leftmostX = factionSheetLeftEdge;
+  const rightmostX = passButtonX + dims.passButton.width / 2;
+  const stationWidth = rightmostX - leftmostX;
   const centerZ = totalHeight / 2;
+  const centerX = (leftmostX + rightmostX) / 2;
 
   return {
     factionSheet: {
@@ -304,19 +265,19 @@ export function calculateStationLayout(
       visible: true,
     },
     commandSheet: {
-      position: [commandSheetX, yOffset, controlsRowZ],
+      position: [commandSheetX, yOffset, commandSheetZ],
       scale: dims.commandSheet.scale,
       visible: true,
     },
     strategyCard: {
-      position: [strategyCardX, yOffset, leadersFragmentsZ],
+      position: [strategyCardX, yOffset, strategyCardZ],
       scale: dims.strategyCard.scale,
       visible: true,
     },
     vpTrack: {
-      position: [vpTrackX, yOffset, controlsRowZ],
+      position: [0, yOffset, 0],
       scale: dims.vpTrack.scale,
-      visible: true,
+      visible: false,
     },
     passButton: {
       position: [passButtonX, yOffset, passButtonZ],
@@ -324,12 +285,12 @@ export function calculateStationLayout(
       visible: true,
     },
     leaders: {
-      position: [leadersX, yOffset, leadersFragmentsZ],
+      position: [leadersX, yOffset, leadersRowZ],
       scale: dims.leaderCards.scale,
       visible: true,
     },
     relicFragments: {
-      position: [relicFragmentsX, yOffset, leadersFragmentsZ],
+      position: [relicFragmentsX, yOffset, relicFragmentsZ],
       scale: dims.relicFragments.scale,
       visible: true,
     },
@@ -339,12 +300,12 @@ export function calculateStationLayout(
       visible: true,
     },
     actionCards: {
-      position: [actionCardsX, yOffset, cardsRowZ],
+      position: [actionCardsX, yOffset, actionCardsZ],
       scale: dims.actionCards.scale,
       visible: true,
     },
     secretsMat: {
-      position: [secretsMatX, yOffset, topRowZ],
+      position: [secretsMatX, yOffset, secretsMatZ],
       scale: dims.secretsMat.scale,
       visible: true,
     },
@@ -359,14 +320,14 @@ export function calculateStationLayout(
       visible: true,
     },
     relics: {
-      position: [relicsX, yOffset, cardsRowZ],
+      position: [relicsX, yOffset, relicsZ],
       scale: dims.relics.scale,
       visible: true,
     },
     bounds: {
-      width: maxWidth + 1.0, // Add padding
+      width: stationWidth + 1.0,
       height: totalHeight + 1.0,
-      centerX: 0,
+      centerX: centerX,
       centerZ: centerZ,
     },
   };

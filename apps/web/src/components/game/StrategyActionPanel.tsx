@@ -11,6 +11,7 @@ import type {
 } from '@ti4/shared';
 import { strategyCards, systems, factions } from '@ti4/game-data';
 import { getStrategyCardUrl } from '@/lib/assets';
+import { GameNotification, WaitingNotification } from './GameNotification';
 
 interface StrategyActionPanelProps {
   gameState: GameState;
@@ -47,45 +48,54 @@ export function StrategyActionPanel({
   const isFreeSecondary = tracking.cardNumber === 1 ||
     (tracking.freeSecondaryPlayers?.includes(currentPlayer.id) ?? false);
 
+  // If waiting for another player, show compact waiting notification
+  if (!isMyTurn) {
+    const waitingForId = isPrimary
+      ? gameState.activePlayerId
+      : tracking.secondaryOrder[tracking.currentSecondaryIndex];
+    const waitingForPlayer = gameState.players.find(p => p.id === waitingForId);
+    const progress = !isPrimary
+      ? `${tracking.currentSecondaryIndex + 1}/${tracking.secondaryOrder.length}`
+      : undefined;
+
+    return (
+      <WaitingNotification
+        playerName={waitingForPlayer?.name || 'player'}
+        action={`${cardData.name} ${isPrimary ? 'primary' : 'secondary'}`}
+        subText={progress}
+      />
+    );
+  }
+
+  // If it's the player's turn, show collapsible action notification
+  const abilityType = isPrimary ? 'Primary' : 'Secondary';
+  const summary = isPrimary ? cardData.primaryAbility : cardData.secondaryAbility;
+
   return (
-    <div className="fixed bottom-16 left-72 right-4 z-30 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-t-lg shadow-xl max-h-[60vh] flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-        <div className="flex items-center gap-4">
+    <GameNotification
+      title={`${cardData.name} - ${abilityType}`}
+      summary={summary.length > 30 ? summary.slice(0, 30) + '...' : summary}
+      variant="action"
+      requiresAction={true}
+      defaultExpanded={true}
+    >
+      <div className="p-3">
+        {/* Strategy card preview */}
+        <div className="flex items-start gap-3 mb-3 pb-3 border-b border-gray-700/50">
           <Image
             src={getStrategyCardUrl(tracking.cardNumber)}
             alt={cardData.name}
-            width={60}
-            height={90}
-            className="rounded"
+            width={48}
+            height={72}
+            className="rounded flex-shrink-0"
           />
-          <div>
-            <h2 className="text-lg font-bold text-white">
-              {cardData.name} - {isPrimary ? 'Primary Ability' : 'Secondary Ability'}
-            </h2>
-            <p className="text-sm text-gray-400">
-              {isPrimary ? cardData.primaryAbility : cardData.secondaryAbility}
-            </p>
-          </div>
+          <p className="text-xs text-gray-400 leading-relaxed">
+            {isPrimary ? cardData.primaryAbility : cardData.secondaryAbility}
+          </p>
         </div>
-        {onClose && (
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {!isMyTurn ? (
-          <WaitingMessage
-            gameState={gameState}
-            tracking={tracking}
-            isPrimary={isPrimary}
-          />
-        ) : isPrimary ? (
+        {/* Ability panel content */}
+        {isPrimary ? (
           <PrimaryAbilityPanel
             cardNumber={tracking.cardNumber}
             gameState={gameState}
@@ -102,37 +112,7 @@ export function StrategyActionPanel({
           />
         )}
       </div>
-    </div>
-  );
-}
-
-function WaitingMessage({
-  gameState,
-  tracking,
-  isPrimary,
-}: {
-  gameState: GameState;
-  tracking: NonNullable<GameState['strategicActionState']>;
-  isPrimary: boolean;
-}) {
-  const waitingForId = isPrimary
-    ? gameState.activePlayerId
-    : tracking.secondaryOrder[tracking.currentSecondaryIndex];
-
-  const waitingForPlayer = gameState.players.find(p => p.id === waitingForId);
-
-  return (
-    <div className="text-center py-8">
-      <div className="text-gray-400 mb-2">
-        Waiting for {waitingForPlayer?.name || 'player'} to resolve{' '}
-        {isPrimary ? 'primary' : 'secondary'} ability...
-      </div>
-      {!isPrimary && (
-        <div className="text-sm text-gray-500">
-          {tracking.currentSecondaryIndex + 1} / {tracking.secondaryOrder.length} players remaining
-        </div>
-      )}
-    </div>
+    </GameNotification>
   );
 }
 
