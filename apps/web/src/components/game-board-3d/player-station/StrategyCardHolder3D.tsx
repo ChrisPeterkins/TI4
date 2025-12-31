@@ -44,7 +44,7 @@ export interface StrategyCardHolder3DProps {
 }
 
 /**
- * Strategy card with texture - flips when exhausted
+ * Strategy card with texture
  */
 function StrategyCardWithTexture({
   cardNumber,
@@ -68,12 +68,6 @@ function StrategyCardWithTexture({
     }
   }, [texture, maxAnisotropy]);
 
-  // Flip animation when exhausted
-  const { flipRotation } = useSpring({
-    flipRotation: exhausted ? Math.PI : 0,
-    config: { mass: 1, tension: 180, friction: 20 },
-  });
-
   // Create geometry
   const geometry = useMemo(() => {
     return new THREE.BoxGeometry(CARD_WIDTH, CARD_DEPTH, CARD_HEIGHT);
@@ -91,14 +85,14 @@ function StrategyCardWithTexture({
       map: texture,
       roughness: 0.4,
       metalness: 0.1,
-      color: '#ffffff',
+      // Dim the card if exhausted
+      color: exhausted ? '#666666' : '#ffffff',
     });
 
-    // Back material - dark with subtle pattern
     const backMaterial = new THREE.MeshStandardMaterial({
-      color: '#0a1525',
-      roughness: 0.7,
-      metalness: 0.2,
+      color: '#1e3a5f',
+      roughness: 0.6,
+      metalness: 0.1,
     });
 
     // [+X, -X, +Y (top), -Y (bottom), +Z, -Z]
@@ -110,7 +104,7 @@ function StrategyCardWithTexture({
       edgeMaterial,   // Front edge
       edgeMaterial,   // Back edge
     ];
-  }, [texture]);
+  }, [texture, exhausted]);
 
   // Hover and playable effects
   useFrame(() => {
@@ -137,12 +131,7 @@ function StrategyCardWithTexture({
   });
 
   return (
-    <animated.mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={materials}
-      rotation-x={flipRotation}
-    />
+    <mesh ref={meshRef} geometry={geometry} material={materials} />
   );
 }
 
@@ -279,12 +268,12 @@ export function StrategyCardHolder3D({
         <EmptyCardSlot />
       )}
 
-      {/* Initiative number badge - shown when card is face up */}
-      {strategyCard && !exhausted && (
+      {/* Initiative number badge */}
+      {strategyCard && (
         <Text
           position={[0, CARD_DEPTH + 0.01, -CARD_HEIGHT / 2 - 0.1]}
           fontSize={0.15}
-          color="#ffffff"
+          color={exhausted ? '#666666' : '#ffffff'}
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.01}
@@ -294,22 +283,19 @@ export function StrategyCardHolder3D({
         </Text>
       )}
 
-      {/* Large number on back when exhausted (flipped) */}
+      {/* Exhausted indicator */}
       {strategyCard && exhausted && (
-        <group rotation={[Math.PI, 0, 0]} position={[0, -CARD_DEPTH - 0.01, 0]}>
-          <Text
-            position={[0, 0, 0]}
-            fontSize={0.35}
-            color="#3b82f6"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#0a1525"
-            fontWeight="bold"
-          >
-            {strategyCard}
-          </Text>
-        </group>
+        <Text
+          position={[0, CARD_DEPTH + 0.03, 0]}
+          fontSize={0.1}
+          color="#ff6b6b"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.01}
+          outlineColor="#000000"
+        >
+          USED
+        </Text>
       )}
 
       {/* Card name on hover */}
