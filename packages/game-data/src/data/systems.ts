@@ -817,4 +817,704 @@ export const systems: Record<number, SystemData> = {
     planets: [],
     expansion: 'base',
   },
+
+  // =====================================================================
+  // PROPHECY OF KINGS - HOME SYSTEMS
+  // =====================================================================
+
+  // Tile 52: Argent Flight
+  52: {
+    id: 52,
+    tileNumber: '52',
+    type: 'home',
+    factionId: 'argent',
+    planets: [
+      {
+        id: 'valk_pok',
+        name: 'Valk',
+        resources: 2,
+        influence: 0,
+      },
+      {
+        id: 'avar_pok',
+        name: 'Avar',
+        resources: 1,
+        influence: 1,
+      },
+      {
+        id: 'ylir',
+        name: 'Ylir',
+        resources: 0,
+        influence: 2,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 53: Empyrean
+  53: {
+    id: 53,
+    tileNumber: '53',
+    type: 'home',
+    factionId: 'empyrean',
+    planets: [
+      {
+        id: 'the_dark',
+        name: 'The Dark',
+        resources: 3,
+        influence: 4,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 54: Mahact Gene-Sorcerers
+  54: {
+    id: 54,
+    tileNumber: '54',
+    type: 'home',
+    factionId: 'mahact',
+    planets: [
+      {
+        id: 'ixth',
+        name: 'Ixth',
+        resources: 3,
+        influence: 5,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 55: Naaz-Rokha Alliance
+  55: {
+    id: 55,
+    tileNumber: '55',
+    type: 'home',
+    factionId: 'naazrokha',
+    planets: [
+      {
+        id: 'naazir',
+        name: 'Naazir',
+        resources: 2,
+        influence: 1,
+      },
+      {
+        id: 'rokha',
+        name: 'Rokha',
+        resources: 1,
+        influence: 2,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 56: Nomad
+  56: {
+    id: 56,
+    tileNumber: '56',
+    type: 'home',
+    factionId: 'nomad',
+    planets: [
+      {
+        id: 'arcturus',
+        name: 'Arcturus',
+        resources: 4,
+        influence: 4,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 57: Titans of Ul
+  57: {
+    id: 57,
+    tileNumber: '57',
+    type: 'home',
+    factionId: 'ul',
+    planets: [
+      {
+        id: 'elysium',
+        name: 'Elysium',
+        resources: 4,
+        influence: 1,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 58: Vuil'raith Cabal
+  58: {
+    id: 58,
+    tileNumber: '58',
+    type: 'home',
+    factionId: 'cabal',
+    planets: [
+      {
+        id: 'acheron',
+        name: 'Acheron',
+        resources: 4,
+        influence: 0,
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // =====================================================================
+  // PROPHECY OF KINGS - LEGENDARY PLANET TILES
+  // =====================================================================
+
+  // Tile 65: Primor - Legendary Industrial Planet
+  65: {
+    id: 65,
+    tileNumber: '65',
+    type: 'blue',
+    planets: [
+      {
+        id: 'primor',
+        name: 'Primor',
+        resources: 2,
+        influence: 1,
+        trait: 'industrial',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to purge up to 2 attachments from planets you control.',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 66: Hope\'s End - Legendary Hazardous Planet
+  66: {
+    id: 66,
+    tileNumber: '66',
+    type: 'blue',
+    planets: [
+      {
+        id: 'hopes_end',
+        name: "Hope's End",
+        resources: 3,
+        influence: 0,
+        trait: 'hazardous',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to draw 3 action cards. Then, choose 3 action cards from your hand and place them on the bottom of the action card deck in any order.',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 82: Mallice - Legendary Wormhole Planet
+  82: {
+    id: 82,
+    tileNumber: '82',
+    type: 'blue',
+    wormhole: 'alpha',
+    planets: [
+      {
+        id: 'mallice',
+        name: 'Mallice',
+        resources: 0,
+        influence: 3,
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to produce up to 2 units in this system.',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // =====================================================================
+  // PROPHECY OF KINGS - BLUE TILES
+  // =====================================================================
+
+  // Tile 59: New Albion + Starpoint
+  59: {
+    id: 59,
+    tileNumber: '59',
+    type: 'blue',
+    planets: [
+      {
+        id: 'new_albion',
+        name: 'New Albion',
+        resources: 1,
+        influence: 1,
+        trait: 'industrial',
+        techSpecialty: 'green',
+      },
+      {
+        id: 'starpoint',
+        name: 'Starpoint',
+        resources: 3,
+        influence: 1,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 60: Abyz + Fria
+  60: {
+    id: 60,
+    tileNumber: '60',
+    type: 'blue',
+    planets: [
+      {
+        id: 'abyz',
+        name: 'Abyz',
+        resources: 3,
+        influence: 0,
+        trait: 'hazardous',
+      },
+      {
+        id: 'fria',
+        name: 'Fria',
+        resources: 2,
+        influence: 0,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 61: Axis
+  61: {
+    id: 61,
+    tileNumber: '61',
+    type: 'blue',
+    planets: [
+      {
+        id: 'axis',
+        name: 'Axis',
+        resources: 5,
+        influence: 0,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 62: Etir V
+  62: {
+    id: 62,
+    tileNumber: '62',
+    type: 'blue',
+    planets: [
+      {
+        id: 'etir_v',
+        name: 'Etir V',
+        resources: 2,
+        influence: 1,
+        trait: 'hazardous',
+        techSpecialty: 'yellow',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 63: Valk + Avar
+  63: {
+    id: 63,
+    tileNumber: '63',
+    type: 'blue',
+    planets: [
+      {
+        id: 'valk',
+        name: 'Valk',
+        resources: 2,
+        influence: 0,
+        trait: 'hazardous',
+      },
+      {
+        id: 'avar',
+        name: 'Avar',
+        resources: 1,
+        influence: 1,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 64: Lirta IV
+  64: {
+    id: 64,
+    tileNumber: '64',
+    type: 'blue',
+    planets: [
+      {
+        id: 'lirta_iv',
+        name: 'Lirta IV',
+        resources: 2,
+        influence: 3,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 67: Cormund
+  67: {
+    id: 67,
+    tileNumber: '67',
+    type: 'blue',
+    planets: [
+      {
+        id: 'cormund',
+        name: 'Cormund',
+        resources: 2,
+        influence: 0,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 68: Everra
+  68: {
+    id: 68,
+    tileNumber: '68',
+    type: 'blue',
+    planets: [
+      {
+        id: 'everra',
+        name: 'Everra',
+        resources: 3,
+        influence: 1,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 69: Accoen + Jeol Ir
+  69: {
+    id: 69,
+    tileNumber: '69',
+    type: 'blue',
+    planets: [
+      {
+        id: 'accoen',
+        name: 'Accoen',
+        resources: 2,
+        influence: 3,
+        trait: 'industrial',
+      },
+      {
+        id: 'jeol_ir',
+        name: 'Jeol Ir',
+        resources: 2,
+        influence: 3,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 70: Kraag + Siig
+  70: {
+    id: 70,
+    tileNumber: '70',
+    type: 'blue',
+    planets: [
+      {
+        id: 'kraag',
+        name: 'Kraag',
+        resources: 2,
+        influence: 1,
+        trait: 'hazardous',
+      },
+      {
+        id: 'siig',
+        name: 'Siig',
+        resources: 0,
+        influence: 2,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 71: Bakal + Alio Prima
+  71: {
+    id: 71,
+    tileNumber: '71',
+    type: 'blue',
+    planets: [
+      {
+        id: 'bakal',
+        name: 'Bakal',
+        resources: 3,
+        influence: 2,
+        trait: 'industrial',
+      },
+      {
+        id: 'alio_prima',
+        name: 'Alio Prima',
+        resources: 1,
+        influence: 1,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 72: Lisis + Velnor
+  72: {
+    id: 72,
+    tileNumber: '72',
+    type: 'blue',
+    planets: [
+      {
+        id: 'lisis',
+        name: 'Lisis',
+        resources: 2,
+        influence: 2,
+        trait: 'industrial',
+      },
+      {
+        id: 'velnor',
+        name: 'Velnor',
+        resources: 2,
+        influence: 0,
+        trait: 'industrial',
+        techSpecialty: 'red',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 73: Cealdri + Xanhact
+  73: {
+    id: 73,
+    tileNumber: '73',
+    type: 'blue',
+    planets: [
+      {
+        id: 'cealdri',
+        name: 'Cealdri',
+        resources: 0,
+        influence: 2,
+        trait: 'cultural',
+        techSpecialty: 'yellow',
+      },
+      {
+        id: 'xanhact',
+        name: 'Xanhact',
+        resources: 0,
+        influence: 1,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 74: Vega Major + Vega Minor
+  74: {
+    id: 74,
+    tileNumber: '74',
+    type: 'blue',
+    planets: [
+      {
+        id: 'vega_major',
+        name: 'Vega Major',
+        resources: 2,
+        influence: 1,
+        trait: 'cultural',
+      },
+      {
+        id: 'vega_minor',
+        name: 'Vega Minor',
+        resources: 1,
+        influence: 2,
+        trait: 'cultural',
+        techSpecialty: 'blue',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 75: Loki
+  75: {
+    id: 75,
+    tileNumber: '75',
+    type: 'blue',
+    planets: [
+      {
+        id: 'loki',
+        name: 'Loki',
+        resources: 1,
+        influence: 2,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // Tile 76: Abaddon + Ashtroth + Loki
+  76: {
+    id: 76,
+    tileNumber: '76',
+    type: 'blue',
+    planets: [
+      {
+        id: 'abaddon',
+        name: 'Abaddon',
+        resources: 1,
+        influence: 0,
+        trait: 'cultural',
+      },
+      {
+        id: 'ashtroth',
+        name: 'Ashtroth',
+        resources: 2,
+        influence: 0,
+        trait: 'hazardous',
+      },
+      {
+        id: 'hazadon',
+        name: 'Hazadon',
+        resources: 1,
+        influence: 0,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'pok',
+  },
+
+  // =====================================================================
+  // PROPHECY OF KINGS - RED TILES
+  // =====================================================================
+
+  // Tile 77: Empty
+  77: {
+    id: 77,
+    tileNumber: '77',
+    type: 'red',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 78: Empty
+  78: {
+    id: 78,
+    tileNumber: '78',
+    type: 'red',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 79: Gravity Rift
+  79: {
+    id: 79,
+    tileNumber: '79',
+    type: 'red',
+    anomaly: 'gravity_rift',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 80: Supernova
+  80: {
+    id: 80,
+    tileNumber: '80',
+    type: 'red',
+    anomaly: 'supernova',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 81: Muaat supernova (with wormhole)
+  81: {
+    id: 81,
+    tileNumber: '81',
+    type: 'red',
+    anomaly: 'supernova',
+    wormhole: 'beta',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // =====================================================================
+  // PROPHECY OF KINGS - HYPERLANE TILES
+  // =====================================================================
+  // Hyperlane tiles are used to connect different parts of the 7-8 player maps.
+  // They contain no planets but provide movement paths between systems.
+
+  // Tile 83A/83B: Hyperlane tile
+  83: {
+    id: 83,
+    tileNumber: '83A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 84A/84B: Hyperlane tile
+  84: {
+    id: 84,
+    tileNumber: '84A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 85A/85B: Hyperlane tile
+  85: {
+    id: 85,
+    tileNumber: '85A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 86A/86B: Hyperlane tile
+  86: {
+    id: 86,
+    tileNumber: '86A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 87A/87B: Hyperlane tile
+  87: {
+    id: 87,
+    tileNumber: '87A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 88A/88B: Hyperlane tile
+  88: {
+    id: 88,
+    tileNumber: '88A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 89A/89B: Hyperlane tile
+  89: {
+    id: 89,
+    tileNumber: '89A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 90A/90B: Hyperlane tile
+  90: {
+    id: 90,
+    tileNumber: '90A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
+
+  // Tile 91A/91B: Hyperlane tile
+  91: {
+    id: 91,
+    tileNumber: '91A',
+    type: 'hyperlane',
+    planets: [],
+    expansion: 'pok',
+  },
 };

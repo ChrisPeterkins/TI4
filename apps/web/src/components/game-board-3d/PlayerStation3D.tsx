@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, Suspense, useState, useCallback } from 'react';
-import { Html, Text } from '@react-three/drei';
-import { ThreeEvent } from '@react-three/fiber';
+import { useMemo, Suspense, useState, useCallback, useRef } from 'react';
+import { Text } from '@react-three/drei';
+import { ThreeEvent, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PlayerState, GameState, UnitType } from '@ti4/shared';
 import { factions } from '@ti4/game-data';
@@ -22,6 +22,9 @@ import {
   TechBoardMat3D,
   SecretsMat3D,
   LeaderCardsDisplay3D,
+  // PoK components
+  RelicFragmentDisplay3D,
+  RelicCardsDisplay3D,
   // Layout system
   calculateStationLayout,
   type TechnologyCard,
@@ -31,8 +34,10 @@ import {
   type LeaderCardData,
   type LeaderType,
   type StationLayoutPositions,
+  type RelicFragments,
+  type RelicCardData,
 } from './player-station';
-import { getFactionLeaderInfo, getLeaderName } from '@ti4/shared';
+import { getFactionLeaderInfo, getLeaderName, getRelic } from '@ti4/shared';
 
 interface PlayerStationCallbacks {
   onFactionClick?: (playerId: string, factionId: string, faceUp: boolean) => void;
@@ -46,6 +51,8 @@ interface PlayerStationCallbacks {
   onLeaderClick?: (playerId: string, leaderId: string, leaderType: LeaderType) => void;
   onTradeGoodsClick?: (playerId: string) => void;
   onStationFocus?: (playerId: string, position: THREE.Vector3, rotation: number) => void;
+  onRelicFragmentPurge?: (playerId: string, fragmentType: string) => void;
+  onRelicClick?: (playerId: string, relicId: string) => void;
 }
 
 interface PlayerStation3DProps extends PlayerStationCallbacks {
@@ -253,6 +260,37 @@ function getLeaderCards(player: PlayerState): LeaderCardData[] {
 }
 
 /**
+ * Get relic fragments data for a player
+ */
+function getRelicFragments(player: PlayerState): RelicFragments {
+  return player.relicFragments || {
+    cultural: 0,
+    industrial: 0,
+    hazardous: 0,
+    unknown: 0,
+  };
+}
+
+/**
+ * Get relic cards data for a player
+ */
+function getRelicCards(player: PlayerState): RelicCardData[] {
+  if (!player.relics || player.relics.length === 0) return [];
+
+  return player.relics.map((relicId) => {
+    const relicData = getRelic(relicId);
+    return {
+      id: relicId,
+      name: relicData?.name || relicId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+      usage: (relicData?.usage || 'passive') as 'exhaust' | 'purge' | 'passive',
+      state: {
+        exhausted: player.exhaustedRelics?.includes(relicId) ?? false,
+      },
+    };
+  });
+}
+
+/**
  * Enhanced 3D Player Station with real game assets
  */
 function EnhancedPlayerStation3D({
@@ -272,6 +310,8 @@ function EnhancedPlayerStation3D({
   onLeaderClick,
   onTradeGoodsClick,
   onStationFocus,
+  onRelicFragmentPurge,
+  onRelicClick,
   isInspectingCard = false,
 }: Omit<PlayerStation3DProps, 'enhanced' | 'useLOD'>) {
   const { position, rotation } = useMemo(
@@ -281,8 +321,23 @@ function EnhancedPlayerStation3D({
 
   const [factionSheetFlipped, setFactionSheetFlipped] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const glowGroupRef = useRef<THREE.Group>(null);
+  const pulseRef = useRef(0);
 
   const playerColor = PLAYER_COLORS_3D[player.color];
+
+  // Pulsing glow animation for active player - animates all border edges
+  useFrame((state, delta) => {
+    if (isActivePlayer && glowGroupRef.current) {
+      pulseRef.current += delta * 3;
+      const pulse = Math.sin(pulseRef.current) * 0.3 + 0.7; // Oscillates between 0.4 and 1.0
+      glowGroupRef.current.children.forEach((child) => {
+        if ((child as THREE.Mesh).material) {
+          ((child as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = pulse * 0.5;
+        }
+      });
+    }
+  });
   const faction = factions[player.faction];
 
   // Prepare data for components
@@ -293,6 +348,8 @@ function EnhancedPlayerStation3D({
   const secretsForMat = useMemo(() => getSecretObjectivesForMat(player), [player.secretObjectives, player.scoredObjectives]);
   const promissoryNotes = useMemo(() => getPromissoryNotes(player), [player.promissoryNotesInHand]);
   const leaderCards = useMemo(() => getLeaderCards(player), [player.faction, player.leaders]);
+  const relicFragments = useMemo(() => getRelicFragments(player), [player.relicFragments]);
+  const relicCards = useMemo(() => getRelicCards(player), [player.relics, player.exhaustedRelics]);
 
   // Calculate non-overlapping layout based on component dimensions
   const layout: StationLayoutPositions = useMemo(
@@ -379,6 +436,14 @@ function EnhancedPlayerStation3D({
     onTradeGoodsClick?.(player.id);
   }, [player.id, onTradeGoodsClick]);
 
+  const handleRelicFragmentPurge = useCallback((fragmentType: string) => {
+    onRelicFragmentPurge?.(player.id, fragmentType);
+  }, [player.id, onRelicFragmentPurge]);
+
+  const handleRelicClick = useCallback((relicId: string) => {
+    onRelicClick?.(player.id, relicId);
+  }, [player.id, onRelicClick]);
+
   const handleStationClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onStationFocus?.(player.id, position, rotation);
@@ -397,7 +462,7 @@ function EnhancedPlayerStation3D({
 
   return (
     <group position={position.toArray()} rotation={[0, rotation, 0]}>
-      {/* Station base/mat - clickable to focus */}
+      {/* Station base/mat - colored with player's color */}
       <mesh
         position={[layout.bounds.centerX, 0, layout.bounds.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -407,28 +472,62 @@ function EnhancedPlayerStation3D({
       >
         <planeGeometry args={[layout.bounds.width, layout.bounds.height]} />
         <meshStandardMaterial
-          color={isActivePlayer ? playerColor : isHovered ? '#1a1a3e' : '#0a0a15'}
+          color={playerColor}
           transparent
-          opacity={0.6}
+          opacity={isHovered ? 0.5 : 0.35}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Glowing border for active player */}
+      {/* Pulsing glow border for active player (animated) - rectangular */}
       {isActivePlayer && (
-        <mesh position={[layout.bounds.centerX, 0.01, layout.bounds.centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[Math.max(layout.bounds.width, layout.bounds.height) / 2 - 0.1, Math.max(layout.bounds.width, layout.bounds.height) / 2, 32]} />
-          <meshBasicMaterial color={playerColor} transparent opacity={0.6} />
-        </mesh>
+        <group ref={glowGroupRef} position={[layout.bounds.centerX, 0.02, layout.bounds.centerZ]}>
+          {/* Top edge */}
+          <mesh position={[0, 0, -layout.bounds.height / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[layout.bounds.width + 0.2, 0.15]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.5} />
+          </mesh>
+          {/* Bottom edge */}
+          <mesh position={[0, 0, layout.bounds.height / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[layout.bounds.width + 0.2, 0.15]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.5} />
+          </mesh>
+          {/* Left edge */}
+          <mesh position={[-layout.bounds.width / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.15, layout.bounds.height + 0.2]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.5} />
+          </mesh>
+          {/* Right edge */}
+          <mesh position={[layout.bounds.width / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.15, layout.bounds.height + 0.2]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.5} />
+          </mesh>
+        </group>
       )}
 
-      {/* Hover border */}
-      {isHovered && !isActivePlayer && (
-        <mesh position={[layout.bounds.centerX, 0.005, layout.bounds.centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[Math.max(layout.bounds.width, layout.bounds.height) / 2 - 0.05, Math.max(layout.bounds.width, layout.bounds.height) / 2, 32]} />
-          <meshBasicMaterial color="#4488ff" transparent opacity={0.4} />
+      {/* Static border outline - rectangular */}
+      <group position={[layout.bounds.centerX, 0.01, layout.bounds.centerZ]}>
+        {/* Top edge */}
+        <mesh position={[0, 0, -layout.bounds.height / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[layout.bounds.width, 0.06]} />
+          <meshBasicMaterial color={playerColor} transparent opacity={isHovered ? 0.8 : 0.5} />
         </mesh>
-      )}
+        {/* Bottom edge */}
+        <mesh position={[0, 0, layout.bounds.height / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[layout.bounds.width, 0.06]} />
+          <meshBasicMaterial color={playerColor} transparent opacity={isHovered ? 0.8 : 0.5} />
+        </mesh>
+        {/* Left edge */}
+        <mesh position={[-layout.bounds.width / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.06, layout.bounds.height]} />
+          <meshBasicMaterial color={playerColor} transparent opacity={isHovered ? 0.8 : 0.5} />
+        </mesh>
+        {/* Right edge */}
+        <mesh position={[layout.bounds.width / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.06, layout.bounds.height]} />
+          <meshBasicMaterial color={playerColor} transparent opacity={isHovered ? 0.8 : 0.5} />
+        </mesh>
+      </group>
 
       {/* Player name header */}
       <group position={[layout.bounds.centerX, 0.05, -0.5]}>
@@ -576,13 +675,27 @@ function EnhancedPlayerStation3D({
         compact={true}
       />
 
-      {/* Current player indicator - hidden when inspecting a card */}
-      {isCurrentPlayer && !isInspectingCard && (
-        <Html position={[layout.bounds.centerX, 0.8, -0.8]} center>
-          <div className="bg-white/90 text-black px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg border-2 border-blue-500">
-            YOUR STATION
-          </div>
-        </Html>
+      {/* Relic Fragments (PoK) */}
+      <Suspense fallback={null}>
+        <RelicFragmentDisplay3D
+          fragments={relicFragments}
+          position={layout.relicFragments.position}
+          scale={layout.relicFragments.scale}
+          onPurgeClick={handleRelicFragmentPurge}
+        />
+      </Suspense>
+
+      {/* Relics (PoK) */}
+      {relicCards.length > 0 && (
+        <Suspense fallback={null}>
+          <RelicCardsDisplay3D
+            relics={relicCards}
+            position={layout.relics.position}
+            scale={layout.relics.scale}
+            faceUp={isCurrentPlayer}
+            onRelicClick={handleRelicClick}
+          />
+        </Suspense>
       )}
     </group>
   );
@@ -610,16 +723,42 @@ function LegacyPlayerStation3D({
 
   return (
     <group position={position.toArray()} rotation={[0, rotation, 0]}>
-      {/* Station base/mat */}
+      {/* Station base/mat - colored with player's color */}
       <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[stationWidth, stationDepth]} />
         <meshStandardMaterial
-          color={isActivePlayer ? playerColor : '#1a1a2e'}
+          color={playerColor}
           transparent
-          opacity={0.8}
+          opacity={0.4}
           side={THREE.DoubleSide}
         />
       </mesh>
+
+      {/* Glowing border for active player - rectangular */}
+      {isActivePlayer && (
+        <group position={[0, 0.01, 0]}>
+          {/* Top edge */}
+          <mesh position={[0, 0, -stationDepth / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[stationWidth + 0.1, 0.1]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.6} />
+          </mesh>
+          {/* Bottom edge */}
+          <mesh position={[0, 0, stationDepth / 2]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[stationWidth + 0.1, 0.1]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.6} />
+          </mesh>
+          {/* Left edge */}
+          <mesh position={[-stationWidth / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.1, stationDepth + 0.1]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.6} />
+          </mesh>
+          {/* Right edge */}
+          <mesh position={[stationWidth / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.1, stationDepth + 0.1]} />
+            <meshBasicMaterial color="#ffdd44" transparent opacity={0.6} />
+          </mesh>
+        </group>
+      )}
 
       {/* Player name and faction */}
       <group position={[0, 0.02, -stationDepth / 2 + 0.15]}>
@@ -716,15 +855,6 @@ function LegacyPlayerStation3D({
           {player.technologies.length}
         </Text>
       </group>
-
-      {/* Current player indicator */}
-      {isCurrentPlayer && (
-        <Html position={[0, 0.5, 0]} center>
-          <div className="bg-white/90 text-black px-2 py-1 rounded text-xs font-bold shadow">
-            YOU
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
@@ -875,6 +1005,8 @@ export function PlayerStations3D({
   onLeaderClick,
   onTradeGoodsClick,
   onStationFocus,
+  onRelicFragmentPurge,
+  onRelicClick,
 }: PlayerStations3DProps) {
   return (
     <group>
@@ -899,6 +1031,8 @@ export function PlayerStations3D({
           onLeaderClick={onLeaderClick}
           onTradeGoodsClick={onTradeGoodsClick}
           onStationFocus={onStationFocus}
+          onRelicFragmentPurge={onRelicFragmentPurge}
+          onRelicClick={onRelicClick}
         />
       ))}
     </group>

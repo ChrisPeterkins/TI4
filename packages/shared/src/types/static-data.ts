@@ -89,17 +89,22 @@ export type AbilityTrigger =
   | 'system_activated'
   | 'agenda_revealed'
   | 'agenda_outcome'
+  | 'agenda_outcome_resolved'
   | 'trade_goods_gained'
   | 'commodities_gained'
   | 'action_cards_drawn'
   | 'production'
+  | 'unit_produced'
   | 'research'
+  | 'tech_researched'
   | 'exploration'
+  | 'explore_planet'
   | 'transaction'
   | 'diplomacy_resolved'
   | 'custodians_removed'
   | 'mecatol_control_gained'
-  | 'token_gain';
+  | 'token_gain'
+  | 'anti_fighter_barrage';
 
 // What kind of effect the ability has
 export type AbilityEffectType =
@@ -125,7 +130,15 @@ export type AbilityEffectType =
   | 'retreat'
   | 'reroll'
   | 'steal'
-  | 'discard';
+  | 'discard'
+  | 'special'
+  | 'capture'
+  | 'cost_reduction'
+  | 'prerequisite_ignore'
+  | 'draw_cards'
+  | 'resource_conversion'
+  | 'token_placement'
+  | 'voting_modifier';
 
 // Requirements to activate an ability
 export interface AbilityRequirement {
@@ -156,6 +169,7 @@ export interface FlagshipData {
   name: string;
   cost: number;
   combat: number;
+  combatRolls?: number; // Number of combat dice (default 1)
   move: number;
   capacity: number;
   abilities: string[];

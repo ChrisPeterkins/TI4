@@ -90,6 +90,8 @@ export {
 
 // Base game faction ability handlers
 import { registerBaseGameFactionAbilities } from './handlers/base-game/index.js';
+// Leader ability handlers
+import { registerLeaderAbilities } from './handlers/leaders/index.js';
 
 /**
  * Initialize all ability handlers.
@@ -97,6 +99,7 @@ import { registerBaseGameFactionAbilities } from './handlers/base-game/index.js'
  */
 export function initializeAbilityHandlers(): void {
   registerBaseGameFactionAbilities();
+  registerLeaderAbilities();
 }
 
 // Auto-initialize handlers on module load

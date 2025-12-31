@@ -6,7 +6,7 @@ import { useLoader, ThreeEvent, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { Text, Html } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
-import { getLeaderCardUrl } from '@/lib/assets';
+import { getLeaderCardUrl, getLeaderCardBackUrl } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
 
 // Leader card dimensions (similar to action cards but slightly larger)
@@ -80,15 +80,19 @@ function LeaderCard({
   const { gl } = useThree();
   const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl]);
 
-  // Load card texture
-  const textureUrl = getLeaderCardUrl(leader.id);
-  const texture = useLoader(TextureLoader, textureUrl);
+  // Load card textures (both front and back)
+  const frontTextureUrl = getLeaderCardUrl(leader.id);
+  const backTextureUrl = getLeaderCardBackUrl();
+  const frontTexture = useLoader(TextureLoader, frontTextureUrl);
+  const backTexture = useLoader(TextureLoader, backTextureUrl);
 
   useEffect(() => {
-    if (texture) {
-      configureHighQualityTexture(texture, maxAnisotropy);
-    }
-  }, [texture, maxAnisotropy]);
+    [frontTexture, backTexture].forEach((tex) => {
+      if (tex) {
+        configureHighQualityTexture(tex, maxAnisotropy);
+      }
+    });
+  }, [frontTexture, backTexture, maxAnisotropy]);
 
   const cardWidth = CARD_WIDTH * scale;
   const cardHeight = CARD_HEIGHT * scale;
@@ -139,9 +143,10 @@ function LeaderCard({
       emissiveIntensity = 0.1;
     }
 
-    const frontMaterial = new THREE.MeshStandardMaterial({
-      map: faceUp ? texture : null,
-      color: faceUp ? cardColor : '#1e3a5f',
+    // Top face shows front or back texture depending on faceUp
+    const topMaterial = new THREE.MeshStandardMaterial({
+      map: faceUp ? frontTexture : backTexture,
+      color: cardColor,
       roughness: 0.5,
       metalness: 0.05,
       transparent: true,
@@ -150,8 +155,9 @@ function LeaderCard({
       emissiveIntensity,
     });
 
-    const backMaterial = new THREE.MeshStandardMaterial({
-      color: '#1e3a5f',
+    // Bottom face shows the opposite texture
+    const bottomMaterial = new THREE.MeshStandardMaterial({
+      map: faceUp ? backTexture : frontTexture,
       roughness: 0.6,
       metalness: 0.1,
     });
@@ -159,12 +165,12 @@ function LeaderCard({
     return [
       edgeMaterial,
       edgeMaterial,
-      frontMaterial, // Top
-      backMaterial,  // Bottom
+      topMaterial,  // Top
+      bottomMaterial,  // Bottom
       edgeMaterial,
       edgeMaterial,
     ];
-  }, [texture, faceUp, typeColor, isLocked, isExhausted, isPurged]);
+  }, [frontTexture, backTexture, faceUp, typeColor, isLocked, isExhausted, isPurged]);
 
   const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();

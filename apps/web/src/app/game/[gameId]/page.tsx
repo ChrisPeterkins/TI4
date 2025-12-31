@@ -7,7 +7,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useGameStore } from '@/stores/game-store';
 import { useLobbyStore } from '@/stores/lobby-store';
 import dynamic from 'next/dynamic';
-import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel, TransactionModal, GameLog, Chat } from '@/components/game';
+import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel, TransactionModal, CanvasOverlayPanel } from '@/components/game';
 import type { UnitMoveSelection } from '@/components/game';
 
 // Dynamically import 3D board to avoid SSR issues with Three.js
@@ -92,8 +92,6 @@ export default function GamePage() {
   // UI state for tactical action flow
   const [tacticalUIState, setTacticalUIState] = useState<TacticalUIState>('idle');
   const [highlightedTiles, setHighlightedTiles] = useState<HexCoord[]>([]);
-  const [showGameLog, setShowGameLog] = useState(true);
-  const [rightPanelTab, setRightPanelTab] = useState<'log' | 'chat'>('log');
 
   // 3D UI mode: when true, player info is shown in 3D stations instead of sidebar
   const [use3DPlayerStations, setUse3DPlayerStations] = useState(() => {
@@ -478,19 +476,69 @@ export default function GamePage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Header */}
+      {/* Header - Compact with player info and resources */}
       <header className="fixed top-0 left-0 right-0 z-10 bg-gray-800/90 backdrop-blur border-b border-gray-700">
-        <div className="flex items-center justify-between px-4 py-2">
-          <div className="flex items-center gap-4">
-            <h1 className="text-lg font-bold text-white">TI4</h1>
+        <div className="flex items-center justify-between px-3 py-1.5 gap-3">
+          {/* Left: Title + Turn Indicator */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <h1 className="text-base font-bold text-white">TI4</h1>
             <TurnIndicator gameState={gameState} currentPlayerId={currentPlayerId} />
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Center: Player Pills (color dot + VP) */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {gameState.players.map((player) => (
+              <div
+                key={player.id}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors ${
+                  player.id === gameState.activePlayerId
+                    ? 'bg-yellow-600/30 ring-1 ring-yellow-500/50'
+                    : 'bg-gray-700/50 hover:bg-gray-700'
+                }`}
+                title={player.name}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: getColorHex(player.color) }}
+                />
+                <span className="font-bold text-white">{player.score}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right: Current Player Resources + Actions */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Resources (only show if current player) */}
+            {currentPlayer && (
+              <div className="flex items-center gap-2.5 text-xs">
+                <div className="flex items-center gap-1" title="Trade Goods">
+                  <span className="text-yellow-500">TG</span>
+                  <span className="text-yellow-400 font-mono font-medium">{currentPlayer.tradeGoods}</span>
+                </div>
+                <div className="flex items-center gap-1" title="Commodities">
+                  <span className="text-blue-500">C</span>
+                  <span className="text-blue-400 font-mono font-medium">{currentPlayer.commodities}/{currentPlayer.maxCommodities}</span>
+                </div>
+                <div className="flex items-center gap-1" title="Command Tokens (Tactics/Fleet/Strategy)">
+                  <span className="text-green-500">T</span>
+                  <span className="text-green-400 font-mono font-medium">
+                    {currentPlayer.commandTokens.tactics}/{currentPlayer.commandTokens.fleet}/{currentPlayer.commandTokens.strategy}
+                  </span>
+                </div>
+                {/* Trade Button */}
+                <button
+                  onClick={toggleTransactionModal}
+                  className="px-2 py-0.5 bg-yellow-600/30 text-yellow-400 rounded hover:bg-yellow-600/50 border border-yellow-600/30 transition-colors"
+                >
+                  Trade
+                </button>
+              </div>
+            )}
+
             {/* 3D Mode Toggle */}
             <button
               onClick={() => setUse3DPlayerStations(!use3DPlayerStations)}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded transition-colors ${
+              className={`p-1.5 rounded transition-colors ${
                 use3DPlayerStations
                   ? 'bg-blue-600/30 text-blue-400 hover:bg-blue-600/40'
                   : 'bg-gray-600/30 text-gray-400 hover:bg-gray-600/40'
@@ -501,29 +549,24 @@ export default function GamePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-              {use3DPlayerStations ? '3D Stations' : 'Sidebar'}
             </button>
 
             {/* Connection Status */}
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              />
-              <span className="text-sm text-gray-400">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
+            <div
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              }`}
+              title={isConnected ? 'Connected' : 'Disconnected'}
+            />
 
             {/* Leave Game */}
             <button
               onClick={() => {
                 leaveGame();
-                useLobbyStore.getState().reset(); // Clear lobby state to prevent redirect back
+                useLobbyStore.getState().reset();
                 router.push('/lobby');
               }}
-              className="px-3 py-1 text-sm bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
+              className="px-2 py-1 text-xs bg-red-600/20 text-red-400 rounded hover:bg-red-600/30"
             >
               Leave
             </button>
@@ -531,8 +574,8 @@ export default function GamePage() {
         </div>
       </header>
 
-      {/* Main Layout - use fixed positioning for reliable centering */}
-      <div className="fixed inset-0 top-12 bottom-16 flex">
+      {/* Main Layout - full screen canvas */}
+      <div className="fixed inset-0 top-10 flex">
         {/* Left Sidebar - Player Dashboard (hidden in 3D station mode) */}
         {!use3DPlayerStations && (
           <aside className="w-72 bg-gray-900 border-r border-gray-700 overflow-y-auto p-4 flex-shrink-0">
@@ -576,66 +619,17 @@ export default function GamePage() {
               </div>
             </div>
           )}
-
-          {/* Right Panel Toggle Button */}
-          <button
-            onClick={() => setShowGameLog(!showGameLog)}
-            className="absolute top-4 right-4 z-20 px-3 py-2 bg-gray-800/90 hover:bg-gray-700/90 text-gray-300 rounded-lg border border-gray-600 shadow-lg transition-colors"
-          >
-            {showGameLog ? 'Hide Panel' : 'Show Panel'}
-          </button>
         </main>
-
-        {/* Right Sidebar - Game Log & Chat */}
-        {showGameLog && (
-          <aside className="w-80 bg-gray-900 border-l border-gray-700 overflow-hidden flex-shrink-0 flex flex-col">
-            {/* Tab Buttons */}
-            <div className="flex border-b border-gray-700 flex-shrink-0">
-              <button
-                onClick={() => setRightPanelTab('log')}
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                  rightPanelTab === 'log'
-                    ? 'bg-gray-800 text-white border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                }`}
-              >
-                Game Log
-              </button>
-              <button
-                onClick={() => setRightPanelTab('chat')}
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors relative ${
-                  rightPanelTab === 'chat'
-                    ? 'bg-gray-800 text-white border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                }`}
-              >
-                Chat
-                {chatMessages.length > 0 && rightPanelTab !== 'chat' && (
-                  <span className="absolute top-1 right-2 w-2 h-2 bg-blue-500 rounded-full" />
-                )}
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            <div className="flex-1 overflow-hidden">
-              {rightPanelTab === 'log' ? (
-                <GameLog
-                  entries={gameState.gameLog || []}
-                  maxHeight="100%"
-                  showTimestamps={false}
-                />
-              ) : (
-                <Chat
-                  messages={chatMessages}
-                  currentPlayerId={currentPlayerId}
-                  players={gameState.players}
-                  onSendMessage={sendChatMessage}
-                />
-              )}
-            </div>
-          </aside>
-        )}
       </div>
+
+      {/* Canvas Overlay Panel - Log/Chat */}
+      <CanvasOverlayPanel
+        gameLogEntries={gameState.gameLog || []}
+        chatMessages={chatMessages}
+        currentPlayerId={currentPlayerId}
+        players={gameState.players}
+        onSendChatMessage={sendChatMessage}
+      />
 
       {/* Strategy Phase Panel */}
       {gameState.phase === 'strategy' && (
@@ -741,65 +735,6 @@ export default function GamePage() {
           onClose={toggleTransactionModal}
         />
       )}
-
-      {/* Player Info Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 z-10 bg-gray-800/90 backdrop-blur border-t border-gray-700">
-        <div className="flex items-center justify-between px-4 py-2">
-          {/* Players */}
-          <div className="flex items-center gap-3">
-            {gameState.players.map((player) => (
-              <div
-                key={player.id}
-                className={`flex items-center gap-2 px-3 py-1 rounded ${
-                  player.id === gameState.activePlayerId
-                    ? 'bg-yellow-600/20 border border-yellow-500'
-                    : 'bg-gray-700/50'
-                }`}
-              >
-                <div
-                  className={`w-3 h-3 rounded-full`}
-                  style={{ backgroundColor: getColorHex(player.color) }}
-                />
-                <span className="text-sm font-medium">{player.name}</span>
-                <span className="text-xs text-gray-400">{player.score} VP</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Current Player Resources */}
-          {currentPlayer && (
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <span className="text-gray-400">TG:</span>
-                <span className="text-yellow-400 font-mono">
-                  {currentPlayer.tradeGoods}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-400">Comm:</span>
-                <span className="text-blue-400 font-mono">
-                  {currentPlayer.commodities}/{currentPlayer.maxCommodities}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-400">Tokens:</span>
-                <span className="text-green-400 font-mono">
-                  {currentPlayer.commandTokens.tactics}/
-                  {currentPlayer.commandTokens.fleet}/
-                  {currentPlayer.commandTokens.strategy}
-                </span>
-              </div>
-              {/* Trade Button */}
-              <button
-                onClick={toggleTransactionModal}
-                className="px-3 py-1 bg-yellow-600/30 text-yellow-400 rounded hover:bg-yellow-600/50 border border-yellow-600/50 transition-colors"
-              >
-                Trade
-              </button>
-            </div>
-          )}
-        </div>
-      </footer>
     </div>
   );
 }

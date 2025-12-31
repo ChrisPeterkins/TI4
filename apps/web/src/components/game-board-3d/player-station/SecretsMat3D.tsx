@@ -50,17 +50,19 @@ function SecretCardOnMat({
   const { gl } = useThree();
   const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl]);
 
-  // Load card texture (face or back)
-  const textureUrl = faceUp
-    ? getSecretObjectiveCardUrl(secret.id)
-    : getSecretObjectiveCardBackUrl();
-  const texture = useLoader(TextureLoader, textureUrl);
+  // Load card textures (both front and back)
+  const frontTextureUrl = getSecretObjectiveCardUrl(secret.id);
+  const backTextureUrl = getSecretObjectiveCardBackUrl();
+  const frontTexture = useLoader(TextureLoader, frontTextureUrl);
+  const backTexture = useLoader(TextureLoader, backTextureUrl);
 
   useEffect(() => {
-    if (texture) {
-      configureHighQualityTexture(texture, maxAnisotropy);
-    }
-  }, [texture, maxAnisotropy]);
+    [frontTexture, backTexture].forEach((tex) => {
+      if (tex) {
+        configureHighQualityTexture(tex, maxAnisotropy);
+      }
+    });
+  }, [frontTexture, backTexture, maxAnisotropy]);
 
   const cardWidth = SECRET_CARD_WIDTH * scale;
   const cardHeight = SECRET_CARD_HEIGHT * scale;
@@ -77,8 +79,9 @@ function SecretCardOnMat({
       metalness: 0.1,
     });
 
-    const cardMaterial = new THREE.MeshStandardMaterial({
-      map: texture,
+    // Top face shows front or back depending on faceUp
+    const topMaterial = new THREE.MeshStandardMaterial({
+      map: faceUp ? frontTexture : backTexture,
       roughness: 0.5,
       metalness: 0.05,
       // Highlight scored secrets
@@ -86,8 +89,9 @@ function SecretCardOnMat({
       emissiveIntensity: secret.scored ? 0.2 : 0,
     });
 
-    const backMaterial = new THREE.MeshStandardMaterial({
-      color: '#1e3a5f',
+    // Bottom face shows the opposite side
+    const bottomMaterial = new THREE.MeshStandardMaterial({
+      map: faceUp ? backTexture : frontTexture,
       roughness: 0.6,
       metalness: 0.1,
     });
@@ -95,12 +99,12 @@ function SecretCardOnMat({
     return [
       edgeMaterial,
       edgeMaterial,
-      cardMaterial,
-      backMaterial,
+      topMaterial,
+      bottomMaterial,
       edgeMaterial,
       edgeMaterial,
     ];
-  }, [texture, secret.scored]);
+  }, [frontTexture, backTexture, faceUp, secret.scored]);
 
   return (
     <mesh

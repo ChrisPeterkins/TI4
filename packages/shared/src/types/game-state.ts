@@ -321,6 +321,7 @@ export interface PlayerState {
     unknown: number;
   };
   relics?: string[];
+  exhaustedRelics?: string[];
   leaders?: LeaderState;
 }
 

@@ -19,3 +19,4 @@ export { TransactionModal } from './TransactionModal';
 export { PromissoryNotesPanel } from './PromissoryNotesPanel';
 export { GameLog, CompactGameLog } from './GameLog';
 export { Chat, CompactChat } from './Chat';
+export { CanvasOverlayPanel } from './CanvasOverlayPanel';

@@ -8,6 +8,7 @@ interface ChatProps {
   currentPlayerId: string | null;
   players: PlayerState[];
   onSendMessage: (message: string, targetPlayerId?: string) => void;
+  variant?: 'sidebar' | 'overlay';
 }
 
 // Color mapping for player colors
@@ -22,12 +23,14 @@ const PLAYER_COLORS: Record<string, string> = {
   black: 'text-gray-400',
 };
 
-export function Chat({ messages, currentPlayerId, players, onSendMessage }: ChatProps) {
+export function Chat({ messages, currentPlayerId, players, onSendMessage, variant = 'sidebar' }: ChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [messageText, setMessageText] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
+
+  const isOverlay = variant === 'overlay';
 
   // Get player color class
   const getPlayerColorClass = useCallback((playerId: string): string => {
@@ -71,6 +74,59 @@ export function Chat({ messages, currentPlayerId, players, onSendMessage }: Chat
   // Get other players for private message dropdown
   const otherPlayers = players.filter(p => p.id !== currentPlayerId);
 
+  // Overlay variant - compact, transparent
+  if (isOverlay) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Messages - compact */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-2 space-y-1"
+          style={{ maxHeight: '150px' }}
+        >
+          {messages.length === 0 ? (
+            <div className="text-center py-4 text-gray-500 text-xs">
+              No messages
+            </div>
+          ) : (
+            messages.slice(-20).map((msg) => (
+              <ChatMessageCompact
+                key={msg.id}
+                message={msg}
+                isOwnMessage={msg.playerId === currentPlayerId}
+                playerColorClass={getPlayerColorClass(msg.playerId)}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Compact Input */}
+        <form onSubmit={handleSubmit} className="border-t border-white/10 p-1.5">
+          <div className="flex gap-1">
+            <input
+              ref={inputRef}
+              type="text"
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder="Message..."
+              maxLength={500}
+              className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+            />
+            <button
+              type="submit"
+              disabled={!messageText.trim()}
+              className="px-2 py-1 bg-blue-600/50 hover:bg-blue-600/70 disabled:bg-gray-700/50 disabled:cursor-not-allowed text-white text-xs rounded transition-colors"
+            >
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // Sidebar variant - full featured
   return (
     <div className="flex flex-col h-full bg-gray-900 rounded-lg border border-gray-700">
       {/* Header */}
@@ -203,6 +259,29 @@ function ChatMessage({ message, isOwnMessage, playerColorClass, formatTime }: Ch
       >
         {message.message}
       </div>
+    </div>
+  );
+}
+
+// Compact chat message for overlay mode
+interface ChatMessageCompactProps {
+  message: ChatMessageEvent;
+  isOwnMessage: boolean;
+  playerColorClass: string;
+}
+
+function ChatMessageCompact({ message, isOwnMessage, playerColorClass }: ChatMessageCompactProps) {
+  return (
+    <div className="flex items-start gap-1.5 text-xs leading-tight">
+      <span className={`font-medium flex-shrink-0 ${playerColorClass}`}>
+        {message.playerName.slice(0, 8)}:
+      </span>
+      <span className={`truncate ${isOwnMessage ? 'text-blue-300' : 'text-gray-300'}`}>
+        {message.message}
+      </span>
+      {message.isPrivate && (
+        <span className="text-yellow-400 flex-shrink-0">*</span>
+      )}
     </div>
   );
 }

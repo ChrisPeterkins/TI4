@@ -414,14 +414,14 @@ const CARD_BACKS_PATH = `${IMAGES_BASE}/card-backs`;
  * Get action card back URL
  */
 export function getActionCardBackUrl(): string {
-  return `${CARD_BACKS_PATH}/action.png`;
+  return `${CARD_BACKS_PATH}/action.jpg`;
 }
 
 /**
  * Get agenda card back URL
  */
 export function getAgendaCardBackUrl(): string {
-  return `${CARD_BACKS_PATH}/agenda.png`;
+  return `${CARD_BACKS_PATH}/agenda.jpg`;
 }
 
 /**
@@ -429,7 +429,7 @@ export function getAgendaCardBackUrl(): string {
  * @param tier - 'stage1' or 'stage2' for different tiers
  */
 export function getObjectiveCardBackUrl(tier: 'stage1' | 'stage2' = 'stage1'): string {
-  return `${CARD_BACKS_PATH}/objective_${tier}.png`;
+  return `${CARD_BACKS_PATH}/objective_${tier}.jpg`;
 }
 
 /**
@@ -439,14 +439,14 @@ export function getObjectiveCardBackUrl(tier: 'stage1' | 'stage2' = 'stage1'): s
 export function getExplorationCardBackUrl(
   type: 'cultural' | 'hazardous' | 'industrial' | 'frontier' = 'cultural'
 ): string {
-  return `${CARD_BACKS_PATH}/exploration_${type}.png`;
+  return `${CARD_BACKS_PATH}/exploration_${type}.jpg`;
 }
 
 /**
  * Get relic card back URL
  */
 export function getRelicCardBackUrl(): string {
-  return `${CARD_BACKS_PATH}/relic.png`;
+  return `${CARD_BACKS_PATH}/relic.jpg`;
 }
 
 /**
@@ -455,23 +455,52 @@ export function getRelicCardBackUrl(): string {
  */
 export function getPromissoryCardBackUrl(factionId?: string): string {
   if (factionId) {
-    return `${CARD_BACKS_PATH}/promissory_${factionId}.png`;
+    return `${CARD_BACKS_PATH}/promissory_${factionId}.jpg`;
   }
-  return `${CARD_BACKS_PATH}/promissory.png`;
+  return `${CARD_BACKS_PATH}/promissory.jpg`;
 }
 
 /**
  * Get secret objective card back URL
  */
 export function getSecretObjectiveCardBackUrl(): string {
-  return `${CARD_BACKS_PATH}/secret_objective.png`;
+  return `${CARD_BACKS_PATH}/secret_objective.jpg`;
+}
+
+/**
+ * Get leader card back URL
+ * Uses leader-specific back image
+ */
+export function getLeaderCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/leader.jpg`;
+}
+
+/**
+ * Get technology card back URL
+ */
+export function getTechnologyCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/technology.jpg`;
+}
+
+/**
+ * Get faction reference card back URL
+ */
+export function getFactionReferenceCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/faction_reference.jpg`;
+}
+
+/**
+ * Get event card back URL
+ */
+export function getEventCardBackUrl(): string {
+  return `${CARD_BACKS_PATH}/event.jpg`;
 }
 
 /**
  * Generic card back for fallback
  */
 export function getGenericCardBackUrl(): string {
-  return `${CARD_BACKS_PATH}/generic.png`;
+  return `${CARD_BACKS_PATH}/faction_reference.jpg`;
 }
 
 // =============================================================================

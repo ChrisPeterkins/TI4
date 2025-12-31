@@ -6,7 +6,7 @@ import { useLoader, ThreeEvent, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { Text, Html, RoundedBox } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
-import { getRelicCardUrl } from '@/lib/assets';
+import { getRelicCardUrl, getRelicCardBackUrl } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
 
 // Relic card dimensions (similar to action cards)
@@ -76,15 +76,19 @@ function RelicCard({
   const { gl } = useThree();
   const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl]);
 
-  // Load card texture
-  const textureUrl = getRelicCardUrl(relic.id);
-  const texture = useLoader(TextureLoader, textureUrl);
+  // Load card textures (both front and back)
+  const frontTextureUrl = getRelicCardUrl(relic.id);
+  const backTextureUrl = getRelicCardBackUrl();
+  const frontTexture = useLoader(TextureLoader, frontTextureUrl);
+  const backTexture = useLoader(TextureLoader, backTextureUrl);
 
   useEffect(() => {
-    if (texture) {
-      configureHighQualityTexture(texture, maxAnisotropy);
-    }
-  }, [texture, maxAnisotropy]);
+    [frontTexture, backTexture].forEach((tex) => {
+      if (tex) {
+        configureHighQualityTexture(tex, maxAnisotropy);
+      }
+    });
+  }, [frontTexture, backTexture, maxAnisotropy]);
 
   const cardWidth = CARD_WIDTH * scale;
   const cardHeight = CARD_HEIGHT * scale;
@@ -143,8 +147,8 @@ function RelicCard({
       >
         <boxGeometry args={[cardWidth, cardHeight, cardDepth]} />
         <meshStandardMaterial
-          map={faceUp && !isPurged ? texture : null}
-          color={faceUp && !isPurged ? '#ffffff' : usageColor}
+          map={isPurged ? null : (faceUp ? frontTexture : backTexture)}
+          color={isPurged ? usageColor : '#ffffff'}
           opacity={isPurged ? 0.3 : isExhausted ? 0.6 : 1}
           transparent={isPurged || isExhausted}
           metalness={0.1}

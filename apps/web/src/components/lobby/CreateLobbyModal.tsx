@@ -54,7 +54,7 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
               Number of Players
             </label>
             <div className="flex gap-2">
-              {[3, 4, 5, 6].map((count) => (
+              {[3, 4, 5, 6, 7, 8].map((count) => (
                 <button
                   key={count}
                   type="button"

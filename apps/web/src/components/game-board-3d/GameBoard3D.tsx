@@ -7,14 +7,12 @@ import { HexTile3D } from './HexTile3D';
 import { TileUnits3D } from './Unit3D';
 import { SpaceBackground, SpaceDust } from './SpaceBackground';
 import { CameraControls } from './CameraControls';
-import { Deck3D, DiscardPile3D } from './cards/Deck3D';
-import { ObjectiveDisplay3D } from './cards/ObjectiveDisplay3D';
+import { SharedElementsLayout3D, type ExplorationDeckType } from './shared';
 import { PlayerStations3D } from './PlayerStation3D';
 import { CameraProvider, useCamera, calculateStationCameraTarget } from './CameraContext';
 import { TexturePreloader } from './TexturePreloader';
 import { CardInspector3D, type InspectedCard } from './CardInspector3D';
 import { getHexBounds3D, hexToWorld3D } from './hex3d';
-import { getActionCardBackUrl, getCardUrl } from '@/lib/assets';
 import * as THREE from 'three';
 
 interface GameBoard3DProps {
@@ -24,12 +22,16 @@ interface GameBoard3DProps {
   onTileHover?: (tile: MapTile | null) => void;
   highlightedTiles?: { q: number; r: number }[];
   className?: string;
-  // Action card deck props
-  onActionCardDeckClick?: () => void;
-  showActionCardDeck?: boolean;
+  // Shared elements visibility
+  showSharedElements?: boolean;
   showPlayerStations?: boolean;
+  // Card deck interactions
+  onActionCardDeckClick?: () => void;
+  onAgendaReveal?: () => void;
+  onRelicDraw?: () => void;
+  onExplorationDraw?: (type: ExplorationDeckType) => void;
+  onSecretObjectiveDraw?: () => void;
   // Objective display props
-  showObjectives?: boolean;
   onObjectiveClick?: (objectiveId: string, type: 'stage1' | 'stage2') => void;
   canScoreObjective?: (objectiveId: string) => boolean;
   // Player station interaction callbacks
@@ -202,6 +204,7 @@ function SceneContent({
   currentPlayerId,
   playerColors,
   boardCenter,
+  boardBounds,
   onTileClick,
   onTileHover,
   onTileActivate,
@@ -209,9 +212,12 @@ function SceneContent({
   highlightedTiles,
   activatableTiles,
   showPlayerStations,
-  showActionCardDeck,
-  showObjectives,
+  showSharedElements,
   onActionCardDeckClick,
+  onAgendaReveal,
+  onRelicDraw,
+  onExplorationDraw,
+  onSecretObjectiveDraw,
   onObjectiveClick,
   canScoreObjective,
   onStrategyCardClick,
@@ -220,9 +226,6 @@ function SceneContent({
   onActionCardClick,
   onTechClick,
   onTradeGoodsClick,
-  actionCardDeckPosition,
-  actionCardDiscardPosition,
-  discardPileCards,
   setResetCameraFn,
   inspectedCard,
   onCardInspect,
@@ -232,6 +235,7 @@ function SceneContent({
   currentPlayerId: string | null;
   playerColors: Map<string, PlayerColor>;
   boardCenter: THREE.Vector3;
+  boardBounds: { center: THREE.Vector3; radius: number };
   onTileClick?: (tile: MapTile) => void;
   onTileHover?: (tile: MapTile | null) => void;
   onTileActivate?: (tile: MapTile) => void;
@@ -239,9 +243,12 @@ function SceneContent({
   highlightedTiles?: { q: number; r: number }[];
   activatableTiles?: { q: number; r: number }[];
   showPlayerStations: boolean;
-  showActionCardDeck: boolean;
-  showObjectives: boolean;
+  showSharedElements: boolean;
   onActionCardDeckClick?: () => void;
+  onAgendaReveal?: () => void;
+  onRelicDraw?: () => void;
+  onExplorationDraw?: (type: ExplorationDeckType) => void;
+  onSecretObjectiveDraw?: () => void;
   onObjectiveClick?: (objectiveId: string, type: 'stage1' | 'stage2') => void;
   canScoreObjective?: (objectiveId: string) => boolean;
   onStrategyCardClick?: (playerId: string, cardNumber: number) => void;
@@ -250,9 +257,6 @@ function SceneContent({
   onActionCardClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
   onTradeGoodsClick?: (playerId: string) => void;
-  actionCardDeckPosition: [number, number, number];
-  actionCardDiscardPosition: [number, number, number];
-  discardPileCards: Array<{ id: string; frontTexture: string }>;
   setResetCameraFn: (fn: () => void) => void;
   inspectedCard: InspectedCard | null;
   onCardInspect: (card: InspectedCard) => void;
@@ -413,36 +417,17 @@ function SceneContent({
         />
       )}
 
-      {/* Action Card Deck */}
-      {showActionCardDeck && (
-        <group>
-          <Deck3D
-            cardCount={gameState.actionCardDeck?.length ?? 0}
-            backTexture={getActionCardBackUrl()}
-            position={actionCardDeckPosition}
-            rotation={[0, 0, 0]}
-            label="Action Cards"
-            onDraw={onActionCardDeckClick}
-            highlightTop={gameState.phase === 'status' && gameState.subPhase === 'draw_action_cards'}
-          />
-          <DiscardPile3D
-            cards={discardPileCards}
-            backTexture={getActionCardBackUrl()}
-            position={actionCardDiscardPosition}
-            rotation={[0, 0, 0]}
-            label="Discard"
-          />
-        </group>
-      )}
-
-      {/* Objective Display */}
-      {showObjectives && gameState.objectives && (
-        <ObjectiveDisplay3D
-          objectives={gameState.objectives}
-          players={gameState.players}
-          position={[12, 0.1, 6]}
-          rotation={[0, -Math.PI / 6, 0]}
+      {/* Shared Elements (Card Decks, Objectives, Exploration, Game Status) */}
+      {showSharedElements && (
+        <SharedElementsLayout3D
+          gameState={gameState}
+          boardBounds={boardBounds}
           currentPlayerId={currentPlayerId ?? undefined}
+          onActionCardDraw={onActionCardDeckClick}
+          onAgendaReveal={onAgendaReveal}
+          onExplorationDraw={onExplorationDraw}
+          onRelicDraw={onRelicDraw}
+          onSecretObjectiveDraw={onSecretObjectiveDraw}
           onObjectiveClick={onObjectiveClick}
           canScoreObjective={canScoreObjective}
         />
@@ -468,10 +453,13 @@ export function GameBoard3D({
   highlightedTiles,
   activatableTiles,
   className,
-  onActionCardDeckClick,
-  showActionCardDeck = true,
+  showSharedElements = true,
   showPlayerStations = true,
-  showObjectives = true,
+  onActionCardDeckClick,
+  onAgendaReveal,
+  onRelicDraw,
+  onExplorationDraw,
+  onSecretObjectiveDraw,
   onObjectiveClick,
   canScoreObjective,
   onStrategyCardClick,
@@ -495,18 +483,6 @@ export function GameBoard3D({
     setInspectedCard(null);
   }, []);
 
-  // Action card deck position (offset from center)
-  const actionCardDeckPosition: [number, number, number] = [-12, 0.1, 8];
-  const actionCardDiscardPosition: [number, number, number] = [-12, 0.1, 5];
-
-  // Prepare discard pile cards for display
-  const discardPileCards = useMemo(() => {
-    return gameState.actionCardDiscard.map(cardId => ({
-      id: cardId,
-      frontTexture: getCardUrl('action', cardId),
-    }));
-  }, [gameState.actionCardDiscard]);
-
   // Build player color map
   const playerColors = useMemo(() => {
     const colors = new Map<string, PlayerColor>();
@@ -516,11 +492,18 @@ export function GameBoard3D({
     return colors;
   }, [gameState.players]);
 
-  // Calculate center of the board for camera target
-  const boardCenter = useMemo(() => {
+  // Calculate board bounds (center and radius) for camera target and shared elements positioning
+  const { boardCenter, boardBounds } = useMemo(() => {
     const positions = gameState.map.tiles.map((t) => t.position);
     const bounds = getHexBounds3D(positions);
-    return bounds.center;
+    const radius = Math.max(
+      bounds.max.x - bounds.min.x,
+      bounds.max.z - bounds.min.z
+    ) / 2;
+    return {
+      boardCenter: bounds.center,
+      boardBounds: { center: bounds.center, radius },
+    };
   }, [gameState.map.tiles]);
 
   // Handle tile hover
@@ -570,6 +553,7 @@ export function GameBoard3D({
               currentPlayerId={currentPlayerId ?? null}
               playerColors={playerColors}
               boardCenter={boardCenter}
+              boardBounds={boardBounds}
               onTileClick={handleTileClick}
               onTileHover={handleTileHover}
               onTileActivate={onTileActivate}
@@ -577,9 +561,12 @@ export function GameBoard3D({
               highlightedTiles={highlightedTiles}
               activatableTiles={activatableTiles}
               showPlayerStations={showPlayerStations}
-              showActionCardDeck={showActionCardDeck}
-              showObjectives={showObjectives}
+              showSharedElements={showSharedElements}
               onActionCardDeckClick={onActionCardDeckClick}
+              onAgendaReveal={onAgendaReveal}
+              onRelicDraw={onRelicDraw}
+              onExplorationDraw={onExplorationDraw}
+              onSecretObjectiveDraw={onSecretObjectiveDraw}
               onObjectiveClick={onObjectiveClick}
               canScoreObjective={canScoreObjective}
               onStrategyCardClick={onStrategyCardClick}
@@ -588,9 +575,6 @@ export function GameBoard3D({
               onActionCardClick={onActionCardClick}
               onTechClick={onTechClick}
               onTradeGoodsClick={onTradeGoodsClick}
-              actionCardDeckPosition={actionCardDeckPosition}
-              actionCardDiscardPosition={actionCardDiscardPosition}
-              discardPileCards={discardPileCards}
               setResetCameraFn={(fn) => { resetCameraRef.current = fn; }}
               inspectedCard={inspectedCard}
               onCardInspect={handleCardInspect}

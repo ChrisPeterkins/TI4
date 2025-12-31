@@ -59,6 +59,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 5,
       abilities: ['After you activate this system, you may produce up to 5 units in this system.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'letani_behemoth',
+      name: 'Letani Behemoth',
+      cost: 2,
+      combat: 6,
+      abilities: ['PLANETARY SHIELD', 'SUSTAIN DAMAGE', 'When you use your MITOSIS faction ability, you may replace 1 of your infantry on the game board with 1 mech from your reinforcements instead.'],
+    },
   },
 
   creuss: {
@@ -126,6 +133,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['This ship\'s system contains a delta wormhole. During movement, this ship may move before or after your other ships.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'icarus_drive',
+      name: 'Icarus Drive',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'After you activate a system, you may remove this unit from the game board to place or move a Creuss wormhole token into this system.'],
+    },
   },
 
   hacan: {
@@ -192,6 +206,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 3,
       abilities: ['After you roll a die during a space combat in this system, you may spend 1 trade good to apply +1 to the result.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'pride_of_kenara',
+      name: 'Pride of Kenara',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'After a player activates a planet you control in a non-home system, you may spend 1 trade good to gain control of the planet or have another player gain control of the planet.'],
     },
   },
 
@@ -263,6 +284,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['When making a combat roll for this ship, each result of 9 or 10, before applying modifiers, produces 2 hits.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'shield_paling',
+      name: 'Shield Paling',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'Your infantry on this planet are not affected by your FRAGILE faction ability.'],
+    },
   },
 
   l1z1x: {
@@ -307,6 +335,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 5,
       abilities: ['During a space combat, hits produced by this ship and by your dreadnoughts in this system must be assigned to non-fighter ships if able.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'annihilator',
+      name: 'Annihilator',
+      cost: 2,
+      combat: 8,
+      abilities: ['SUSTAIN DAMAGE', 'BOMBARDMENT 8'],
     },
   },
 
@@ -367,6 +402,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['Other players\' units in this system lose PLANETARY SHIELD.', 'At the start of each space combat round, repair this ship.', 'BOMBARDMENT 5 (x3)', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'dunlain_reaper',
+      name: 'Dunlain Reaper',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'DEPLOY: At the start of a round of ground combat, you may spend 2 resources to replace 1 of your infantry in that combat with 1 mech.'],
+    },
   },
 
   mentak: {
@@ -412,6 +454,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['Other players\' ships in this system cannot use SUSTAIN DAMAGE.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'moll_terminus',
+      name: 'Moll Terminus',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'Other players\' ground forces on this planet cannot use SUSTAIN DAMAGE.'],
+    },
   },
 
   muaat: {
@@ -454,6 +503,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 3,
       abilities: ['ACTION: Spend 1 token from your strategy pool to place 1 cruiser in this unit\'s system.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'ember_colossus',
+      name: 'Ember Colossus',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'When you use your STAR FORGE faction ability, you may place 1 infantry from your reinforcements with this unit.'],
     },
   },
 
@@ -514,6 +570,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 6,
       abilities: ['During an invasion in this system, you may commit fighters to planets as if they were ground forces. When combat ends, return those units to the space area.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'iconoclast',
+      name: 'Iconoclast',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'During combat against an opponent who has at least 1 relic fragment, apply +2 to this unit\'s combat rolls.'],
+    },
   },
 
   nekro: {
@@ -563,6 +626,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 3,
       abilities: ['At the start of a space combat, your opponent must destroy 1 of their non-fighter ships.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'mordred',
+      name: 'Mordred',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'During combat against an opponent who has an "X" or "Y" token on 1 or more of their technologies, apply +2 to this unit\'s combat rolls.'],
     },
   },
 
@@ -620,6 +690,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['ANTI-FIGHTER BARRAGE 6 (x4)', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'scavenger_zeta',
+      name: 'Scavenger Zeta',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'DEPLOY: After you gain control of a planet, you may spend 1 trade good to place 1 mech on that planet.'],
+    },
   },
 
   sardakk: {
@@ -665,6 +742,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 3,
       abilities: ['Apply +1 to the result of each of your other ship\'s combat rolls in this system.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'valkyrie_exoskeleton',
+      name: 'Valkyrie Exoskeleton',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'After this unit uses SUSTAIN DAMAGE, produce 1 hit against your opponent\'s ground forces on this planet.'],
     },
   },
 
@@ -723,6 +807,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 12,
       abilities: ['At the end of the status phase, place 1 infantry from your reinforcements in this system\'s space area.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'zs_thunderbolt_m2',
+      name: 'ZS Thunderbolt M2',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'DEPLOY: After you use your ORBITAL DROP faction ability, you may spend 3 resources to place 1 mech on that planet.'],
+    },
   },
 
   winnu: {
@@ -780,6 +871,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['When this unit makes a combat roll, it rolls a number of dice equal to the number of your opponent\'s non-fighter ships in this system.', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'reclaimer',
+      name: 'Reclaimer',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'After you win a ground combat, you may place 1 PDS or 1 space dock from your reinforcements on that planet.'],
+    },
   },
 
   xxcha: {
@@ -826,6 +924,13 @@ export const factions: Record<string, FactionData> = {
       capacity: 3,
       abilities: ['You may use this unit\'s SPACE CANNON against ships that are in adjacent systems.', 'SPACE CANNON 5 (x3)', 'SUSTAIN DAMAGE'],
     },
+    mech: {
+      id: 'indomitus',
+      name: 'Indomitus',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'SPACE CANNON 8', 'You may use this unit\'s SPACE CANNON against ships that are in adjacent systems.'],
+    },
   },
 
   yin: {
@@ -869,6 +974,13 @@ export const factions: Record<string, FactionData> = {
       move: 1,
       capacity: 3,
       abilities: ['When this ship is destroyed, destroy all ships in this system.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'moyin_ashes',
+      name: 'Moyin\'s Ashes',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'DEPLOY: When you would spend a token to resolve the secondary ability of the WARFARE strategy card, you may spend 1 of your infantry\'s influence instead. If you do, place 1 mech on that planet.'],
     },
   },
 
@@ -939,6 +1051,517 @@ export const factions: Record<string, FactionData> = {
       move: 2,
       capacity: 3,
       abilities: ['This ship can move through systems that contain other player\'s ships.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'blackshade_infiltrator',
+      name: 'Blackshade Infiltrator',
+      cost: 2,
+      combat: 6,
+      abilities: ['SUSTAIN DAMAGE', 'DEPLOY: When you use your STALL TACTICS faction ability, you may place 1 mech from your reinforcements on a planet you control.'],
+    },
+  },
+
+  // ============================================================================
+  // Prophecy of Kings Factions
+  // ============================================================================
+
+  argent: {
+    id: 'argent',
+    name: 'The Argent Flight',
+    shortName: 'Argent',
+    expansion: 'pok',
+    homeSystemId: 52,
+    startingTech: [], // Choose 2 from: neural_motivator, sarween_tools, plasma_scoring
+    startingUnits: [
+      { type: 'carrier', count: 1 },
+      { type: 'destroyer', count: 2 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 2, planet: 'valk' },
+      { type: 'infantry', count: 2, planet: 'avar' },
+      { type: 'infantry', count: 1, planet: 'ylir' },
+      { type: 'pds', count: 1, planet: 'ylir' },
+      { type: 'space_dock', count: 1, planet: 'avar' },
+    ],
+    commodities: 3,
+    abilities: [
+      {
+        id: 'zeal',
+        name: 'Zeal',
+        description: 'You always vote first during the agenda phase. When you cast at least 1 vote, cast 1 additional vote for each player in the game including you.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'voting_modifier',
+          handlerId: 'argent_zeal',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'raid_formation',
+        name: 'Raid Formation',
+        description: 'When 1 or more of your units uses ANTI-FIGHTER BARRAGE, for each hit produced in excess of your opponent\'s fighters, choose 1 of your opponent\'s ships that has SUSTAIN DAMAGE to become damaged.',
+        implementation: {
+          timing: { type: 'when', trigger: 'anti_fighter_barrage' },
+          effectType: 'combat_modifier',
+          handlerId: 'argent_raid_formation',
+          isOptional: false,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'strike_wing_ambuscade',
+      name: 'Strike Wing Ambuscade',
+      owner: 'argent',
+      description: 'When 1 or more of your units make a roll for a unit ability: Choose 1 of those units to roll 1 additional die. Then, return this card to the Argent player.',
+    },
+    flagship: {
+      id: 'quetzecoatl',
+      name: 'Quetzecoatl',
+      cost: 8,
+      combat: 7,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['Other players cannot use SPACE CANNON against your ships in this system.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'aerie_sentinel',
+      name: 'Aerie Sentinel',
+      cost: 2,
+      combat: 6,
+      abilities: ['This unit does not count against capacity when it is being transported or when it is in a space area with 1 or more of your ships that have capacity values.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  empyrean: {
+    id: 'empyrean',
+    name: 'The Empyrean',
+    shortName: 'Empyrean',
+    expansion: 'pok',
+    homeSystemId: 53,
+    startingTech: ['dark_energy_tap'],
+    startingUnits: [
+      { type: 'carrier', count: 2 },
+      { type: 'destroyer', count: 1 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 4, planet: 'the_dark' },
+      { type: 'space_dock', count: 1, planet: 'the_dark' },
+    ],
+    commodities: 4,
+    abilities: [
+      {
+        id: 'voidborn',
+        name: 'Voidborn',
+        description: 'Nebulae do not affect your ships\' movement.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'movement_modifier',
+          handlerId: 'empyrean_voidborn',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'aetherpassage',
+        name: 'Aetherpassage',
+        description: 'After a player activates a system, you may allow that player to move their ships through systems that contain your ships.',
+        implementation: {
+          timing: { type: 'after', trigger: 'system_activated' },
+          effectType: 'movement_modifier',
+          handlerId: 'empyrean_aetherpassage',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'dark_whispers',
+        name: 'Dark Whispers',
+        description: 'During setup, take the additional Empyrean faction promissory note; you have 2 faction promissory notes.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'special',
+          handlerId: 'empyrean_dark_whispers',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'dark_pact',
+      name: 'Dark Pact',
+      owner: 'empyrean',
+      description: 'After the Empyrean player gains commodities: You and the Empyrean player each gain 1 trade good. Then, return this card to the Empyrean player.',
+    },
+    flagship: {
+      id: 'dynamo',
+      name: 'Dynamo',
+      cost: 8,
+      combat: 5,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['After any player\'s unit in this system or an adjacent system uses SUSTAIN DAMAGE, you may spend 2 influence to repair that unit.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'watcher',
+      name: 'Watcher',
+      cost: 2,
+      combat: 6,
+      abilities: ['After an opponent activates a system that contains or is adjacent to 1 or more of your units, you may remove this unit from the board to cancel 1 action card played by that player.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  mahact: {
+    id: 'mahact',
+    name: 'The Mahact Gene-Sorcerers',
+    shortName: 'Mahact',
+    expansion: 'pok',
+    homeSystemId: 54,
+    startingTech: ['bio_stims', 'predictive_intelligence'],
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'cruiser', count: 1 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 3, planet: 'ixth' },
+      { type: 'space_dock', count: 1, planet: 'ixth' },
+    ],
+    commodities: 3,
+    abilities: [
+      {
+        id: 'edict',
+        name: 'Edict',
+        description: 'When you win a combat, place 1 command token from your opponent\'s reinforcements in your fleet pool if it does not already contain 1 of that player\'s tokens.',
+        implementation: {
+          timing: { type: 'when', trigger: 'combat_win' },
+          effectType: 'resource_gain',
+          handlerId: 'mahact_edict',
+          isOptional: false,
+        },
+      },
+      {
+        id: 'imperia',
+        name: 'Imperia',
+        description: 'While another player\'s command token is in your fleet pool, you can use the ability of that player\'s commander, if it is unlocked.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'special',
+          handlerId: 'mahact_imperia',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'hubris',
+        name: 'Hubris',
+        description: 'During setup, purge your "Alliance" promissory note. Other players cannot give you their "Alliance" promissory note.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'special',
+          handlerId: 'mahact_hubris',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'scepter_of_dominion',
+      name: 'Scepter of Dominion',
+      owner: 'mahact',
+      description: 'At the start of the strategy phase: Choose 1 non-home system that contains your units; each other player places a command token from their reinforcements in that system. Then, return this card to the Mahact player.',
+    },
+    flagship: {
+      id: 'arvicon_rex',
+      name: 'Arvicon Rex',
+      cost: 8,
+      combat: 5,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['During combat against an opponent whose command token is not in your fleet pool, apply +2 to the results of this unit\'s combat rolls.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'starlancer',
+      name: 'Starlancer',
+      cost: 2,
+      combat: 6,
+      abilities: ['After an opponent activates a system that contains this unit, you may spend their command token from your fleet pool to end their turn; they gain that token.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  naazrokha: {
+    id: 'naazrokha',
+    name: 'The Naaz-Rokha Alliance',
+    shortName: 'Naaz-Rokha',
+    expansion: 'pok',
+    homeSystemId: 55,
+    startingTech: ['psychoarchaeology', 'ai_development_algorithm'],
+    startingUnits: [
+      { type: 'carrier', count: 2 },
+      { type: 'destroyer', count: 1 },
+      { type: 'fighter', count: 2 },
+      { type: 'mech', count: 1, planet: 'naazir' },
+      { type: 'infantry', count: 2, planet: 'naazir' },
+      { type: 'infantry', count: 1, planet: 'rokha' },
+      { type: 'space_dock', count: 1, planet: 'rokha' },
+    ],
+    commodities: 3,
+    abilities: [
+      {
+        id: 'distant_suns',
+        name: 'Distant Suns',
+        description: 'When you explore a planet that contains 1 of your mechs, you may draw 1 additional card; choose 1 to resolve and discard the rest.',
+        implementation: {
+          timing: { type: 'when', trigger: 'explore_planet' },
+          effectType: 'draw_cards',
+          handlerId: 'naazrokha_distant_suns',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'fabrication',
+        name: 'Fabrication',
+        description: 'ACTION: Either purge 2 of your relic fragments of the same type to gain 1 relic; or purge 1 of your relic fragments to gain 1 command token.',
+        implementation: {
+          timing: { type: 'action' },
+          effectType: 'resource_conversion',
+          handlerId: 'naazrokha_fabrication',
+          isOptional: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'black_market_forgery',
+      name: 'Black Market Forgery',
+      owner: 'naazrokha',
+      description: 'ACTION: Purge 2 of your relic fragments of the same type to gain 1 relic. Then, return this card to the Naaz-Rokha player.',
+    },
+    flagship: {
+      id: 'visz_el_vir',
+      name: 'Visz el Vir',
+      cost: 8,
+      combat: 9,
+      combatRolls: 2,
+      move: 1,
+      capacity: 4,
+      abilities: ['Your mechs in this system roll 1 additional die during combat.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'eidolon',
+      name: 'Eidolon',
+      cost: 2,
+      combat: 6,
+      abilities: ['While this unit is in a space area during combat, it is also a ship. At the start of a round of ground combat, you may commit this unit to that combat as if it were in the space area.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  nomad: {
+    id: 'nomad',
+    name: 'The Nomad',
+    shortName: 'Nomad',
+    expansion: 'pok',
+    homeSystemId: 56,
+    startingTech: ['sling_relay'],
+    startingUnits: [
+      { type: 'flagship', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'destroyer', count: 1 },
+      { type: 'fighter', count: 3 },
+      { type: 'infantry', count: 4, planet: 'arcturus' },
+      { type: 'space_dock', count: 1, planet: 'arcturus' },
+    ],
+    commodities: 4,
+    abilities: [
+      {
+        id: 'the_company',
+        name: 'The Company',
+        description: 'During setup, take the 2 additional Nomad faction agents and place them next to your faction sheet; you have 3 agents.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'special',
+          handlerId: 'nomad_the_company',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'future_sight',
+        name: 'Future Sight',
+        description: 'During the agenda phase, after an outcome you voted for or predicted is resolved, gain 1 trade good.',
+        implementation: {
+          timing: { type: 'after', trigger: 'agenda_outcome_resolved' },
+          effectType: 'resource_gain',
+          handlerId: 'nomad_future_sight',
+          isOptional: false,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'the_cavalry',
+      name: 'The Cavalry',
+      owner: 'nomad',
+      description: 'At the start of a space combat against a player other than the Nomad: During this combat, treat 1 of your non-fighter ships as if it has the SUSTAIN DAMAGE ability, the combat value of the Nomad\'s flagship, and ANTI-FIGHTER BARRAGE 8 (x3). Then, return this card to the Nomad player.',
+    },
+    flagship: {
+      id: 'memoria',
+      name: 'Memoria',
+      cost: 8,
+      combat: 7,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['You may treat this unit as if it is adjacent to systems that contain 1 or more of your mechs.', 'ANTI-FIGHTER BARRAGE 8 (x3)', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'quantum_manipulator',
+      name: 'Quantum Manipulator',
+      cost: 2,
+      combat: 6,
+      abilities: ['While this unit is in a space area, you may use its SUSTAIN DAMAGE ability to cancel a hit that is produced against your ships in this system.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  titans: {
+    id: 'titans',
+    name: 'The Titans of Ul',
+    shortName: 'Titans',
+    expansion: 'pok',
+    homeSystemId: 57,
+    startingTech: ['antimass_deflectors', 'scanlink_drone_network'],
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'cruiser', count: 2 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 3, planet: 'elysium' },
+      { type: 'space_dock', count: 1, planet: 'elysium' },
+    ],
+    commodities: 2,
+    abilities: [
+      {
+        id: 'terragenesis',
+        name: 'Terragenesis',
+        description: 'After you explore a planet that does not have a sleeper token, you may place or move 1 sleeper token onto that planet.',
+        implementation: {
+          timing: { type: 'after', trigger: 'explore_planet' },
+          effectType: 'token_placement',
+          handlerId: 'titans_terragenesis',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'awaken',
+        name: 'Awaken',
+        description: 'After you activate a system that contains 1 or more of your sleeper tokens, you may replace each of those tokens with 1 PDS from your reinforcements.',
+        implementation: {
+          timing: { type: 'after', trigger: 'system_activated' },
+          effectType: 'unit_placement',
+          handlerId: 'titans_awaken',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'coalescence',
+        name: 'Coalescence',
+        description: 'If your flagship or your AWAKEN faction ability places your units into the same space area or onto the same planet as another player\'s units, your units must participate in combat during the "Space Combat" or "Ground Combat" steps.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'combat_modifier',
+          handlerId: 'titans_coalescence',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'terraform',
+      name: 'Terraform',
+      owner: 'titans',
+      description: 'ACTION: Attach this card to a non-home planet you control. Its resource and influence values are each increased by 1, and it is treated as having all 3 planet traits (Cultural, Hazardous, and Industrial).',
+    },
+    flagship: {
+      id: 'ouranos',
+      name: 'Ouranos',
+      cost: 8,
+      combat: 7,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['DEPLOY: After you activate a system that contains 1 or more of your PDS, you may replace 1 of those PDS with this unit.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'hecatoncheires',
+      name: 'Hecatoncheires',
+      cost: 2,
+      combat: 6,
+      abilities: ['DEPLOY: When you would use your AWAKEN faction ability, you may place 1 mech and 1 infantry from your reinforcements on that planet instead of placing a PDS.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  cabal: {
+    id: 'cabal',
+    name: 'The Vuil\'Raith Cabal',
+    shortName: 'Cabal',
+    expansion: 'pok',
+    homeSystemId: 58,
+    startingTech: ['self_assembly_routines'],
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'cruiser', count: 1 },
+      { type: 'fighter', count: 3 },
+      { type: 'infantry', count: 3, planet: 'acheron' },
+      { type: 'space_dock', count: 1, planet: 'acheron' },
+    ],
+    commodities: 2,
+    abilities: [
+      {
+        id: 'devour',
+        name: 'Devour',
+        description: 'Capture your opponent\'s non-structure units that are destroyed during combat.',
+        implementation: {
+          timing: { type: 'when', trigger: 'unit_destroyed' },
+          effectType: 'capture',
+          handlerId: 'cabal_devour',
+          isOptional: false,
+        },
+      },
+      {
+        id: 'amalgamation',
+        name: 'Amalgamation',
+        description: 'When you produce a unit, you may return 1 captured unit of that type to produce that unit without spending resources.',
+        implementation: {
+          timing: { type: 'when', trigger: 'unit_produced' },
+          effectType: 'cost_reduction',
+          handlerId: 'cabal_amalgamation',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'riftmeld',
+        name: 'Riftmeld',
+        description: 'When you research a unit upgrade technology, you may return 1 captured unit of that type to ignore all of the technology\'s prerequisites.',
+        implementation: {
+          timing: { type: 'when', trigger: 'tech_researched' },
+          effectType: 'prerequisite_ignore',
+          handlerId: 'cabal_riftmeld',
+          isOptional: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'crucible',
+      name: 'Crucible',
+      owner: 'cabal',
+      description: 'After you activate a system: Your ships do not roll for gravity rifts during this movement; apply an additional +1 to the move values of your ships that would move out of or through a gravity rift. Then, return this card to the Vuil\'Raith player.',
+    },
+    flagship: {
+      id: 'the_terror_between',
+      name: 'The Terror Between',
+      cost: 8,
+      combat: 5,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['BOMBARDMENT 5', 'Other players\' non-structure units in this system that are destroyed are captured instead.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'reanimator',
+      name: 'Reanimator',
+      cost: 2,
+      combat: 6,
+      abilities: ['When your infantry on this planet are destroyed, place them on your faction sheet; those units are captured.', 'SUSTAIN DAMAGE'],
     },
   },
 };

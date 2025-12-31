@@ -8,6 +8,7 @@ interface GameLogProps {
   maxHeight?: string;
   showTimestamps?: boolean;
   filterTypes?: GameLogEntryType[];
+  variant?: 'sidebar' | 'overlay';
 }
 
 // Icon and color mapping for log entry types
@@ -88,16 +89,22 @@ export function GameLog({
   maxHeight = '400px',
   showTimestamps = false,
   filterTypes,
+  variant = 'sidebar',
 }: GameLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
+
+  const isOverlay = variant === 'overlay';
 
   // Filter entries
   const filteredEntries = entries.filter(entry => {
     if (filterTypes && !filterTypes.includes(entry.type)) {
       return false;
     }
+
+    // No filtering in overlay mode - show all
+    if (isOverlay) return true;
 
     const category = LOG_FILTER_CATEGORIES.find(c => c.label === selectedFilter);
     if (category && category.types) {
@@ -121,6 +128,32 @@ export function GameLog({
     setAutoScroll(isAtBottom);
   };
 
+  // Overlay variant - compact, transparent, no filters
+  if (isOverlay) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Log Entries - compact */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-2 space-y-0.5"
+          style={{ maxHeight }}
+        >
+          {filteredEntries.length === 0 ? (
+            <div className="text-center py-4 text-gray-500 text-xs">
+              No events
+            </div>
+          ) : (
+            filteredEntries.slice(-50).map(entry => (
+              <LogEntryItemCompact key={entry.id} entry={entry} />
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Sidebar variant - full featured
   return (
     <div className="flex flex-col h-full bg-gray-900 rounded-lg border border-gray-700">
       {/* Header */}
@@ -235,6 +268,23 @@ function LogEntryItem({ entry, showTimestamp }: LogEntryItemProps) {
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+// Compact log entry for overlay mode
+function LogEntryItemCompact({ entry }: { entry: GameLogEntry }) {
+  const config = LOG_TYPE_CONFIG[entry.type] || {
+    icon: '>',
+    color: 'text-gray-400',
+  };
+
+  return (
+    <div className="flex items-start gap-1.5 text-xs leading-tight">
+      <span className={`font-mono ${config.color} flex-shrink-0`}>
+        {config.icon}
+      </span>
+      <span className="text-gray-400 truncate">{entry.message}</span>
     </div>
   );
 }

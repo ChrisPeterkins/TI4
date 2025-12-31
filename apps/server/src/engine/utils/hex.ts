@@ -208,6 +208,22 @@ export function generateStandardMapPositions(playerCount: number): HexCoord[] {
     }
   }
 
+  // Ring 4 (24 tiles) - for 7-8 player maps
+  if (playerCount >= 7) {
+    for (let i = 0; i < 6; i++) {
+      const dir1 = HEX_DIRECTIONS[i];
+      const dir2 = HEX_DIRECTIONS[(i + 1) % 6];
+
+      // Corner (4 steps in one direction)
+      positions.push({ q: dir1.q * 4, r: dir1.r * 4 });
+
+      // Edge positions (3 positions per edge)
+      positions.push({ q: dir1.q * 3 + dir2.q, r: dir1.r * 3 + dir2.r });
+      positions.push({ q: dir1.q * 2 + dir2.q * 2, r: dir1.r * 2 + dir2.r * 2 });
+      positions.push({ q: dir1.q + dir2.q * 3, r: dir1.r + dir2.r * 3 });
+    }
+  }
+
   return positions;
 }
 
@@ -380,6 +396,26 @@ export function getHomeSystemPositions(playerCount: number): HexCoord[] {
       { q: 0, r: 3 },    // South
       { q: -3, r: 3 },   // Southwest
       { q: -3, r: 0 },   // West
+    ],
+    // 7-8 player maps use extended layout with hyperlane tiles
+    7: [
+      { q: 0, r: -4 },   // North
+      { q: 3, r: -4 },   // Northeast-1
+      { q: 4, r: -1 },   // Northeast-2
+      { q: 4, r: 2 },    // East
+      { q: 0, r: 4 },    // South
+      { q: -4, r: 4 },   // Southwest
+      { q: -4, r: 0 },   // West
+    ],
+    8: [
+      { q: 0, r: -4 },   // North
+      { q: 3, r: -4 },   // Northeast-1
+      { q: 4, r: -1 },   // Northeast-2
+      { q: 4, r: 2 },    // Southeast-1
+      { q: 2, r: 4 },    // Southeast-2
+      { q: -2, r: 4 },   // Southwest-1
+      { q: -4, r: 2 },   // Southwest-2
+      { q: -4, r: -1 },  // Northwest
     ],
   };
 

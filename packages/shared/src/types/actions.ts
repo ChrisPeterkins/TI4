@@ -436,6 +436,37 @@ export interface PurgeRelicFragmentsAction extends BaseAction {
   count: number;
 }
 
+// Relic Actions (PoK)
+export interface UseRelicAction extends BaseAction {
+  type: 'use_relic';
+  relicId: string;
+  /** For relics that require target selection */
+  targets?: {
+    playerId?: UUID;
+    systemId?: string;
+    planetId?: string;
+    techId?: string;
+    actionCardIds?: string[];
+  };
+}
+
+export interface ReadyRelicAction extends BaseAction {
+  type: 'ready_relic';
+  relicId: string;
+}
+
+// Legendary Planet Actions (PoK)
+export interface UseLegendaryAbilityAction extends BaseAction {
+  type: 'use_legendary_ability';
+  planetId: string;
+  /** For abilities that require targets */
+  targets?: {
+    attachmentIds?: string[];  // For Primor (purge attachments)
+    actionCardIds?: string[];  // For Hope's End (return to deck)
+    unitProduction?: { type: string; count: number }[];  // For Mallice
+  };
+}
+
 // Leader Actions (PoK)
 export interface UnlockCommanderAction extends BaseAction {
   type: 'unlock_commander';
@@ -505,6 +536,9 @@ export type GameAction =
   | ReadyPlanetAction
   | ExploreAction
   | PurgeRelicFragmentsAction
+  | UseRelicAction
+  | ReadyRelicAction
+  | UseLegendaryAbilityAction
   | UnlockCommanderAction
   | UseAgentAction
   | PurgeHeroAction
