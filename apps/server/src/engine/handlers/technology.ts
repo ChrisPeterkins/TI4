@@ -5,6 +5,7 @@ import type {
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { technologies, systems, meetsPrerequisites, type TechnologyData } from '@ti4/game-data';
+import { checkAllCommanderUnlocks } from './leaders.js';
 
 /**
  * Handle researching a technology
@@ -63,9 +64,17 @@ export function handleResearchTechnology(
   // Increment version
   state.version++;
 
+  // Check for commander unlocks (some commanders unlock based on tech count)
+  const unlockedCommanders = checkAllCommanderUnlocks(state);
+
+  const triggeredEvents = ['technology_researched'];
+  if (unlockedCommanders.length > 0) {
+    triggeredEvents.push('commander_unlocked');
+  }
+
   return {
     success: true,
-    triggeredEvents: ['technology_researched'],
+    triggeredEvents,
     data: {
       playerId: player.id,
       techId: action.techId,

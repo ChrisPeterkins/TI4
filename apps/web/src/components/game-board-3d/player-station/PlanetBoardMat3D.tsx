@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, Suspense, useCallback, useEffect } from 'react';
+import { useMemo, Suspense, useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
-import { useLoader, useThree } from '@react-three/fiber';
+import { useLoader, useThree, ThreeEvent } from '@react-three/fiber';
 import { TextureLoader } from 'three';
+import { Text } from '@react-three/drei';
 import { getPlanetCardUrl, getPlaymatTextureUrl, PLAYMAT_DIMENSIONS } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
 
@@ -12,12 +13,32 @@ const PLANET_CARD_WIDTH = 0.55;
 const PLANET_CARD_HEIGHT = 0.85;
 const PLANET_CARD_DEPTH = 0.008;
 
+// Planet trait colors
+const TRAIT_COLORS: Record<string, string> = {
+  cultural: '#3b82f6',   // Blue
+  industrial: '#22c55e', // Green
+  hazardous: '#ef4444',  // Red
+};
+
+export type PlanetTrait = 'cultural' | 'industrial' | 'hazardous';
+
+export interface PlanetAttachment {
+  id: string;
+  name: string;
+  resourceBonus?: number;
+  influenceBonus?: number;
+}
+
 export interface PlanetCardData {
   id: string;          // Planet ID
   name: string;        // Planet name
   exhausted: boolean;  // Whether the planet is exhausted (rotated 90 degrees)
   resources?: number;
   influence?: number;
+  trait?: PlanetTrait;  // Planet trait for exploration
+  attachments?: PlanetAttachment[]; // Exploration attachments
+  modifiedResources?: number; // Resources after attachment bonuses
+  modifiedInfluence?: number; // Influence after attachment bonuses
 }
 
 export interface PlanetBoardMat3DProps {
@@ -30,7 +51,7 @@ export interface PlanetBoardMat3DProps {
 }
 
 /**
- * Individual planet card on the planet board
+ * Individual planet card on the planet board with trait indicator and attachments
  */
 function PlanetCardOnBoard({
   planet,
@@ -47,6 +68,7 @@ function PlanetCardOnBoard({
 }) {
   const { gl } = useThree();
   const maxAnisotropy = useMemo(() => gl.capabilities.getMaxAnisotropy(), [gl]);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Load planet card texture
   const textureUrl = getPlanetCardUrl(planet.id);
@@ -104,27 +126,117 @@ function PlanetCardOnBoard({
     ? [0, Math.PI / 2, 0]
     : [0, 0, 0];
 
+  const handlePointerOver = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setIsHovered(true);
+    onHover?.(true);
+    document.body.style.cursor = 'pointer';
+  }, [onHover]);
+
+  const handlePointerOut = useCallback((e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setIsHovered(false);
+    onHover?.(false);
+    document.body.style.cursor = 'auto';
+  }, [onHover]);
+
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    onClick?.();
+  }, [onClick]);
+
+  const hasAttachments = planet.attachments && planet.attachments.length > 0;
+  const hasModifiedStats = planet.modifiedResources !== undefined || planet.modifiedInfluence !== undefined;
+
   return (
-    <mesh
-      geometry={geometry}
-      material={materials}
-      position={position}
-      rotation={cardRotation}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        onHover?.(true);
-        document.body.style.cursor = 'pointer';
-      }}
-      onPointerOut={(e) => {
-        e.stopPropagation();
-        onHover?.(false);
-        document.body.style.cursor = 'auto';
-      }}
-    />
+    <group position={position} rotation={cardRotation}>
+      {/* Main card */}
+      <mesh
+        geometry={geometry}
+        material={materials}
+        onClick={handleClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+      />
+
+      {/* Trait indicator (top-left corner) */}
+      {planet.trait && (
+        <group position={[-cardWidth * 0.35, cardDepth + 0.01, -cardHeight * 0.35]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.04 * scale, 16]} />
+            <meshBasicMaterial color={TRAIT_COLORS[planet.trait]} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Attachment indicators (top-right corner, stacked) */}
+      {hasAttachments && planet.attachments!.map((attachment, index) => (
+        <group
+          key={attachment.id}
+          position={[cardWidth * 0.35, cardDepth + 0.02 + index * 0.015, -cardHeight * 0.35]}
+        >
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <boxGeometry args={[0.06 * scale, 0.06 * scale, 0.01]} />
+            <meshStandardMaterial
+              color="#a855f7"
+              emissive="#6d28d9"
+              emissiveIntensity={0.3}
+            />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Modified stats display (bottom of card, only when hovered or has modifications) */}
+      {hasModifiedStats && (isHovered || hasAttachments) && (
+        <group position={[0, cardDepth + 0.015, cardHeight * 0.35]}>
+          {/* Resource bonus indicator */}
+          {planet.modifiedResources !== undefined && planet.modifiedResources !== planet.resources && (
+            <Text
+              position={[-cardWidth * 0.2, 0, 0]}
+              fontSize={0.06 * scale}
+              color="#fbbf24"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              R:{planet.modifiedResources}
+            </Text>
+          )}
+          {/* Influence bonus indicator */}
+          {planet.modifiedInfluence !== undefined && planet.modifiedInfluence !== planet.influence && (
+            <Text
+              position={[cardWidth * 0.2, 0, 0]}
+              fontSize={0.06 * scale}
+              color="#60a5fa"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              I:{planet.modifiedInfluence}
+            </Text>
+          )}
+        </group>
+      )}
+
+      {/* Attachment tooltip on hover */}
+      {isHovered && hasAttachments && (
+        <group position={[0, cardDepth + 0.1, 0]}>
+          {planet.attachments!.map((attachment, index) => (
+            <Text
+              key={attachment.id}
+              position={[0, 0.05 * index, 0]}
+              fontSize={0.035 * scale}
+              color="#c4b5fd"
+              anchorX="center"
+              anchorY="middle"
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              {attachment.name}
+            </Text>
+          ))}
+        </group>
+      )}
+    </group>
   );
 }
 

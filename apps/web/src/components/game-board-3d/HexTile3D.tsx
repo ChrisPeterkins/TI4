@@ -2,9 +2,9 @@
 
 import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
-import { useLoader, ThreeEvent } from '@react-three/fiber';
+import { useLoader, ThreeEvent, useFrame } from '@react-three/fiber';
 import { TextureLoader } from 'three';
-import { Html } from '@react-three/drei';
+import { Html, Text } from '@react-three/drei';
 import type { MapTile } from '@ti4/shared';
 import { hexToWorld3D } from './hex3d';
 import { HEX_CONFIG, TILE_SIDE_COLOR, HIGHLIGHT_COLORS } from './constants';
@@ -61,6 +61,75 @@ function createHexCylinderGeometry(radius: number, height: number): THREE.Cylind
 
   uv.needsUpdate = true;
   return geo;
+}
+
+/**
+ * Frontier Token - Floating crystal/gem indicating explorable empty space
+ */
+function FrontierToken3D({ position }: { position: [number, number, number] }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+
+  // Gentle floating and rotation animation
+  useFrame((state) => {
+    if (meshRef.current) {
+      // Slow rotation
+      meshRef.current.rotation.y += 0.008;
+      // Gentle floating motion
+      meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+    }
+    if (glowRef.current) {
+      // Pulsing glow
+      const pulse = 0.3 + Math.sin(state.clock.elapsedTime * 2) * 0.15;
+      (glowRef.current.material as THREE.MeshBasicMaterial).opacity = pulse;
+    }
+  });
+
+  return (
+    <group position={position}>
+      {/* Outer glow */}
+      <mesh ref={glowRef} scale={1.6}>
+        <octahedronGeometry args={[0.18, 0]} />
+        <meshBasicMaterial
+          color="#a855f7"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Main crystal */}
+      <mesh ref={meshRef}>
+        <octahedronGeometry args={[0.15, 0]} />
+        <meshStandardMaterial
+          color="#8b5cf6"
+          emissive="#6d28d9"
+          emissiveIntensity={0.4}
+          metalness={0.6}
+          roughness={0.2}
+        />
+      </mesh>
+
+      {/* Inner core */}
+      <mesh rotation={[0, Math.PI / 4, 0]}>
+        <octahedronGeometry args={[0.08, 0]} />
+        <meshBasicMaterial color="#c4b5fd" transparent opacity={0.8} />
+      </mesh>
+
+      {/* Label */}
+      <Text
+        position={[0, -0.25, 0]}
+        fontSize={0.1}
+        color="#a855f7"
+        anchorX="center"
+        anchorY="top"
+        outlineWidth={0.01}
+        outlineColor="#1a1a2e"
+      >
+        FRONTIER
+      </Text>
+    </group>
+  );
 }
 
 /**
@@ -251,6 +320,11 @@ export function HexTile3D({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       />
+
+      {/* Frontier Token - shows on empty systems that can be explored */}
+      {tile.frontier && (
+        <FrontierToken3D position={[position.x, HEX_CONFIG.height + 0.15, position.z]} />
+      )}
 
       {/* Action confirmation popup */}
       {showPopup && canActivate && (

@@ -27,6 +27,8 @@ import { initializeInvasion, getInvadablePlanets, hasGroundForcesToLand } from '
 import { units, systems } from '@ti4/game-data';
 import { hasGravityRiftDanger, rollGravityRift } from '../abilities/movement-modifiers.js';
 import { logPass, logTacticalAction, logStrategicAction, logUnitsProduced, logSystemActivated } from '../utils/game-log.js';
+import { checkAllCommanderUnlocks } from './leaders.js';
+import { checkPromissoryReturnsOnActivation } from './transactions.js';
 
 /**
  * Handle pass action
@@ -86,6 +88,10 @@ export function handleTacticalAction(
 
   // Log the action
   logSystemActivated(state, action.playerId, targetTile.id, systemName);
+
+  // Check for promissory notes that return on activation
+  // (e.g., Support for Throne, Ceasefire when activating system with owner's units)
+  checkPromissoryReturnsOnActivation(state, action.playerId, targetTile.id);
 
   // Transition to movement sub-phase
   state.subPhase = 'tactical_movement';
@@ -177,6 +183,9 @@ function initializeStrategicActionState(
 export function completeTacticalAction(state: GameState): HandlerResult {
   // Clear the activated system
   state.activatedSystem = undefined;
+
+  // Clear ceasefire blocks from this tactical action
+  state.ceasefireBlocks = undefined;
 
   state.subPhase = 'awaiting_action';
   advanceToNextActivePlayer(state);
@@ -502,6 +511,13 @@ export function handleSkipProduction(
 function completeTacticalActionInternal(state: GameState): HandlerResult {
   // Clear the activated system
   state.activatedSystem = undefined;
+
+  // Clear ceasefire blocks from this tactical action
+  state.ceasefireBlocks = undefined;
+
+  // Check for commander unlocks after tactical action completion
+  // This covers production, movement, and combat resolution
+  const unlockedCommanders = checkAllCommanderUnlocks(state);
 
   state.subPhase = 'awaiting_action';
   advanceToNextActivePlayer(state);

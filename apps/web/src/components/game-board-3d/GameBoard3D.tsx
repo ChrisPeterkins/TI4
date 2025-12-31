@@ -45,6 +45,11 @@ interface GameBoard3DProps {
   onStrategyCardPlay?: (playerId: string, cardNumber: number) => void;  // Strategic action
   onPass?: (playerId: string) => void;             // Pass turn
   activatableTiles?: { q: number; r: number }[];   // Tiles that can be activated (tactical action)
+  // Exploration & Relic callbacks
+  onRelicFragmentPurge?: (playerId: string, fragmentType: string) => void;  // Purge fragments for relic
+  onRelicClick?: (playerId: string, relicId: string) => void;  // Use/activate a relic
+  // Leader callbacks
+  onLeaderClick?: (playerId: string, leaderId: string, leaderType: 'agent' | 'commander' | 'hero') => void;
 }
 
 /**
@@ -226,6 +231,9 @@ function SceneContent({
   onActionCardClick,
   onTechClick,
   onTradeGoodsClick,
+  onRelicFragmentPurge,
+  onRelicClick,
+  onLeaderClick,
   setResetCameraFn,
   inspectedCard,
   onCardInspect,
@@ -257,6 +265,9 @@ function SceneContent({
   onActionCardClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
   onTradeGoodsClick?: (playerId: string) => void;
+  onRelicFragmentPurge?: (playerId: string, fragmentType: string) => void;
+  onRelicClick?: (playerId: string, relicId: string) => void;
+  onLeaderClick?: (playerId: string, leaderId: string, leaderType: 'agent' | 'commander' | 'hero') => void;
   setResetCameraFn: (fn: () => void) => void;
   inspectedCard: InspectedCard | null;
   onCardInspect: (card: InspectedCard) => void;
@@ -414,6 +425,9 @@ function SceneContent({
           onTechClick={handleTechCardInspect}
           onTradeGoodsClick={onTradeGoodsClick}
           onStationFocus={handleStationFocus}
+          onRelicFragmentPurge={onRelicFragmentPurge}
+          onRelicClick={onRelicClick}
+          onLeaderClick={onLeaderClick}
         />
       )}
 
@@ -468,6 +482,9 @@ export function GameBoard3D({
   onActionCardClick,
   onTechClick,
   onTradeGoodsClick,
+  onRelicFragmentPurge,
+  onRelicClick,
+  onLeaderClick,
 }: GameBoard3DProps) {
   const [hoveredTile, setHoveredTile] = useState<MapTile | null>(null);
   const [isCameraFocused, setIsCameraFocused] = useState(false);
@@ -575,6 +592,9 @@ export function GameBoard3D({
               onActionCardClick={onActionCardClick}
               onTechClick={onTechClick}
               onTradeGoodsClick={onTradeGoodsClick}
+              onRelicFragmentPurge={onRelicFragmentPurge}
+              onRelicClick={onRelicClick}
+              onLeaderClick={onLeaderClick}
               setResetCameraFn={(fn) => { resetCameraRef.current = fn; }}
               inspectedCard={inspectedCard}
               onCardInspect={handleCardInspect}

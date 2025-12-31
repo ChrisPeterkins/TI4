@@ -232,8 +232,83 @@ function resolveExplorationCard(
           break;
 
         case 'special':
-          // Handle special effects
+          // Handle special exploration card effects
           result.specialEffect = effect.special;
+          switch (effect.special) {
+            case 'replenish_commodities':
+              // Merchant Station: Replenish commodities
+              const commoditiesGained = player.maxCommodities - player.commodities;
+              player.commodities = player.maxCommodities;
+              result.commoditiesReplenished = commoditiesGained;
+              addLogEntry(
+                state,
+                'planet_explored',
+                `${player.name} replenished ${commoditiesGained} commodities`,
+                { playerId: player.id }
+              );
+              break;
+
+            case 'roll_for_reward':
+              // Enigmatic Device: Roll 1-3: gain 2 TG, 4-6: gain a relic
+              const roll = Math.floor(Math.random() * 6) + 1;
+              result.enigmaticDeviceRoll = roll;
+              if (roll <= 3) {
+                player.tradeGoods += 2;
+                result.tradeGoodsGained = 2;
+                addLogEntry(
+                  state,
+                  'planet_explored',
+                  `${player.name} rolled ${roll} on Enigmatic Device and gained 2 trade goods`,
+                  { playerId: player.id }
+                );
+              } else {
+                // Gain a relic
+                if (state.relicDeck && state.relicDeck.length > 0) {
+                  const relicId = state.relicDeck.shift()!;
+                  const fullPlayer = state.players.find((p) => p.id === player.id);
+                  if (fullPlayer) {
+                    if (!fullPlayer.relics) {
+                      fullPlayer.relics = [];
+                    }
+                    fullPlayer.relics.push(relicId);
+                    result.relicGained = relicId;
+                    addLogEntry(
+                      state,
+                      'planet_explored',
+                      `${player.name} rolled ${roll} on Enigmatic Device and gained a relic!`,
+                      { playerId: player.id }
+                    );
+                  }
+                }
+              }
+              break;
+
+            case 'draw_relic_for_influence':
+              // Tomb of Emphidia: Player may spend 6 influence to gain a relic
+              // This is a choice that needs player interaction
+              // For now, mark as pending choice
+              result.pendingChoice = 'tomb_of_emphidia';
+              result.choiceDescription = 'Spend 6 influence to gain a relic?';
+              break;
+
+            case 'combat_penalty':
+              // Ion Storm: Attached planet gives -1 to all combat rolls in this system
+              // This is stored as an attachment effect (handled in combat)
+              result.combatModifier = -1;
+              break;
+
+            case 'place_gamma_wormhole':
+              // Place a gamma wormhole token in this system (for planet cards)
+              // Note: Frontier cards handle this separately
+              result.pendingWormhole = 'gamma';
+              break;
+
+            case 'place_mirage_planet':
+              // Creates a planet in the system
+              // This is complex and needs special handling for the Mirage planet
+              result.miragePlaced = true;
+              break;
+          }
           break;
       }
     }
@@ -253,13 +328,30 @@ function resolveExplorationCard(
  */
 export function handleExploreFrontier(
   state: GameState,
-  action: ExploreAction
+  action: ExploreAction & { systemPosition?: { q: number; r: number } }
 ): HandlerResult {
-  const { playerId } = action;
+  const { playerId, systemPosition } = action;
   const player = state.players.find((p) => p.id === playerId);
 
   if (!player) {
     return { success: false, error: 'Player not found' };
+  }
+
+  if (!systemPosition) {
+    return { success: false, error: 'System position required for frontier exploration' };
+  }
+
+  // Find the tile
+  const tile = state.map.tiles.find(
+    (t) => t.position.q === systemPosition.q && t.position.r === systemPosition.r
+  );
+
+  if (!tile) {
+    return { success: false, error: 'System not found' };
+  }
+
+  if (!tile.frontier) {
+    return { success: false, error: 'This system does not have a frontier token' };
   }
 
   // Initialize frontier deck if needed
@@ -284,6 +376,9 @@ export function handleExploreFrontier(
     return { success: false, error: 'Invalid exploration card' };
   }
 
+  // Remove the frontier token - it can only be explored once
+  tile.frontier = undefined;
+
   addLogEntry(
     state,
     'planet_explored',
@@ -294,9 +389,13 @@ export function handleExploreFrontier(
         explorationCardId: drawnCardId,
         explorationCardName: cardData.name,
         explorationDeckType: 'frontier',
+        systemPosition,
       },
     }
   );
+
+  // Apply the frontier card effect
+  const effectResult = resolveFrontierCard(state, player, cardData, drawnCardId, tile);
 
   return {
     success: true,
@@ -305,8 +404,147 @@ export function handleExploreFrontier(
       cardId: drawnCardId,
       cardName: cardData.name,
       cardSubtype: cardData.subtype,
+      ...effectResult,
     },
   };
+}
+
+/**
+ * Resolve a frontier exploration card effect
+ * Frontier cards are fragments, instant effects, or special (gamma wormhole, ion storm, mirage)
+ */
+function resolveFrontierCard(
+  state: GameState,
+  player: { id: string; name: string; relicFragments?: { cultural: number; industrial: number; hazardous: number; unknown: number }; commodities: number; maxCommodities: number; tradeGoods: number },
+  cardData: ReturnType<typeof getExplorationCard>,
+  cardId: string,
+  tile: { position: { q: number; r: number }; wormhole: string | null }
+): Record<string, unknown> {
+  if (!cardData) return {};
+
+  const result: Record<string, unknown> = {};
+
+  if (isRelicFragment(cardId)) {
+    // Fragment card - add to player's fragment count (frontier gives 'unknown' fragments)
+    const fragmentType = cardData.effects[0]?.fragmentType as RelicFragmentType || 'unknown';
+    if (!player.relicFragments) {
+      player.relicFragments = { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 };
+    }
+    player.relicFragments[fragmentType] = (player.relicFragments[fragmentType] || 0) + 1;
+    result.fragmentType = fragmentType;
+    result.newFragmentCount = player.relicFragments[fragmentType];
+
+    // Add to discard pile
+    if (!state.explorationDiscard) {
+      state.explorationDiscard = [];
+    }
+    state.explorationDiscard.push(cardId);
+
+    addLogEntry(
+      state,
+      'relic_fragment_gained',
+      `${player.name} gained an unknown relic fragment from frontier exploration`,
+      {
+        playerId: player.id,
+        details: {
+          fragmentType,
+          fragmentCount: player.relicFragments[fragmentType],
+        },
+      }
+    );
+  } else if (isInstantEffect(cardId)) {
+    // Instant effect - apply and discard
+    for (const effect of cardData.effects) {
+      switch (effect.type) {
+        case 'gain_commodities':
+          if (effect.amount) {
+            const gained = Math.min(effect.amount, player.maxCommodities - player.commodities);
+            player.commodities += gained;
+            result.commoditiesGained = gained;
+          }
+          break;
+
+        case 'gain_trade_goods':
+          if (effect.amount) {
+            player.tradeGoods += effect.amount;
+            result.tradeGoodsGained = effect.amount;
+          }
+          break;
+
+        case 'draw_action_cards':
+          if (effect.amount) {
+            const drawn: string[] = [];
+            for (let i = 0; i < effect.amount; i++) {
+              if (state.actionCardDeck.length > 0) {
+                const card = state.actionCardDeck.shift()!;
+                const fullPlayer = state.players.find((p) => p.id === player.id);
+                if (fullPlayer) {
+                  fullPlayer.actionCards.push(card);
+                  drawn.push(card);
+                }
+              }
+            }
+            result.actionCardsDrawn = drawn.length;
+          }
+          break;
+
+        case 'gain_unit':
+          // Place unit in space from reinforcements
+          // For frontier, units go in space not on a planet
+          result.unitGained = effect.unitType;
+          break;
+
+        case 'special':
+          // Handle frontier-specific special effects
+          result.specialEffect = effect.special;
+          break;
+      }
+    }
+
+    // Add to discard pile
+    if (!state.explorationDiscard) {
+      state.explorationDiscard = [];
+    }
+    state.explorationDiscard.push(cardId);
+  } else {
+    // Special frontier cards (gamma wormhole, ion storm, mirage)
+    for (const effect of cardData.effects) {
+      if (effect.type === 'special') {
+        switch (effect.special) {
+          case 'gamma_wormhole':
+            // Add gamma wormhole to this system
+            (tile as { wormhole: string | null }).wormhole = 'gamma';
+            result.wormholeAdded = 'gamma';
+            addLogEntry(
+              state,
+              'planet_explored',
+              `A gamma wormhole appeared at position (${tile.position.q}, ${tile.position.r})`,
+              {
+                playerId: player.id,
+                details: {
+                  explorationDeckType: 'frontier',
+                },
+              }
+            );
+            break;
+
+          case 'ion_storm':
+            // Ion storm affects combat in this system
+            result.ionStorm = true;
+            // TODO: Add ion storm token tracking when implemented
+            break;
+
+          case 'mirage':
+            // Creates a temporary planet in this system
+            result.mirage = true;
+            // TODO: Add mirage planet when implemented
+            break;
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /**

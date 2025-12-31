@@ -31,6 +31,9 @@ import type {
   UseRelicAction,
   ReadyRelicAction,
   UseLegendaryAbilityAction,
+  UseAgentAction,
+  UnlockCommanderAction,
+  PurgeHeroAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -93,6 +96,11 @@ import {
   handleReadyRelic,
 } from './relics.js';
 import { handleUseLegendaryAbility } from './legendary-planets.js';
+import {
+  handleUseAgent,
+  handleUnlockCommander,
+  handlePurgeHero,
+} from './leaders.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -234,6 +242,16 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
     // Legendary Planet Actions (PoK)
     case 'use_legendary_ability':
       return handleUseLegendaryAbility(state, action as UseLegendaryAbilityAction);
+
+    // Leader Actions (PoK)
+    case 'use_agent':
+      return handleUseAgent(state, action as UseAgentAction);
+
+    case 'unlock_commander':
+      return handleUnlockCommander(state, action as UnlockCommanderAction);
+
+    case 'purge_hero':
+      return handlePurgeHero(state, action as PurgeHeroAction);
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };

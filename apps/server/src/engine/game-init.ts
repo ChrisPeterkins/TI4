@@ -18,6 +18,9 @@ import {
   STAGE_II_OBJECTIVES,
   SECRET_OBJECTIVES,
   getGenericNoteIdsForColor,
+  getInitialExplorationDeck,
+  getInitialRelicDeck,
+  FACTION_LEADERS,
 } from '@ti4/shared';
 import { factions, systems, strategyCards } from '@ti4/game-data';
 import { getHomeSystemPositions, generateStandardMapPositions } from './utils/hex.js';
@@ -92,6 +95,16 @@ export function createGame(options: GameSetupOptions): GameState {
     activeTimingWindow: null,
     winner: null,
     gameLog: [],
+    // PoK exploration decks
+    explorationDecks: {
+      cultural: shuffleArray(getInitialExplorationDeck('cultural')),
+      industrial: shuffleArray(getInitialExplorationDeck('industrial')),
+      hazardous: shuffleArray(getInitialExplorationDeck('hazardous')),
+      frontier: shuffleArray(getInitialExplorationDeck('frontier')),
+    },
+    explorationDiscard: [],
+    relicDeck: shuffleArray(getInitialRelicDeck()),
+    relicDiscard: [],
   };
 
   // Place starting units for each player
@@ -124,6 +137,9 @@ function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
   // All promissory notes this player owns (faction + generic)
   const allOwnedNotes = [faction.promissoryNote.id, ...genericNotes];
 
+  // Get leader info for this faction (PoK leaders)
+  const factionLeaders = FACTION_LEADERS[setup.factionId];
+
   return {
     id: uuidv4(),
     name: setup.name,
@@ -152,6 +168,20 @@ function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
     score: 0,
     neighbors: [],
     transactedWith: [],
+    // PoK Leaders - agents start unlocked, commanders/heroes need to be unlocked
+    leaders: factionLeaders ? {
+      agent: {
+        unlocked: true,  // Agents are always unlocked from the start
+        exhausted: false,
+      },
+      commander: {
+        unlocked: false, // Commanders require faction-specific unlock conditions
+      },
+      hero: {
+        unlocked: false, // Heroes require scoring 3 objectives
+        purged: false,   // Heroes are purged after use
+      },
+    } : undefined,
   };
 }
 
@@ -258,6 +288,10 @@ function createMapTile(
     units: [],
   })) ?? [];
 
+  // Frontier tokens are placed on systems with no planets (except home systems and Mecatol)
+  // Home systems have a factionId, Mecatol Rex is system 18
+  const hasFrontier = planets.length === 0 && !system?.factionId && systemId !== 18;
+
   return {
     id: uuidv4(),
     systemId,
@@ -268,6 +302,7 @@ function createMapTile(
     anomaly: system?.anomaly ?? null,
     units: [],
     commandTokens: [],
+    frontier: hasFrontier || undefined,
   };
 }
 

@@ -27,8 +27,10 @@ import {
   isImmediatePlayNote,
   noteStaysInPlay,
   getBaseNoteId,
+  getPromissoryNoteById,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
+import { logPromissoryNoteReturned } from '../utils/game-log.js';
 
 /**
  * Handle a player proposing a transaction to another player
@@ -414,6 +416,17 @@ export function returnPromissoryNote(
       originalOwner.promissoryNotesInHand.push(noteId);
     }
 
+    // Log the return
+    const noteDef = getPromissoryNoteById(noteId);
+    logPromissoryNoteReturned(
+      state,
+      holderId,
+      noteId,
+      noteDef?.name || noteId,
+      noteInPlay.originalOwnerId,
+      reason
+    );
+
     return {
       success: true,
       triggeredEvents: ['promissory_note_returned'],
@@ -489,6 +502,7 @@ export function checkPromissoryReturnsOnActivation(
         if (
           baseId === 'support_for_the_throne' ||
           baseId === 'alliance' ||
+          baseId === 'ceasefire' ||
           baseId === 'stymie' ||
           baseId === 'trade_convoys' ||
           baseId === 'promise_of_protection' ||

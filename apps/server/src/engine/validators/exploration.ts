@@ -85,9 +85,9 @@ export function validateExplore(
  */
 export function validateExploreFrontier(
   state: GameState,
-  action: ExploreAction
+  action: ExploreAction & { systemPosition?: { q: number; r: number } }
 ): ValidationResult {
-  const { playerId } = action;
+  const { playerId, systemPosition } = action;
   const player = state.players.find((p) => p.id === playerId);
 
   if (!player) {
@@ -97,6 +97,38 @@ export function validateExploreFrontier(
   // Check if we're in action phase
   if (state.phase !== 'action') {
     return { valid: false, error: 'Can only explore during action phase' };
+  }
+
+  // Check if player has Dark Energy Tap technology
+  if (!player.technologies?.includes('dark_energy_tap')) {
+    return { valid: false, error: 'Dark Energy Tap technology required to explore frontier' };
+  }
+
+  // Find the system
+  if (!systemPosition) {
+    return { valid: false, error: 'System position required for frontier exploration' };
+  }
+
+  const tile = state.map.tiles.find(
+    (t) => t.position.q === systemPosition.q && t.position.r === systemPosition.r
+  );
+
+  if (!tile) {
+    return { valid: false, error: 'System not found' };
+  }
+
+  // Check if system has a frontier token
+  if (!tile.frontier) {
+    return { valid: false, error: 'This system does not have a frontier token' };
+  }
+
+  // Check if player has ships in the system
+  const playerShips = tile.units.filter(
+    (u) => u.ownerId === playerId && ['carrier', 'cruiser', 'destroyer', 'dreadnought', 'flagship', 'war_sun', 'fighter'].includes(u.type)
+  );
+
+  if (playerShips.length === 0) {
+    return { valid: false, error: 'You must have ships in the system to explore frontier' };
   }
 
   // Check frontier deck

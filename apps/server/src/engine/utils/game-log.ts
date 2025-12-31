@@ -593,6 +593,62 @@ export function logTransactionCompleted(
 }
 
 // =============================================================================
+// PROMISSORY NOTE LOGGING
+// =============================================================================
+
+export function logPromissoryNotePlayed(
+  state: GameState,
+  playerId: UUID,
+  noteId: string,
+  noteName: string,
+  originalOwnerId: UUID
+): void {
+  const player = state.players.find(p => p.id === playerId);
+  const originalOwner = state.players.find(p => p.id === originalOwnerId);
+  addLogEntry(
+    state,
+    'ability_triggered',
+    `${player?.name || 'Unknown'} played ${noteName} (from ${originalOwner?.name || 'Unknown'})`,
+    {
+      playerId,
+      details: {
+        noteId,
+        noteName,
+        originalOwnerId,
+      },
+    }
+  );
+}
+
+export function logPromissoryNoteReturned(
+  state: GameState,
+  holderId: UUID,
+  noteId: string,
+  noteName: string,
+  originalOwnerId: UUID,
+  reason: 'activation' | 'elimination' | 'resolved'
+): void {
+  const holder = state.players.find(p => p.id === holderId);
+  const originalOwner = state.players.find(p => p.id === originalOwnerId);
+  const reasonText = reason === 'activation' ? 'due to activation' :
+                     reason === 'elimination' ? 'due to elimination' : 'after resolving';
+  addLogEntry(
+    state,
+    'ability_triggered',
+    `${noteName} returned to ${originalOwner?.name || 'Unknown'} from ${holder?.name || 'Unknown'} ${reasonText}`,
+    {
+      playerId: originalOwnerId,
+      details: {
+        noteId,
+        noteName,
+        holderId,
+        reason,
+      },
+    }
+  );
+}
+
+// =============================================================================
 // OTHER LOGGING
 // =============================================================================
 

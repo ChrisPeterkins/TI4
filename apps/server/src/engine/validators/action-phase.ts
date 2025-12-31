@@ -228,6 +228,23 @@ export function validateMoveUnits(
     return { valid: false, error: 'Activated system not found' };
   }
 
+  // Check if player is blocked by Ceasefire from moving ships
+  if (state.ceasefireBlocks?.includes(action.playerId)) {
+    // Check if any ships are being moved
+    for (const move of action.moves) {
+      const fromTile = findTileAtPosition(state.map, move.from.systemPosition);
+      if (!fromTile) continue;
+
+      const unit = move.from.planetId
+        ? fromTile.planets.find(p => p.planetId === move.from.planetId)?.units.find(u => u.id === move.unitId)
+        : fromTile.units.find(u => u.id === move.unitId);
+
+      if (unit && isShipType(unit.type)) {
+        return { valid: false, error: 'Cannot move ships into this system - blocked by Ceasefire' };
+      }
+    }
+  }
+
   // Track units moving into the system and their capacity requirements
   const movingShips: UnitType[] = [];
   const movingGroundUnits: UnitType[] = [];

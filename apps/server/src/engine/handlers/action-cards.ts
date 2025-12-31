@@ -14,6 +14,7 @@ import { ACTION_CARDS_BY_ID, isSabotageCard } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { drawCards, discardCards, removeCard, hasCard } from '../utils/deck.js';
 import { checkTimingTrigger } from './timing-windows.js';
+import { applyCardEffect } from './action-card-effects.js';
 
 // Action card hand limit
 const ACTION_CARD_HAND_LIMIT = 7;
@@ -81,9 +82,25 @@ export function handlePlayActionCard(
   };
 
   if (timingResult.triggeredEvents?.includes('timing_window_opened')) {
+    // Timing window opened - effects will be applied when window resolves
     triggeredEvents.push('timing_window_opened');
     if (timingResult.data) {
       data.timingWindow = timingResult.data;
+    }
+  } else {
+    // No timing window opened (no one can Sabotage) - apply effect immediately
+    const effectResult = applyCardEffect(state, action.cardId, action.playerId, action.targets);
+    if (effectResult.triggeredEvents) {
+      triggeredEvents.push(...effectResult.triggeredEvents);
+    }
+    if (effectResult.data) {
+      data.effectResult = effectResult.data;
+    }
+    if (!effectResult.success) {
+      // Effect failed, but card was already played/discarded
+      // Log the error but don't fail the action
+      console.warn(`Action card ${action.cardId} effect failed: ${effectResult.error}`);
+      data.effectError = effectResult.error;
     }
   }
 

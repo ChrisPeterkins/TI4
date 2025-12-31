@@ -22,6 +22,8 @@ import type {
   PlayPromissoryNoteAction,
   ExploreAction,
   PurgeRelicFragmentsAction,
+  UseAgentAction,
+  PurgeHeroAction,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
@@ -77,6 +79,10 @@ import {
   validateExplore,
   validatePurgeRelicFragments,
 } from './exploration.js';
+import {
+  validateUseAgent,
+  validatePurgeHero,
+} from './leaders.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -206,6 +212,17 @@ export function validateAction(state: GameState, action: GameAction): Validation
     case 'purge_relic_fragments':
       return validatePurgeRelicFragments(state, action as PurgeRelicFragmentsAction);
 
+    // Leader Actions (PoK)
+    case 'use_agent':
+      return validateUseAgent(state, action as UseAgentAction);
+
+    case 'unlock_commander':
+      // Unlock commander is validated within the handler
+      return { valid: true };
+
+    case 'purge_hero':
+      return validatePurgeHero(state, action as PurgeHeroAction);
+
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };
   }
@@ -228,6 +245,8 @@ function isPlayersTurn(state: GameState, action: GameAction): boolean {
     'accept_transaction',       // Target player accepts/declines
     'decline_transaction',      // Either player can decline
     'play_promissory_note',     // Some notes can be played at timing windows
+    'use_agent',                // Many agents trigger on other players' actions
+    'unlock_commander',         // Can be triggered by game state changes
   ];
   if (outOfTurnActions.includes(action.type)) {
     return true;

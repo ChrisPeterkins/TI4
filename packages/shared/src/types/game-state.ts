@@ -235,6 +235,8 @@ export interface GameState {
   winner: UUID | null;
   // Tactical action tracking
   activatedSystem?: HexCoord;
+  /** Player IDs blocked from moving ships by Ceasefire (cleared after tactical action) */
+  ceasefireBlocks?: UUID[];
   // Status phase tracking
   statusPhase?: StatusPhaseTracking;
   // Agenda phase tracking
@@ -254,6 +256,41 @@ export interface GameState {
   relicDiscard?: string[];
   // Planets explored this tactical action (reset each activation)
   planetsExploredThisTurn?: string[];
+  /** Temporary tactical modifiers from action cards (cleared after tactical action) */
+  tacticalModifiers?: {
+    [playerId: string]: TacticalModifiers;
+  };
+}
+
+/** Temporary tactical modifiers from action cards and relics */
+export interface TacticalModifiers {
+  /** +N to movement value (Flank Speed) */
+  movementBonus?: number;
+  /** +N to production value (War Machine) */
+  productionBonus?: number;
+  /** -N to production value (Tech Sabotage) */
+  productionPenalty?: number;
+  /** Can pass through enemy ships (In the Silence of Space) */
+  canPassThroughShips?: boolean;
+  /** Space cannon hits cancelled (Maneuvering Jets) */
+  spaceCannonHitsCancelled?: number;
+  /** Experimental Battlestation effect */
+  experimentalBattlestation?: {
+    systemPosition: HexCoord;
+    spaceCannon: { value: number; dice: number };
+  };
+  /** Solar Flare blocks space cannon in this system */
+  solarFlareSystem?: HexCoord;
+  /** Units with Reveal Prototype (gain sustain damage) */
+  revealPrototypeUnits?: string[];
+  /** Can perform strategic action without token (Master Plan) */
+  freeStrategicAction?: boolean;
+  /** Dominus Orb - Can move from systems with command tokens */
+  canMoveFromTokenedSystems?: boolean;
+  /** Scepter of Emelpar - Use reinforcement token instead of strategy token */
+  useReinforcementForStrategy?: boolean;
+  /** Prophet's Tears - Ignore 1 tech prerequisite on next research */
+  ignoreOnePrerequisite?: boolean;
 }
 
 // PoK Exploration Deck State
@@ -323,6 +360,10 @@ export interface PlayerState {
   relics?: string[];
   exhaustedRelics?: string[];
   leaders?: LeaderState;
+  /** Political Stability - keep strategy card next round */
+  keepStrategyCard?: boolean;
+  /** Public Disgrace - commodity refresh blocked */
+  commodityRefreshBlocked?: boolean;
 }
 
 export interface LeaderState {
@@ -453,6 +494,30 @@ export interface CombatInstance {
     attacker: boolean;
     defender: boolean;
   };
+  /** Temporary combat modifiers from action cards (cleared after each round) */
+  temporaryModifiers?: {
+    [playerId: string]: CombatModifiers;
+  };
+}
+
+/** Temporary combat modifiers from action cards */
+export interface CombatModifiers {
+  /** +N to combat roll results (Morale Boost) */
+  combatBonus?: number;
+  /** -N to combat roll results (Bunker) */
+  combatPenalty?: number;
+  /** Number of rerolls available (Fire Team) */
+  rerollsAvailable?: number;
+  /** Extra dice per unit (Blitz) */
+  extraDice?: number;
+  /** Units excluded from combat (Infiltrate) */
+  infiltratedUnits?: string[];
+  /** Units that can't use AFB (Disable) */
+  disabledAFBUnits?: string[];
+  /** AFB hits are cancelled (Scramble Frequency) */
+  afbHitsCancelled?: boolean;
+  /** Fighter combat bonus/penalty (Fighter Prototype) */
+  fighterBonus?: number;
 }
 
 // Timing Windows for Action Cards
@@ -549,6 +614,10 @@ export interface AgendaPhaseTracking {
   electedPlayer: UUID | null;
   /** For planet elections, the elected planet */
   electedPlanet: string | null;
+  /** Confusing Legal Text swaps outcomes */
+  confusingLegalText?: boolean;
+  /** Sanctions forces TG payment to vote */
+  sanctionsActive?: UUID;
 }
 
 export interface AgendaVoteRecord {

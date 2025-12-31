@@ -33,6 +33,8 @@ import {
   rollDiceForPlayer,
   checkCombatEnd,
 } from '../utils/combat.js';
+import { systems } from '@ti4/game-data';
+import { handleExplore } from './exploration.js';
 
 /**
  * Initialize invasion phase
@@ -989,6 +991,11 @@ export function establishControl(
     }
   }
 
+  // Trigger exploration if taking control of an uncontrolled planet (not from another player)
+  if (previousController === null) {
+    triggerExploration(state, tile, planet, newControllerId);
+  }
+
   // Move to next planet or complete invasion
   return advanceToNextPlanet(state);
 }
@@ -1111,5 +1118,39 @@ function hasPlanetaryShield(state: GameState, planet: PlanetInstance): boolean {
     if (u.ownerId !== defenderId) return false;
     const stats = getUnitStats(u.type, defender);
     return stats.planetaryShield === true;
+  });
+}
+
+/**
+ * Trigger exploration when taking control of an uncontrolled planet
+ * Only planets with traits (cultural, industrial, hazardous) can be explored
+ */
+function triggerExploration(
+  state: GameState,
+  tile: MapTile,
+  planet: PlanetInstance,
+  playerId: string
+): void {
+  // Get planet data to check for trait
+  const systemData = systems[tile.systemId];
+  if (!systemData) return;
+
+  const planetData = systemData.planets.find((p: { id: string }) => p.id === planet.planetId);
+  if (!planetData?.trait) {
+    // No trait means planet cannot be explored (e.g., Mecatol Rex, home system planets)
+    return;
+  }
+
+  // Check if exploration decks are initialized
+  if (!state.explorationDecks) {
+    return;
+  }
+
+  // Call the exploration handler
+  handleExplore(state, {
+    type: 'explore',
+    playerId,
+    planetId: planet.planetId,
+    timestamp: Date.now(),
   });
 }

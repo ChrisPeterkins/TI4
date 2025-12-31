@@ -18,6 +18,7 @@ import { ACTION_CARDS_BY_ID, isSabotageCard } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { v4 as uuidv4 } from 'uuid';
 import { removeCard, discardCards } from '../utils/deck.js';
+import { applyCardEffect } from './action-card-effects.js';
 
 // Default timing window duration in milliseconds (30 seconds)
 const DEFAULT_WINDOW_TIMEOUT = 30000;
@@ -337,7 +338,7 @@ export function resolveTimingWindow(
   window.resolved = true;
 
   // Process played cards in order (LIFO for interrupts, FIFO for effects)
-  const effects: { playerId: string; cardId: string; cancelled: boolean }[] = [];
+  const effects: { playerId: string; cardId: string; cancelled: boolean; effectResult?: HandlerResult }[] = [];
 
   // Check for Sabotage cancellations
   for (const playedCard of window.playedCards) {
@@ -362,10 +363,23 @@ export function resolveTimingWindow(
       }
     }
 
+    // Apply card effect if not cancelled
+    let effectResult: HandlerResult | undefined;
+    if (!cancelled && !isSabotageCard(playedCard.cardId)) {
+      // Sabotage cards don't have effects to apply - they just cancel other cards
+      effectResult = applyCardEffect(
+        state,
+        playedCard.cardId,
+        playedCard.playerId,
+        playedCard.targets
+      );
+    }
+
     effects.push({
       playerId: playedCard.playerId,
       cardId: playedCard.cardId,
       cancelled,
+      effectResult,
     });
   }
 
@@ -387,9 +401,17 @@ export function resolveTimingWindow(
       : null;
   }
 
+  // Collect all triggered events from effects
+  const triggeredEvents = ['timing_window_closed'];
+  for (const effect of effects) {
+    if (effect.effectResult?.triggeredEvents) {
+      triggeredEvents.push(...effect.effectResult.triggeredEvents);
+    }
+  }
+
   return {
     success: true,
-    triggeredEvents: ['timing_window_closed'],
+    triggeredEvents,
     data: {
       windowId: window.id,
       playedCards: effects,

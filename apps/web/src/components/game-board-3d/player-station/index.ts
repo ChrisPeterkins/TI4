@@ -42,7 +42,7 @@ export { TechBoardMat3D, TECH_BOARD_MAT_DIMENSIONS } from './TechBoardMat3D';
 export type { TechBoardMat3DProps, TechBoardTechnology } from './TechBoardMat3D';
 
 export { PlanetBoardMat3D, PLANET_BOARD_MAT_DIMENSIONS } from './PlanetBoardMat3D';
-export type { PlanetBoardMat3DProps, PlanetCardData } from './PlanetBoardMat3D';
+export type { PlanetBoardMat3DProps, PlanetCardData, PlanetAttachment, PlanetTrait } from './PlanetBoardMat3D';
 
 export { SecretsMat3D, SECRETS_MAT_DIMENSIONS } from './SecretsMat3D';
 export type { SecretsMat3DProps, SecretObjectiveData } from './SecretsMat3D';

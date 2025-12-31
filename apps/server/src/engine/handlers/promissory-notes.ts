@@ -22,6 +22,7 @@ import {
   noteStaysInPlay,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
+import { logPromissoryNotePlayed, logPromissoryNoteReturned } from '../utils/game-log.js';
 
 /**
  * Handle playing a promissory note
@@ -83,6 +84,9 @@ export function handlePlayPromissoryNote(
     // Return to original owner's hand
     originalOwner.promissoryNotesInHand.push(noteId);
   }
+
+  // Log the promissory note play
+  logPromissoryNotePlayed(state, player.id, noteId, noteDef.name, originalOwner.id);
 
   state.version++;
 
@@ -251,12 +255,18 @@ function executeNoteEffect(
       return { success: true };
 
     case 'ceasefire':
-      // Effect: Owner cannot move into active system this tactical action
-      // This is tracked via a flag or checked during movement validation
-      if (!state.activeCombat && state.subPhase !== 'tactical_movement') {
+      // Effect: The player who activated this system cannot move ships into it
+      // Must be played after activation (during tactical movement phase)
+      if (state.subPhase !== 'tactical_movement') {
         return { success: false, error: 'Ceasefire can only be played during tactical action' };
       }
-      // The effect is enforced by movement validators checking for ceasefire
+      // Block the active player from moving ships into the activated system
+      if (!state.ceasefireBlocks) {
+        state.ceasefireBlocks = [];
+      }
+      if (!state.ceasefireBlocks.includes(state.activePlayerId)) {
+        state.ceasefireBlocks.push(state.activePlayerId);
+      }
       return { success: true };
 
     case 'trade_agreement':
@@ -452,6 +462,17 @@ export function returnPromissoryNoteFromPlay(
   if (originalOwner) {
     originalOwner.promissoryNotesInHand.push(noteId);
   }
+
+  // Log the return
+  const noteDef = getPromissoryNoteById(noteId);
+  logPromissoryNoteReturned(
+    state,
+    holderId,
+    noteId,
+    noteDef?.name || noteId,
+    noteInPlay.originalOwnerId,
+    reason
+  );
 
   state.version++;
 

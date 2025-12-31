@@ -72,6 +72,22 @@ export interface ActionCardTargets {
   systemPosition?: HexCoord;
   planetId?: string;
   unitIds?: UUID[];
+  /** For Direct Hit - the ship that used sustain damage */
+  sustainedUnitId?: UUID;
+  /** For Signal Jamming, Insubordination, Spy, etc - the target player */
+  targetPlayerId?: UUID;
+  /** For riders - the predicted outcome */
+  prediction?: string;
+  /** For technology research (Focused Research) */
+  techId?: string;
+  /** For Skilled Retreat - the destination system */
+  destinationSystem?: HexCoord;
+  /** For Shields Holding, Bribery - count of hits to cancel / TG to spend */
+  count?: number;
+  /** For Repeal Law - the agenda/law ID */
+  agendaId?: string;
+  /** Card ID passed through for riders */
+  cardId?: string;
 }
 
 export interface ComponentAction extends BaseAction {

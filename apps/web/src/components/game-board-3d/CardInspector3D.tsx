@@ -13,15 +13,22 @@ import {
   getSecretObjectiveCardBackUrl,
   getPromissoryCardBackUrl,
   getFactionSheetUrl,
+  getExplorationCardUrl,
+  getExplorationCardBackUrl,
+  getRelicCardUrl,
+  getRelicCardBackUrl,
 } from '@/lib/assets';
 import { configureHighQualityTexture } from './textureUtils';
 
-export type InspectedCardType = 'action' | 'secret_objective' | 'promissory' | 'technology' | 'strategy' | 'faction_sheet';
+export type InspectedCardType = 'action' | 'secret_objective' | 'promissory' | 'technology' | 'strategy' | 'faction_sheet' | 'exploration' | 'relic';
+
+export type ExplorationDeckType = 'cultural' | 'industrial' | 'hazardous' | 'frontier';
 
 export interface InspectedCard {
   id: string;
   type: InspectedCardType;
   faceUp: boolean;
+  explorationDeckType?: ExplorationDeckType; // For exploration card backs
 }
 
 export interface CardInspector3DProps {
@@ -55,6 +62,10 @@ function getCardTextureUrl(card: InspectedCard): string {
         return getStrategyCardUrl(parseInt(card.id)); // Strategy cards are always visible
       case 'faction_sheet':
         return getFactionSheetUrl(card.id, 'back');
+      case 'exploration':
+        return getExplorationCardBackUrl(card.explorationDeckType || 'cultural');
+      case 'relic':
+        return getRelicCardBackUrl();
       default:
         return getActionCardBackUrl();
     }
@@ -73,6 +84,10 @@ function getCardTextureUrl(card: InspectedCard): string {
       return getStrategyCardUrl(parseInt(card.id));
     case 'faction_sheet':
       return getFactionSheetUrl(card.id, 'face');
+    case 'exploration':
+      return getExplorationCardUrl(card.id);
+    case 'relic':
+      return getRelicCardUrl(card.id);
     default:
       return getCardUrl('action', card.id);
   }

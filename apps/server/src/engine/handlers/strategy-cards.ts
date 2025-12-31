@@ -12,6 +12,7 @@ import { findTileAtPosition } from '../utils/hex.js';
 import { systems, factions } from '@ti4/game-data';
 import { createUnitInstance, calculateProductionCost } from '../utils/units.js';
 import { checkObjectiveRequirement } from '../utils/objectives.js';
+import { getBaseNoteId } from '@ti4/shared';
 
 /**
  * Handle strategic primary ability resolution
@@ -436,6 +437,9 @@ function handleTradePrimary(
   // Replenish commodities
   player.commodities = player.maxCommodities;
 
+  // Check for Trade Agreements in play that trigger on this player's replenish
+  const tradeAgreementSwaps = triggerTradeAgreements(state, player);
+
   // Set free secondary players
   if (choices.freeSecondaryPlayers && choices.freeSecondaryPlayers.length > 0) {
     if (state.strategicActionState) {
@@ -445,11 +449,12 @@ function handleTradePrimary(
 
   return {
     success: true,
-    triggeredEvents: ['trade_primary_resolved'],
+    triggeredEvents: ['trade_primary_resolved', ...tradeAgreementSwaps.events],
     data: {
       tradeGoodsGained: 3,
       commoditiesReplenished: player.maxCommodities,
       freeSecondaryPlayers: choices.freeSecondaryPlayers,
+      tradeAgreementSwaps: tradeAgreementSwaps.swaps,
     },
   };
 }
@@ -727,10 +732,16 @@ function handleTradeSecondary(
   // Replenish commodities
   player.commodities = player.maxCommodities;
 
+  // Check for Trade Agreements in play that trigger on this player's replenish
+  const tradeAgreementSwaps = triggerTradeAgreements(state, player);
+
   return {
     success: true,
-    triggeredEvents: ['trade_secondary_resolved'],
-    data: { commoditiesReplenished: player.maxCommodities },
+    triggeredEvents: ['trade_secondary_resolved', ...tradeAgreementSwaps.events],
+    data: {
+      commoditiesReplenished: player.maxCommodities,
+      tradeAgreementSwaps: tradeAgreementSwaps.swaps,
+    },
   };
 }
 
@@ -1042,4 +1053,43 @@ function findPlayerHomeSystem(state: GameState, player: PlayerState) {
 
   const homeSystemId = faction.homeSystemId;
   return state.map.tiles.find(t => t.systemId === homeSystemId);
+}
+
+/**
+ * Trigger Trade Agreements when a player replenishes commodities
+ * Trade Agreement: When the original owner replenishes, the holder can swap commodities
+ *
+ * In this implementation, Trade Agreements in play auto-trigger on replenish
+ */
+function triggerTradeAgreements(
+  state: GameState,
+  replenishingPlayer: PlayerState
+): { events: string[]; swaps: Array<{ holderId: string; holderName: string }> } {
+  const events: string[] = [];
+  const swaps: Array<{ holderId: string; holderName: string }> = [];
+
+  // Find all players who have this player's Trade Agreement in their play area
+  for (const holder of state.players) {
+    if (holder.id === replenishingPlayer.id) continue;
+
+    // Check if holder has replenishing player's Trade Agreement in play
+    const hasTradeAgreement = holder.promissoryNotesInPlay.some(note => {
+      const baseId = getBaseNoteId(note.noteId);
+      return baseId === 'trade_agreement' && note.originalOwnerId === replenishingPlayer.id;
+    });
+
+    if (hasTradeAgreement) {
+      // Swap commodities
+      const holderCommodities = holder.commodities;
+      const ownerCommodities = replenishingPlayer.commodities;
+
+      holder.commodities = ownerCommodities;
+      replenishingPlayer.commodities = holderCommodities;
+
+      events.push('trade_agreement_triggered');
+      swaps.push({ holderId: holder.id, holderName: holder.name || holder.id });
+    }
+  }
+
+  return { events, swaps };
 }

@@ -55,6 +55,10 @@ import type {
   StrategicSecondaryAction,
   StrategicPrimaryChoices,
   StrategicSecondaryChoices,
+  PurgeRelicFragmentsAction,
+  UseRelicAction,
+  UseAgentAction,
+  PurgeHeroAction,
 } from '@ti4/shared';
 
 type TacticalUIState = 'idle' | 'selecting_system';
@@ -198,6 +202,52 @@ export default function GamePage() {
       type: 'pass',
     } as Omit<PassAction, 'playerId' | 'timestamp'>);
   }, [currentPlayerId, sendAction]);
+
+  // Handle relic fragment purge (to gain a relic)
+  const handleRelicFragmentPurge = useCallback((playerId: string, fragmentType: string) => {
+    if (playerId !== currentPlayerId) return;
+    sendAction({
+      type: 'purge_relic_fragments',
+      fragmentType: fragmentType as 'cultural' | 'industrial' | 'hazardous' | 'unknown',
+      count: 3,
+    } as Omit<PurgeRelicFragmentsAction, 'playerId' | 'timestamp'>);
+  }, [currentPlayerId, sendAction]);
+
+  // Handle relic activation/use
+  const handleRelicClick = useCallback((playerId: string, relicId: string) => {
+    if (playerId !== currentPlayerId) return;
+    sendAction({
+      type: 'use_relic',
+      relicId,
+    } as Omit<UseRelicAction, 'playerId' | 'timestamp'>);
+  }, [currentPlayerId, sendAction]);
+
+  const handleLeaderClick = useCallback((playerId: string, leaderId: string, leaderType: 'agent' | 'commander' | 'hero') => {
+    if (playerId !== currentPlayerId) return;
+
+    // Find the player's leader state
+    const player = gameState?.players.find(p => p.id === playerId);
+    if (!player?.leaders) return;
+
+    if (leaderType === 'agent') {
+      // Check if agent is ready (not exhausted)
+      if (!player.leaders.agent.exhausted) {
+        sendAction({
+          type: 'use_agent',
+          // Additional targets can be added based on the agent's requirements
+        } as Omit<UseAgentAction, 'playerId' | 'timestamp'>);
+      }
+    } else if (leaderType === 'hero') {
+      // Check if hero is unlocked and not purged
+      if (player.leaders.hero.unlocked && !player.leaders.hero.purged) {
+        sendAction({
+          type: 'purge_hero',
+          // Additional targets can be added based on the hero's requirements
+        } as Omit<PurgeHeroAction, 'playerId' | 'timestamp'>);
+      }
+    }
+    // Commanders are passive abilities - clicking just opens the card for inspection
+  }, [currentPlayerId, gameState?.players, sendAction]);
 
   if (socketLoading || isLoading) {
     return (
@@ -600,6 +650,9 @@ export default function GamePage() {
             onStrategyCardPlay={handleStrategyCardPlay3D}
             onPass={handlePass3D}
             showPlayerStations={use3DPlayerStations}
+            onRelicFragmentPurge={handleRelicFragmentPurge}
+            onRelicClick={handleRelicClick}
+            onLeaderClick={handleLeaderClick}
           />
 
           {/* System Selection Overlay */}

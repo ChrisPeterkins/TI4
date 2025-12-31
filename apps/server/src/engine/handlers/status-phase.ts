@@ -15,6 +15,7 @@ import {
 } from '../utils/objectives.js';
 import { systems } from '@ti4/game-data';
 import { getStatusPhaseTokenGain } from '../abilities/fleet-modifiers.js';
+import { checkAllHeroUnlocks } from './leaders.js';
 
 // =============================================================================
 // STATUS PHASE STEP DEFINITIONS
@@ -109,9 +110,17 @@ export function handleScoreObjective(
     }
   }
 
+  // Check if any heroes should be unlocked (requires 3 scored objectives)
+  const unlockedHeroes = checkAllHeroUnlocks(state);
+
+  const triggeredEvents = ['objective_scored'];
+  if (unlockedHeroes.length > 0) {
+    triggeredEvents.push('hero_unlocked');
+  }
+
   return {
     success: true,
-    triggeredEvents: ['objective_scored'],
+    triggeredEvents,
   };
 }
 
