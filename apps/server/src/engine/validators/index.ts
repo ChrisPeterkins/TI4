@@ -20,6 +20,8 @@ import type {
   AcceptTransactionAction,
   DeclineTransactionAction,
   PlayPromissoryNoteAction,
+  ExploreAction,
+  PurgeRelicFragmentsAction,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
@@ -71,6 +73,10 @@ import {
   validateDeclineTransaction,
 } from './transactions.js';
 import { validatePlayPromissoryNote } from './promissory-notes.js';
+import {
+  validateExplore,
+  validatePurgeRelicFragments,
+} from './exploration.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -192,6 +198,13 @@ export function validateAction(state: GameState, action: GameAction): Validation
     // Promissory Notes
     case 'play_promissory_note':
       return validatePlayPromissoryNote(state, action as PlayPromissoryNoteAction);
+
+    // Exploration (PoK)
+    case 'explore':
+      return validateExplore(state, action as ExploreAction);
+
+    case 'purge_relic_fragments':
+      return validatePurgeRelicFragments(state, action as PurgeRelicFragmentsAction);
 
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };

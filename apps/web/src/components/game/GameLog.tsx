@@ -61,6 +61,12 @@ const LOG_TYPE_CONFIG: Record<
   // Trade
   transaction_completed: { icon: '$', color: 'text-amber-400', bgColor: 'bg-amber-900/20' },
   commodities_refreshed: { icon: '$', color: 'text-amber-300', bgColor: 'bg-amber-900/20' },
+  // Exploration
+  planet_explored: { icon: '?', color: 'text-teal-400', bgColor: 'bg-teal-900/20' },
+  relic_fragment_gained: { icon: '+', color: 'text-violet-400', bgColor: 'bg-violet-900/20' },
+  relic_gained: { icon: '*', color: 'text-amber-400', bgColor: 'bg-amber-900/30' },
+  fragments_purged: { icon: '-', color: 'text-violet-300', bgColor: 'bg-violet-900/20' },
+  attachment_placed: { icon: '+', color: 'text-teal-300', bgColor: 'bg-teal-900/20' },
   // Other
   promissory_note_played: { icon: '>', color: 'text-pink-400', bgColor: 'bg-pink-900/20' },
   ability_triggered: { icon: '*', color: 'text-indigo-400', bgColor: 'bg-indigo-900/20' },

@@ -26,6 +26,11 @@ export function addLogEntry(
     details?: GameLogDetails;
   } = {}
 ): void {
+  // Ensure gameLog exists (for games created before this field was added)
+  if (!state.gameLog) {
+    state.gameLog = [];
+  }
+
   const player = options.playerId
     ? state.players.find(p => p.id === options.playerId)
     : undefined;

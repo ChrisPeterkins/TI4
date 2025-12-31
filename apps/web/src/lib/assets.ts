@@ -579,6 +579,38 @@ export function getPlaymatTextureUrl(type: PlaymatType): string {
   return `${MATS_PATH}/${type}.${extensions[type]}`;
 }
 
+/**
+ * Playmat dimensions (aspect ratios in 3D units)
+ * These maintain the original image proportions
+ */
+export const PLAYMAT_DIMENSIONS: Record<PlaymatType, { width: number; height: number; slots?: { cols: number; rows: number } }> = {
+  tech_board: {
+    width: 5.7,  // Wide format (1901:1024 ≈ 1.86:1)
+    height: 3.07,
+    slots: { cols: 5, rows: 4 }  // Blue, Green, Yellow, Red, Unit
+  },
+  planet_board: {
+    width: 2.8,  // Tall format (2100:3140 ≈ 0.67:1)
+    height: 4.2,
+    slots: { cols: 4, rows: 4 }
+  },
+  secrets_mat: {
+    width: 1.5,  // Square format
+    height: 1.5,
+    slots: { cols: 1, rows: 1 }
+  },
+  exploration_mat: {
+    width: 3.4,  // Wide format (1024:594 ≈ 1.72:1)
+    height: 2.0,
+    slots: { cols: 5, rows: 2 }
+  },
+  build_area: {
+    width: 1.5,  // Square format
+    height: 1.5,
+    slots: { cols: 1, rows: 1 }
+  },
+};
+
 // =============================================================================
 // PLANET CARD ASSETS
 // =============================================================================
@@ -633,3 +665,4 @@ export function getExplorationCardUrl(cardId: string): string {
 export function getRelicCardUrl(relicId: string): string {
   return `${CARDS_PATH}/relic/${relicId}.jpg`;
 }
+

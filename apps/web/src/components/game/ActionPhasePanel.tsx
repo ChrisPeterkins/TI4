@@ -17,6 +17,8 @@ interface ActionPhasePanelProps {
   onSkipMovement: () => void;
   onProduceUnits: (units: { type: UnitType; count: number }[]) => void;
   onSkipProduction: () => void;
+  /** Hide the action button bar (used when 3D mode handles actions) */
+  hideActionButtons?: boolean;
 }
 
 export function ActionPhasePanel({
@@ -30,6 +32,7 @@ export function ActionPhasePanel({
   onSkipMovement,
   onProduceUnits,
   onSkipProduction,
+  hideActionButtons = false,
 }: ActionPhasePanelProps) {
   const activePlayer = gameState.players.find((p) => p.id === gameState.activePlayerId);
   const subPhase = gameState.subPhase;
@@ -114,6 +117,11 @@ export function ActionPhasePanel({
         </div>
       </div>
     );
+  }
+
+  // Hide action button bar when 3D mode handles actions
+  if (hideActionButtons) {
+    return null;
   }
 
   return (

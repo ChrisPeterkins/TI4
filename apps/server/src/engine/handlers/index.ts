@@ -26,6 +26,8 @@ import type {
   DeclineTransactionAction,
   PlayPromissoryNoteAction,
   TimingWindowResponseAction,
+  ExploreAction,
+  PurgeRelicFragmentsAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -79,6 +81,10 @@ import {
 } from './transactions.js';
 import { handlePlayPromissoryNote } from './promissory-notes.js';
 import { handleTimingWindowResponse } from './timing-windows.js';
+import {
+  handleExplore,
+  handlePurgeRelicFragments,
+} from './exploration.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -202,6 +208,13 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
     // Timing Windows
     case 'timing_window_response':
       return handleTimingWindowResponse(state, action as TimingWindowResponseAction);
+
+    // Exploration (PoK)
+    case 'explore':
+      return handleExplore(state, action as ExploreAction);
+
+    case 'purge_relic_fragments':
+      return handlePurgeRelicFragments(state, action as PurgeRelicFragmentsAction);
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };

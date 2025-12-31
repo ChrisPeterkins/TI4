@@ -17,17 +17,33 @@ import {
   TechnologyDisplay3D,
   UnitSupplyArea3D,
   PlayerStationLOD,
+  PassButton3D,
+  // New mat components
+  TechBoardMat3D,
+  SecretsMat3D,
+  LeaderCardsDisplay3D,
+  // Layout system
+  calculateStationLayout,
   type TechnologyCard,
   type CardHandCard,
+  type TechBoardTechnology,
+  type SecretObjectiveData,
+  type LeaderCardData,
+  type LeaderType,
+  type StationLayoutPositions,
 } from './player-station';
+import { getFactionLeaderInfo, getLeaderName } from '@ti4/shared';
 
 interface PlayerStationCallbacks {
   onFactionClick?: (playerId: string, factionId: string, faceUp: boolean) => void;
-  onStrategyCardClick?: (playerId: string, cardNumber: number) => void;
+  onStrategyCardClick?: (playerId: string, cardNumber: number) => void;  // Right-click to inspect
+  onStrategyCardPlay?: (playerId: string, cardNumber: number) => void;   // Left-click to play (strategic action)
+  onPass?: (playerId: string) => void;                                    // Pass action
   onActionCardClick?: (playerId: string, cardId: string) => void;
   onSecretObjectiveClick?: (playerId: string, cardId: string) => void;
   onPromissoryClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
+  onLeaderClick?: (playerId: string, leaderId: string, leaderType: LeaderType) => void;
   onTradeGoodsClick?: (playerId: string) => void;
   onStationFocus?: (playerId: string, position: THREE.Vector3, rotation: number) => void;
 }
@@ -115,36 +131,69 @@ function calculateStationPosition(
 }
 
 /**
- * Convert player technologies to TechnologyCard format
+ * Determine technology type from tech ID
+ */
+function getTechType(techId: string): 'blue' | 'green' | 'yellow' | 'red' | 'unit' {
+  // Unit upgrades
+  if (techId.includes('carrier') || techId.includes('cruiser') || techId.includes('destroyer') ||
+      techId.includes('dreadnought') || techId.includes('fighter') || techId.includes('infantry') ||
+      techId.includes('pds') || techId.includes('war_sun') || techId.includes('_ii')) {
+    return 'unit';
+  }
+  // Blue (Propulsion)
+  if (techId.includes('antimass') || techId.includes('gravity') || techId.includes('fleet') ||
+      techId.includes('light_wave') || techId.includes('dark_energy') || techId.includes('sling_relay')) {
+    return 'blue';
+  }
+  // Green (Biotic)
+  if (techId.includes('neural') || techId.includes('bio') || techId.includes('hyper') ||
+      techId.includes('x89') || techId.includes('dacxive') || techId.includes('psycho')) {
+    return 'green';
+  }
+  // Red (Warfare)
+  if (techId.includes('plasma') || techId.includes('magen') || techId.includes('duranium') ||
+      techId.includes('assault') || techId.includes('ai_development')) {
+    return 'red';
+  }
+  // Yellow (Cybernetic)
+  if (techId.includes('sarween') || techId.includes('graviton') || techId.includes('transit') ||
+      techId.includes('integrated') || techId.includes('scanlink')) {
+    return 'yellow';
+  }
+  return 'unit'; // Default
+}
+
+/**
+ * Convert player technologies to TechnologyCard format (for legacy TechnologyDisplay3D)
  */
 function getTechnologyCards(player: PlayerState): TechnologyCard[] {
-  return player.technologies.map((techId) => {
-    // Determine tech type from ID prefix or other logic
-    let type: TechnologyCard['type'] = 'unit';
-    if (techId.includes('carrier') || techId.includes('cruiser') || techId.includes('destroyer') ||
-        techId.includes('dreadnought') || techId.includes('fighter') || techId.includes('infantry') ||
-        techId.includes('pds') || techId.includes('war_sun')) {
-      type = 'unit';
-    } else if (techId.includes('antimass') || techId.includes('gravity') || techId.includes('fleet') ||
-               techId.includes('light_wave') || techId.includes('dark_energy')) {
-      type = 'blue';
-    } else if (techId.includes('neural') || techId.includes('bio') || techId.includes('hyper') ||
-               techId.includes('x89') || techId.includes('dacxive') || techId.includes('psycho')) {
-      type = 'green';
-    } else if (techId.includes('plasma') || techId.includes('magen') || techId.includes('duranium') ||
-               techId.includes('assault') || techId.includes('ai_development')) {
-      type = 'red';
-    } else if (techId.includes('sarween') || techId.includes('graviton') || techId.includes('transit') ||
-               techId.includes('integrated') || techId.includes('scanlink')) {
-      type = 'yellow';
-    }
+  return player.technologies.map((techId) => ({
+    id: techId,
+    name: techId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    type: getTechType(techId),
+  }));
+}
 
-    return {
-      id: techId,
-      name: techId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
-      type,
-    };
-  });
+/**
+ * Convert player technologies to TechBoardTechnology format (for TechBoardMat3D)
+ */
+function getTechBoardTechnologies(player: PlayerState): TechBoardTechnology[] {
+  return player.technologies.map((techId) => ({
+    id: techId,
+    name: techId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    type: getTechType(techId),
+  }));
+}
+
+/**
+ * Convert player secret objectives to SecretObjectiveData format (for SecretsMat3D)
+ */
+function getSecretObjectivesForMat(player: PlayerState): SecretObjectiveData[] {
+  return player.secretObjectives.map((objId) => ({
+    id: objId,
+    name: objId.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    scored: player.scoredObjectives.includes(objId),
+  }));
 }
 
 /**
@@ -178,6 +227,32 @@ function getPromissoryNotes(player: PlayerState): CardHandCard[] {
 }
 
 /**
+ * Get leader cards data for a player
+ */
+function getLeaderCards(player: PlayerState): LeaderCardData[] {
+  const leaderInfos = getFactionLeaderInfo(player.faction);
+  if (!leaderInfos || leaderInfos.length === 0) return [];
+
+  // Get leader state from player (defaults to agent unlocked, others locked)
+  const leaderState = player.leaders || {
+    agent: { unlocked: true, exhausted: false },
+    commander: { unlocked: false },
+    hero: { unlocked: false, purged: false },
+  };
+
+  return leaderInfos.map((info) => ({
+    id: info.id,
+    name: getLeaderName(info.id),
+    type: info.type,
+    state: {
+      unlocked: leaderState[info.type]?.unlocked ?? (info.type === 'agent'),
+      exhausted: info.type === 'agent' ? leaderState.agent?.exhausted : undefined,
+      purged: info.type === 'hero' ? leaderState.hero?.purged : undefined,
+    },
+  }));
+}
+
+/**
  * Enhanced 3D Player Station with real game assets
  */
 function EnhancedPlayerStation3D({
@@ -188,14 +263,17 @@ function EnhancedPlayerStation3D({
   onStationClick,
   onFactionClick,
   onStrategyCardClick,
+  onStrategyCardPlay,
+  onPass,
   onActionCardClick,
   onSecretObjectiveClick,
   onPromissoryClick,
   onTechClick,
+  onLeaderClick,
   onTradeGoodsClick,
   onStationFocus,
   isInspectingCard = false,
-}: Omit<PlayerStation3DProps, 'enhanced'>) {
+}: Omit<PlayerStation3DProps, 'enhanced' | 'useLOD'>) {
   const { position, rotation } = useMemo(
     () => calculateStationPosition(player, gameState),
     [player, gameState]
@@ -209,23 +287,46 @@ function EnhancedPlayerStation3D({
 
   // Prepare data for components
   const technologies = useMemo(() => getTechnologyCards(player), [player.technologies]);
+  const techBoardTechs = useMemo(() => getTechBoardTechnologies(player), [player.technologies]);
   const actionCards = useMemo(() => getActionCards(player), [player.actionCards]);
   const secretObjectives = useMemo(() => getSecretObjectives(player), [player.secretObjectives]);
+  const secretsForMat = useMemo(() => getSecretObjectivesForMat(player), [player.secretObjectives, player.scoredObjectives]);
   const promissoryNotes = useMemo(() => getPromissoryNotes(player), [player.promissoryNotesInHand]);
+  const leaderCards = useMemo(() => getLeaderCards(player), [player.faction, player.leaders]);
 
-  // Station layout offsets (relative to center)
-  // Faction sheet is centered, other elements arranged around it
-  const layout = {
-    factionSheet: [0, 0.02, 0],           // Center of station
-    strategyCard: [3.2, 0.02, 0],         // Right of faction sheet
-    vpTrack: [-3.2, 0.02, 0],             // Left of faction sheet
-    commandSheet: [0, 0.02, 2.5],         // Below faction sheet
-    actionCards: [0, 0.02, 4.5],          // Below command sheet
-    secretObjectives: [-2.5, 0.02, 5.8],
-    promissoryNotes: [2.5, 0.02, 5.8],
-    technologies: [0, 0.02, 7.2],
-    unitSupply: [0, 0.02, 8.8],
-  };
+  // Calculate non-overlapping layout based on component dimensions
+  const layout: StationLayoutPositions = useMemo(
+    () => calculateStationLayout({ isCurrentPlayer }),
+    [isCurrentPlayer]
+  );
+
+  // Determine if strategy card can be played
+  const canPlayStrategyCard = useMemo(() => {
+    // Must be in action phase, awaiting_action subphase
+    if (gameState.phase !== 'action' || gameState.subPhase !== 'awaiting_action') return false;
+    // Must be this player's turn
+    if (!isCurrentPlayer || !isActivePlayer) return false;
+    // Must have a strategy card that isn't exhausted
+    if (!player.strategyCard || player.strategyCardUsed) return false;
+    // Check if the card is exhausted in game state
+    const card = gameState.strategyCards.find(c => c.number === player.strategyCard);
+    if (card?.exhausted) return false;
+    return true;
+  }, [gameState.phase, gameState.subPhase, gameState.strategyCards, isCurrentPlayer, isActivePlayer, player.strategyCard, player.strategyCardUsed]);
+
+  // Determine if player can pass
+  const canPass = useMemo(() => {
+    // Must be in action phase, awaiting_action subphase
+    if (gameState.phase !== 'action' || gameState.subPhase !== 'awaiting_action') return false;
+    // Must be this player's turn
+    if (!isCurrentPlayer || !isActivePlayer) return false;
+    // Cannot pass if already passed
+    if (player.passed) return false;
+    // In standard TI4, must have used strategy card before passing
+    // (In 3-4 player games with 2 cards, must use both)
+    if (!player.strategyCardUsed) return false;
+    return true;
+  }, [gameState.phase, gameState.subPhase, isCurrentPlayer, isActivePlayer, player.passed, player.strategyCardUsed]);
 
   // Interaction handlers
   const handleFactionClick = useCallback(() => {
@@ -233,11 +334,26 @@ function EnhancedPlayerStation3D({
     onFactionClick?.(player.id, player.faction, !factionSheetFlipped);
   }, [player.id, player.faction, factionSheetFlipped, onFactionClick]);
 
-  const handleStrategyCardClick = useCallback(() => {
+  // Right-click to inspect strategy card
+  const handleStrategyCardInspect = useCallback(() => {
     if (player.strategyCard) {
       onStrategyCardClick?.(player.id, player.strategyCard);
     }
   }, [player.id, player.strategyCard, onStrategyCardClick]);
+
+  // Left-click to play strategy card (strategic action)
+  const handleStrategyCardPlay = useCallback(() => {
+    if (player.strategyCard && canPlayStrategyCard) {
+      onStrategyCardPlay?.(player.id, player.strategyCard);
+    }
+  }, [player.id, player.strategyCard, canPlayStrategyCard, onStrategyCardPlay]);
+
+  // Pass action
+  const handlePass = useCallback(() => {
+    if (canPass) {
+      onPass?.(player.id);
+    }
+  }, [player.id, canPass, onPass]);
 
   const handleActionCardClick = useCallback((cardId: string) => {
     onActionCardClick?.(player.id, cardId);
@@ -254,6 +370,10 @@ function EnhancedPlayerStation3D({
   const handleTechClick = useCallback((techId: string) => {
     onTechClick?.(player.id, techId);
   }, [player.id, onTechClick]);
+
+  const handleLeaderClick = useCallback((leaderId: string, leaderType: LeaderType) => {
+    onLeaderClick?.(player.id, leaderId, leaderType);
+  }, [player.id, onLeaderClick]);
 
   const handleTradeGoodsClick = useCallback(() => {
     onTradeGoodsClick?.(player.id);
@@ -279,13 +399,13 @@ function EnhancedPlayerStation3D({
     <group position={position.toArray()} rotation={[0, rotation, 0]}>
       {/* Station base/mat - clickable to focus */}
       <mesh
-        position={[0, 0, 4]}
+        position={[layout.bounds.centerX, 0, layout.bounds.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
         onClick={handleStationClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
       >
-        <planeGeometry args={[8, 12]} />
+        <planeGeometry args={[layout.bounds.width, layout.bounds.height]} />
         <meshStandardMaterial
           color={isActivePlayer ? playerColor : isHovered ? '#1a1a3e' : '#0a0a15'}
           transparent
@@ -296,22 +416,22 @@ function EnhancedPlayerStation3D({
 
       {/* Glowing border for active player */}
       {isActivePlayer && (
-        <mesh position={[0, 0.01, 4]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[5.5, 5.6, 32]} />
+        <mesh position={[layout.bounds.centerX, 0.01, layout.bounds.centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[Math.max(layout.bounds.width, layout.bounds.height) / 2 - 0.1, Math.max(layout.bounds.width, layout.bounds.height) / 2, 32]} />
           <meshBasicMaterial color={playerColor} transparent opacity={0.6} />
         </mesh>
       )}
 
       {/* Hover border */}
       {isHovered && !isActivePlayer && (
-        <mesh position={[0, 0.005, 4]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[5.55, 5.6, 32]} />
+        <mesh position={[layout.bounds.centerX, 0.005, layout.bounds.centerZ]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[Math.max(layout.bounds.width, layout.bounds.height) / 2 - 0.05, Math.max(layout.bounds.width, layout.bounds.height) / 2, 32]} />
           <meshBasicMaterial color="#4488ff" transparent opacity={0.4} />
         </mesh>
       )}
 
       {/* Player name header */}
-      <group position={[0, 0.05, -2.0]}>
+      <group position={[layout.bounds.centerX, 0.05, -0.5]}>
         <Text
           fontSize={0.2}
           color={playerColor}
@@ -322,7 +442,7 @@ function EnhancedPlayerStation3D({
           {player.name}
         </Text>
         <Text
-          position={[0, 0, 0.2]}
+          position={[0, 0, 0.25]}
           fontSize={0.1}
           color="#888"
           anchorX="center"
@@ -336,27 +456,52 @@ function EnhancedPlayerStation3D({
       <Suspense fallback={null}>
         <FactionSheet3D
           factionId={player.faction}
-          position={layout.factionSheet as [number, number, number]}
-          scale={0.8}
+          position={layout.factionSheet.position}
+          scale={layout.factionSheet.scale}
           faceUp={!factionSheetFlipped}
           onClick={handleFactionClick}
         />
       </Suspense>
 
+      {/* Leader Cards (Agent, Commander, Hero) */}
+      {leaderCards.length > 0 && (
+        <Suspense fallback={null}>
+          <LeaderCardsDisplay3D
+            leaders={leaderCards}
+            position={layout.leaders.position}
+            scale={layout.leaders.scale}
+            faceUp={isCurrentPlayer}
+            onLeaderClick={handleLeaderClick}
+          />
+        </Suspense>
+      )}
+
       {/* Strategy Card */}
       <StrategyCardHolder3D
         strategyCard={player.strategyCard || null}
         exhausted={player.strategyCardUsed}
-        position={layout.strategyCard as [number, number, number]}
-        scale={0.9}
-        onClick={handleStrategyCardClick}
+        position={layout.strategyCard.position}
+        scale={layout.strategyCard.scale}
+        onClick={handleStrategyCardInspect}
+        onPlay={handleStrategyCardPlay}
+        onInspect={handleStrategyCardInspect}
+        canPlay={canPlayStrategyCard}
+      />
+
+      {/* Pass Button (only visible to current player) */}
+      <PassButton3D
+        position={layout.passButton.position}
+        onPass={handlePass}
+        canPass={canPass}
+        hasPassed={player.passed}
+        visible={isCurrentPlayer}
       />
 
       {/* Command Sheet (tokens + resources) */}
       <CommandSheet3D
         player={player}
-        position={layout.commandSheet as [number, number, number]}
-        scale={0.9}
+        position={layout.commandSheet.position}
+        scale={layout.commandSheet.scale}
         onTradeGoodsClick={handleTradeGoodsClick}
       />
 
@@ -365,8 +510,8 @@ function EnhancedPlayerStation3D({
         score={player.score}
         maxScore={10}
         playerColor={player.color}
-        position={layout.vpTrack as [number, number, number]}
-        scale={0.9}
+        position={layout.vpTrack.position}
+        scale={layout.vpTrack.scale}
       />
 
       {/* Action Cards (face up for owner, face down for others) */}
@@ -374,27 +519,26 @@ function EnhancedPlayerStation3D({
         <CardHand3D
           cards={actionCards}
           cardType="action"
-          position={layout.actionCards as [number, number, number]}
+          position={layout.actionCards.position}
           faceUp={isCurrentPlayer}
           layout={isCurrentPlayer ? 'spread' : 'stack'}
           maxVisible={isCurrentPlayer ? 8 : 5}
-          scale={0.7}
+          scale={layout.actionCards.scale}
           onCardClick={handleActionCardClick}
         />
       )}
 
-      {/* Secret Objectives (face up for owner only) */}
-      {secretObjectives.length > 0 && (
-        <CardHand3D
-          cards={secretObjectives}
-          cardType="secret_objective"
-          position={layout.secretObjectives as [number, number, number]}
-          faceUp={isCurrentPlayer}
-          layout={isCurrentPlayer ? 'spread' : 'stack'}
-          maxVisible={3}
-          scale={0.6}
-          onCardClick={handleSecretObjectiveClick}
-        />
+      {/* Secret Objectives Mat (face up for owner only) */}
+      {secretsForMat.length > 0 && (
+        <Suspense fallback={null}>
+          <SecretsMat3D
+            secrets={secretsForMat}
+            position={layout.secretsMat.position}
+            scale={layout.secretsMat.scale}
+            faceUp={isCurrentPlayer}
+            onSecretClick={handleSecretObjectiveClick}
+          />
+        </Suspense>
       )}
 
       {/* Promissory Notes (face up for owner, face down for others) */}
@@ -402,38 +546,39 @@ function EnhancedPlayerStation3D({
         <CardHand3D
           cards={promissoryNotes}
           cardType="promissory"
-          position={layout.promissoryNotes as [number, number, number]}
+          position={layout.promissoryCards.position}
           faceUp={isCurrentPlayer}
           layout={isCurrentPlayer ? 'spread' : 'stack'}
           maxVisible={5}
-          scale={0.6}
+          scale={layout.promissoryCards.scale}
           onCardClick={handlePromissoryClick}
         />
       )}
 
-      {/* Technologies */}
-      {technologies.length > 0 && (
-        <TechnologyDisplay3D
-          technologies={technologies}
-          position={layout.technologies as [number, number, number]}
-          scale={0.8}
-          maxVisible={12}
-          onTechClick={handleTechClick}
-        />
+      {/* Technology Board Mat */}
+      {techBoardTechs.length > 0 && (
+        <Suspense fallback={null}>
+          <TechBoardMat3D
+            technologies={techBoardTechs}
+            position={layout.techBoard.position}
+            scale={layout.techBoard.scale}
+            onTechClick={handleTechClick}
+          />
+        </Suspense>
       )}
 
       {/* Unit Supply */}
       <UnitSupplyArea3D
         player={player}
         gameState={gameState}
-        position={layout.unitSupply as [number, number, number]}
-        scale={0.8}
+        position={layout.unitSupply.position}
+        scale={layout.unitSupply.scale}
         compact={true}
       />
 
       {/* Current player indicator - hidden when inspecting a card */}
       {isCurrentPlayer && !isInspectingCard && (
-        <Html position={[0, 0.8, -2.2]} center>
+        <Html position={[layout.bounds.centerX, 0.8, -0.8]} center>
           <div className="bg-white/90 text-black px-3 py-1.5 rounded-lg text-sm font-bold shadow-lg border-2 border-blue-500">
             YOUR STATION
           </div>
@@ -633,10 +778,13 @@ export function PlayerStation3D({
   onStationClick,
   onFactionClick,
   onStrategyCardClick,
+  onStrategyCardPlay,
+  onPass,
   onActionCardClick,
   onSecretObjectiveClick,
   onPromissoryClick,
   onTechClick,
+  onLeaderClick,
   onTradeGoodsClick,
   onStationFocus,
   enhanced = true, // Default to enhanced mode
@@ -659,10 +807,13 @@ export function PlayerStation3D({
       onStationClick={onStationClick}
       onFactionClick={onFactionClick}
       onStrategyCardClick={onStrategyCardClick}
+      onStrategyCardPlay={onStrategyCardPlay}
+      onPass={onPass}
       onActionCardClick={onActionCardClick}
       onSecretObjectiveClick={onSecretObjectiveClick}
       onPromissoryClick={onPromissoryClick}
       onTechClick={onTechClick}
+      onLeaderClick={onLeaderClick}
       onTradeGoodsClick={onTradeGoodsClick}
       onStationFocus={onStationFocus}
       isInspectingCard={isInspectingCard}
@@ -715,10 +866,13 @@ export function PlayerStations3D({
   isInspectingCard = false,
   onFactionClick,
   onStrategyCardClick,
+  onStrategyCardPlay,
+  onPass,
   onActionCardClick,
   onSecretObjectiveClick,
   onPromissoryClick,
   onTechClick,
+  onLeaderClick,
   onTradeGoodsClick,
   onStationFocus,
 }: PlayerStations3DProps) {
@@ -736,10 +890,13 @@ export function PlayerStations3D({
           isInspectingCard={isInspectingCard}
           onFactionClick={onFactionClick}
           onStrategyCardClick={onStrategyCardClick}
+          onStrategyCardPlay={onStrategyCardPlay}
+          onPass={onPass}
           onActionCardClick={onActionCardClick}
           onSecretObjectiveClick={onSecretObjectiveClick}
           onPromissoryClick={onPromissoryClick}
           onTechClick={onTechClick}
+          onLeaderClick={onLeaderClick}
           onTradeGoodsClick={onTradeGoodsClick}
           onStationFocus={onStationFocus}
         />

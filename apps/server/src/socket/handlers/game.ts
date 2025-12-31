@@ -7,7 +7,7 @@ import type {
 import { getUserId, getUser } from '../../middleware/auth.js';
 import * as gameRepo from '../../db/repositories/game.js';
 import { GameMachine } from '../../engine/game-machine.js';
-import { generateBotAction, getBotActionDelay, isBot } from '../../engine/bot-ai.js';
+import { generateBotAction, getBotActionDelay, getCurrentBotPlayerId } from '../../engine/bot-ai.js';
 
 type TI4Server = Server<ClientToServerEvents, ServerToClientEvents>;
 type TI4Socket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -82,7 +82,7 @@ async function getBotPlayerIds(gameId: string): Promise<Set<string>> {
 }
 
 /**
- * Process bot turn if the active player is a bot
+ * Process bot turn if a bot needs to act (active player or secondary responder)
  */
 async function processBotTurnIfNeeded(
   io: TI4Server,
@@ -90,16 +90,16 @@ async function processBotTurnIfNeeded(
   machine: GameMachine
 ): Promise<void> {
   const state = machine.getState();
-  const activePlayerId = state.activePlayerId;
   const botIds = await getBotPlayerIds(gameId);
 
-  // Check if active player is a bot
-  if (!isBot(state, activePlayerId, botIds)) {
+  // Check if any bot needs to act (either active player or secondary responder)
+  const botPlayerId = getCurrentBotPlayerId(state, botIds);
+  if (!botPlayerId) {
     return;
   }
 
   // Prevent duplicate bot actions
-  const actionKey = `${gameId}:${activePlayerId}:${state.version}`;
+  const actionKey = `${gameId}:${botPlayerId}:${state.version}:${state.subPhase}`;
   if (pendingBotActions.has(actionKey)) {
     return;
   }
@@ -112,19 +112,21 @@ async function processBotTurnIfNeeded(
     try {
       // Re-check state hasn't changed
       const currentState = machine.getState();
-      if (currentState.activePlayerId !== activePlayerId) {
+      const currentBotId = getCurrentBotPlayerId(currentState, botIds);
+      if (currentBotId !== botPlayerId) {
         pendingBotActions.delete(actionKey);
         return;
       }
 
       // Generate bot action
-      const action = generateBotAction(currentState, activePlayerId);
+      const action = generateBotAction(currentState, botPlayerId);
       if (!action) {
+        console.log(`Bot ${botPlayerId} has no action to perform in subPhase: ${currentState.subPhase}`);
         pendingBotActions.delete(actionKey);
         return;
       }
 
-      console.log(`Bot ${activePlayerId} performing action: ${action.type}`);
+      console.log(`Bot ${botPlayerId} performing action: ${action.type}`);
 
       // Process the action
       const result = machine.processAction(action);
@@ -134,7 +136,7 @@ async function processBotTurnIfNeeded(
 
         // Persist the new state
         await gameRepo.updateGameState(gameId, newState, {
-          playerId: activePlayerId,
+          playerId: botPlayerId,
           type: action.type,
           data: action,
         });
@@ -144,7 +146,7 @@ async function processBotTurnIfNeeded(
 
         console.log(`Bot action completed: ${action.type}`);
 
-        // Check if next player is also a bot
+        // Check if another bot needs to act
         await processBotTurnIfNeeded(io, gameId, machine);
       } else {
         console.error(`Bot action failed: ${result.error}`);
@@ -172,7 +174,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get game player info (also verifies user is a player)
       const gamePlayer = await gameRepo.getGamePlayer(gameId, userId);
       if (!gamePlayer) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'UNAUTHORIZED',
           message: 'You are not a player in this game',
         });
@@ -189,7 +191,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get game state
       const game = await gameRepo.getGame(gameId);
       if (!game) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'GAME_NOT_FOUND',
           message: 'Game not found',
         });
@@ -217,7 +219,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error joining game:', error);
-      socket.emit('error', {
+      socket.emit('server_error', {
         code: 'SERVER_ERROR',
         message: 'Failed to join game',
       });
@@ -254,7 +256,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get game player info
       const gamePlayer = await gameRepo.getGamePlayer(gameId, userId);
       if (!gamePlayer) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'UNAUTHORIZED',
           message: 'You are not a player in this game',
         });
@@ -264,7 +266,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get the game machine
       const machine = await getGameMachine(gameId);
       if (!machine) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'GAME_NOT_FOUND',
           message: 'Game not found',
         });
@@ -273,7 +275,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
 
       // Validate the action is from the correct player
       if (action.playerId !== gamePlayer.playerId) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'UNAUTHORIZED',
           message: 'Invalid player ID',
         });
@@ -322,9 +324,10 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       await processBotTurnIfNeeded(io, gameId, machine);
     } catch (error) {
       console.error('Error processing game action:', error);
-      socket.emit('error', {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      socket.emit('server_error', {
         code: 'SERVER_ERROR',
-        message: 'Failed to process action',
+        message: `Failed to process action: ${errorMessage}`,
       });
     }
   });
@@ -336,7 +339,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
 
       const game = await gameRepo.getGame(gameId);
       if (!game) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'GAME_NOT_FOUND',
           message: 'Game not found',
         });
@@ -348,7 +351,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       socket.emit('game_state', { state: game.state });
     } catch (error) {
       console.error('Error requesting state:', error);
-      socket.emit('error', {
+      socket.emit('server_error', {
         code: 'SERVER_ERROR',
         message: 'Failed to get game state',
       });
@@ -363,7 +366,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get game player info
       const gamePlayer = await gameRepo.getGamePlayer(gameId, userId);
       if (!gamePlayer) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'UNAUTHORIZED',
           message: 'You are not a player in this game',
         });
@@ -373,7 +376,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       // Get the player name
       const game = await gameRepo.getGame(gameId);
       if (!game) {
-        socket.emit('error', {
+        socket.emit('server_error', {
           code: 'GAME_NOT_FOUND',
           message: 'Game not found',
         });
@@ -413,7 +416,7 @@ export function registerGameHandlers(io: TI4Server, socket: TI4Socket): void {
       console.log(`Chat in game ${gameId}: ${playerName}: ${message.slice(0, 50)}...`);
     } catch (error) {
       console.error('Error sending chat message:', error);
-      socket.emit('error', {
+      socket.emit('server_error', {
         code: 'SERVER_ERROR',
         message: 'Failed to send chat message',
       });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useMemo, useEffect, Suspense } from 'react';
+import { useRef, useState, useMemo, useEffect, Suspense, useCallback } from 'react';
 import * as THREE from 'three';
 import { useLoader, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import { TextureLoader } from 'three';
@@ -8,6 +8,7 @@ import { Text } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
 import { getStrategyCardUrl } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
+import { ActionConfirmPopup3D } from './ActionConfirmPopup3D';
 
 // Strategy card dimensions (roughly square with slight height)
 const CARD_WIDTH = 0.8;
@@ -36,7 +37,10 @@ export interface StrategyCardHolder3DProps {
   rotation?: [number, number, number];
   scale?: number;
   onClick?: () => void;
+  onPlay?: () => void;             // Called when clicking playable card (strategic action)
+  onInspect?: () => void;          // Called on right-click to inspect
   onHover?: (hovered: boolean) => void;
+  canPlay?: boolean;               // Whether card can be played (player's turn, not exhausted)
 }
 
 /**
@@ -46,10 +50,12 @@ function StrategyCardWithTexture({
   cardNumber,
   exhausted,
   isHovered,
+  canPlay = false,
 }: {
   cardNumber: number;
   exhausted: boolean;
   isHovered: boolean;
+  canPlay?: boolean;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const { gl } = useThree();
@@ -100,14 +106,26 @@ function StrategyCardWithTexture({
     ];
   }, [texture, exhausted]);
 
-  // Hover effect
+  // Hover and playable effects
   useFrame(() => {
     if (meshRef.current) {
       const mats = meshRef.current.material as THREE.MeshStandardMaterial[];
       const topMat = mats[2];
       if (topMat) {
-        topMat.emissive = new THREE.Color(isHovered && !exhausted ? '#4488ff' : '#000000');
-        topMat.emissiveIntensity = isHovered && !exhausted ? 0.2 : 0;
+        // Priority: hovered+playable (bright purple) > playable (subtle purple) > hovered (blue) > none
+        if (isHovered && canPlay) {
+          topMat.emissive = new THREE.Color('#a855f7'); // Bright purple for playable + hovered
+          topMat.emissiveIntensity = 0.5;
+        } else if (canPlay) {
+          topMat.emissive = new THREE.Color('#a855f7'); // Subtle purple glow for playable
+          topMat.emissiveIntensity = 0.2;
+        } else if (isHovered && !exhausted) {
+          topMat.emissive = new THREE.Color('#4488ff'); // Blue for hover (inspect)
+          topMat.emissiveIntensity = 0.2;
+        } else {
+          topMat.emissive = new THREE.Color('#000000');
+          topMat.emissiveIntensity = 0;
+        }
       }
     }
   });
@@ -149,23 +167,34 @@ export function StrategyCardHolder3D({
   rotation = [0, 0, 0],
   scale = 1,
   onClick,
+  onPlay,
+  onInspect,
   onHover,
+  canPlay = false,
 }: StrategyCardHolder3DProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
 
-  // Spring animation for hover
+  // Spring animation for hover (also animate when playable)
   const { positionY, scaleValue } = useSpring({
-    positionY: isHovered && strategyCard && !exhausted ? 0.05 : 0,
-    scaleValue: isHovered && strategyCard && !exhausted ? 1.05 : 1,
+    positionY: isHovered && strategyCard && (canPlay || !exhausted) ? 0.05 : 0,
+    scaleValue: isHovered && strategyCard && (canPlay || !exhausted) ? 1.05 : 1,
     config: { mass: 1, tension: 300, friction: 20 },
   });
+
+  // Close popup when canPlay changes to false
+  useEffect(() => {
+    if (!canPlay && showPopup) {
+      setShowPopup(false);
+    }
+  }, [canPlay, showPopup]);
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     setIsHovered(true);
     onHover?.(true);
-    if (onClick && strategyCard && !exhausted) {
+    if (strategyCard) {
       document.body.style.cursor = 'pointer';
     }
   };
@@ -180,7 +209,36 @@ export function StrategyCardHolder3D({
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     if (strategyCard) {
-      onClick?.();
+      // If can play, show confirmation popup instead of directly playing
+      if (canPlay) {
+        setShowPopup(true);
+      } else {
+        // If can't play, just inspect
+        onInspect?.();
+      }
+    }
+  };
+
+  const handlePlay = useCallback(() => {
+    onPlay?.();
+    setShowPopup(false);
+  }, [onPlay]);
+
+  const handleInspect = useCallback(() => {
+    onInspect?.();
+    setShowPopup(false);
+  }, [onInspect]);
+
+  const handleClosePopup = useCallback(() => {
+    setShowPopup(false);
+  }, []);
+
+  const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    e.nativeEvent.preventDefault();
+    // Right-click always inspects
+    if (strategyCard) {
+      onInspect?.();
     }
   };
 
@@ -195,6 +253,7 @@ export function StrategyCardHolder3D({
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
     >
       {strategyCard ? (
         <Suspense fallback={<EmptyCardSlot />}>
@@ -202,6 +261,7 @@ export function StrategyCardHolder3D({
             cardNumber={strategyCard}
             exhausted={exhausted}
             isHovered={isHovered}
+            canPlay={canPlay}
           />
         </Suspense>
       ) : (
@@ -251,6 +311,35 @@ export function StrategyCardHolder3D({
         >
           {STRATEGY_CARD_NAMES[strategyCard]}
         </Text>
+      )}
+
+      {/* Play indicator when card is playable and hovered (but popup not showing) */}
+      {strategyCard && canPlay && isHovered && !showPopup && (
+        <Text
+          position={[0, CARD_DEPTH + 0.25, 0]}
+          fontSize={0.1}
+          color="#a855f7"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.008}
+          outlineColor="#000000"
+          fontWeight="bold"
+        >
+          CLICK FOR OPTIONS
+        </Text>
+      )}
+
+      {/* Action confirmation popup */}
+      {showPopup && strategyCard && (
+        <ActionConfirmPopup3D
+          position={[0, CARD_DEPTH + 0.4, 0]}
+          onPlay={handlePlay}
+          onInspect={handleInspect}
+          onClose={handleClosePopup}
+          playLabel="Play Card"
+          inspectLabel="View Card"
+          title={STRATEGY_CARD_NAMES[strategyCard]}
+        />
       )}
     </animated.group>
   );

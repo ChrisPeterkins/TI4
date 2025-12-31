@@ -37,6 +37,12 @@ interface GameBoard3DProps {
   onActionCardClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
   onTradeGoodsClick?: (playerId: string) => void;
+  // 3D Action declaration callbacks
+  onTileActivate?: (tile: MapTile) => void;        // Tactical action: activate a system
+  onTileInspect?: (tile: MapTile) => void;         // Right-click to inspect tile
+  onStrategyCardPlay?: (playerId: string, cardNumber: number) => void;  // Strategic action
+  onPass?: (playerId: string) => void;             // Pass turn
+  activatableTiles?: { q: number; r: number }[];   // Tiles that can be activated (tactical action)
 }
 
 /**
@@ -119,13 +125,19 @@ function HexGrid({
   playerColors,
   onTileClick,
   onTileHover,
+  onTileActivate,
+  onTileInspect,
   highlightedTiles,
+  activatableTiles,
 }: {
   tiles: MapTile[];
   playerColors: Map<string, PlayerColor>;
   onTileClick?: (tile: MapTile) => void;
   onTileHover?: (tile: MapTile | null) => void;
+  onTileActivate?: (tile: MapTile) => void;
+  onTileInspect?: (tile: MapTile) => void;
   highlightedTiles?: { q: number; r: number }[];
+  activatableTiles?: { q: number; r: number }[];
 }) {
   // Create a set of highlighted positions for quick lookup
   const highlightedSet = useMemo(() => {
@@ -136,11 +148,21 @@ function HexGrid({
     return set;
   }, [highlightedTiles]);
 
+  // Create a set of activatable positions for quick lookup
+  const activatableSet = useMemo(() => {
+    const set = new Set<string>();
+    activatableTiles?.forEach((pos) => {
+      set.add(`${pos.q},${pos.r}`);
+    });
+    return set;
+  }, [activatableTiles]);
+
   return (
     <group>
       {tiles.map((tile) => {
         const key = `${tile.position.q},${tile.position.r}`;
         const isHighlighted = highlightedSet.has(key);
+        const canActivate = activatableSet.has(key);
         const tileWorldPos = hexToWorld3D(tile.position);
 
         // Group space units (units not on a planet)
@@ -153,7 +175,10 @@ function HexGrid({
               tile={tile}
               onHover={onTileHover}
               onClick={onTileClick}
+              onActivate={onTileActivate}
+              onInspect={onTileInspect}
               isHighlighted={isHighlighted}
+              canActivate={canActivate}
             />
             {/* Render units on this tile */}
             {spaceUnitGroups.length > 0 && (
@@ -179,7 +204,10 @@ function SceneContent({
   boardCenter,
   onTileClick,
   onTileHover,
+  onTileActivate,
+  onTileInspect,
   highlightedTiles,
+  activatableTiles,
   showPlayerStations,
   showActionCardDeck,
   showObjectives,
@@ -187,6 +215,8 @@ function SceneContent({
   onObjectiveClick,
   canScoreObjective,
   onStrategyCardClick,
+  onStrategyCardPlay,
+  onPass,
   onActionCardClick,
   onTechClick,
   onTradeGoodsClick,
@@ -204,7 +234,10 @@ function SceneContent({
   boardCenter: THREE.Vector3;
   onTileClick?: (tile: MapTile) => void;
   onTileHover?: (tile: MapTile | null) => void;
+  onTileActivate?: (tile: MapTile) => void;
+  onTileInspect?: (tile: MapTile) => void;
   highlightedTiles?: { q: number; r: number }[];
+  activatableTiles?: { q: number; r: number }[];
   showPlayerStations: boolean;
   showActionCardDeck: boolean;
   showObjectives: boolean;
@@ -212,6 +245,8 @@ function SceneContent({
   onObjectiveClick?: (objectiveId: string, type: 'stage1' | 'stage2') => void;
   canScoreObjective?: (objectiveId: string) => boolean;
   onStrategyCardClick?: (playerId: string, cardNumber: number) => void;
+  onStrategyCardPlay?: (playerId: string, cardNumber: number) => void;
+  onPass?: (playerId: string) => void;
   onActionCardClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
   onTradeGoodsClick?: (playerId: string) => void;
@@ -353,7 +388,10 @@ function SceneContent({
         playerColors={playerColors}
         onTileClick={onTileClick}
         onTileHover={onTileHover}
+        onTileActivate={onTileActivate}
+        onTileInspect={onTileInspect}
         highlightedTiles={highlightedTiles}
+        activatableTiles={activatableTiles}
       />
 
       {/* Player Stations */}
@@ -364,6 +402,8 @@ function SceneContent({
           isInspectingCard={inspectedCard !== null}
           onFactionClick={handleFactionSheetInspect}
           onStrategyCardClick={handleStrategyCardInspect}
+          onStrategyCardPlay={onStrategyCardPlay}
+          onPass={onPass}
           onActionCardClick={handleActionCardInspect}
           onSecretObjectiveClick={handleSecretObjectiveInspect}
           onPromissoryClick={handlePromissoryInspect}
@@ -423,7 +463,10 @@ export function GameBoard3D({
   currentPlayerId,
   onTileClick,
   onTileHover,
+  onTileActivate,
+  onTileInspect,
   highlightedTiles,
+  activatableTiles,
   className,
   onActionCardDeckClick,
   showActionCardDeck = true,
@@ -432,6 +475,8 @@ export function GameBoard3D({
   onObjectiveClick,
   canScoreObjective,
   onStrategyCardClick,
+  onStrategyCardPlay,
+  onPass,
   onActionCardClick,
   onTechClick,
   onTradeGoodsClick,
@@ -527,7 +572,10 @@ export function GameBoard3D({
               boardCenter={boardCenter}
               onTileClick={handleTileClick}
               onTileHover={handleTileHover}
+              onTileActivate={onTileActivate}
+              onTileInspect={onTileInspect}
               highlightedTiles={highlightedTiles}
+              activatableTiles={activatableTiles}
               showPlayerStations={showPlayerStations}
               showActionCardDeck={showActionCardDeck}
               showObjectives={showObjectives}
@@ -535,6 +583,8 @@ export function GameBoard3D({
               onObjectiveClick={onObjectiveClick}
               canScoreObjective={canScoreObjective}
               onStrategyCardClick={onStrategyCardClick}
+              onStrategyCardPlay={onStrategyCardPlay}
+              onPass={onPass}
               onActionCardClick={onActionCardClick}
               onTechClick={onTechClick}
               onTradeGoodsClick={onTradeGoodsClick}

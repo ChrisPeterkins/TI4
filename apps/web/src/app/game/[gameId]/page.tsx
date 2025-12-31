@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
@@ -145,6 +145,61 @@ export default function GamePage() {
       })
       .map(tile => tile.position);
   }, [gameState, currentPlayerId]);
+
+  // Get tiles that can be activated for tactical action (for 3D UI highlighting)
+  const activatableTiles = useMemo((): HexCoord[] => {
+    if (!gameState || !currentPlayerId) return [];
+
+    // Look up player inside useMemo since currentPlayer is defined after early returns
+    const player = gameState.players.find((p) => p.id === currentPlayerId);
+    if (!player) return [];
+
+    // Only show activatable tiles during action phase, awaiting_action, and when it's my turn
+    const isMyTurn = currentPlayerId === gameState.activePlayerId;
+    if (gameState.phase !== 'action' || gameState.subPhase !== 'awaiting_action' || !isMyTurn) {
+      return [];
+    }
+
+    // Need at least 1 tactics token
+    if (player.commandTokens.tactics < 1) {
+      return [];
+    }
+
+    return getValidActivationTiles();
+  }, [gameState, currentPlayerId, getValidActivationTiles]);
+
+  // Handle 3D tile activation (direct tactical action, no selection mode needed)
+  const handleTileActivate = useCallback((tile: MapTile) => {
+    if (!currentPlayerId) return;
+
+    // Check if this tile can be activated
+    if (!tile.commandTokens.includes(currentPlayerId)) {
+      // Send tactical action directly
+      sendAction({
+        type: 'tactical_action',
+        systemPosition: tile.position,
+      } as Omit<TacticalAction, 'playerId' | 'timestamp'>);
+    }
+  }, [currentPlayerId, sendAction]);
+
+  // Handle 3D strategy card play (strategic action)
+  const handleStrategyCardPlay3D = useCallback((playerId: string, cardNumber: number) => {
+    if (playerId !== currentPlayerId) return;
+
+    sendAction({
+      type: 'strategic_action',
+      cardNumber,
+    } as Omit<StrategicAction, 'playerId' | 'timestamp'>);
+  }, [currentPlayerId, sendAction]);
+
+  // Handle 3D pass button click
+  const handlePass3D = useCallback((playerId: string) => {
+    if (playerId !== currentPlayerId) return;
+
+    sendAction({
+      type: 'pass',
+    } as Omit<PassAction, 'playerId' | 'timestamp'>);
+  }, [currentPlayerId, sendAction]);
 
   if (socketLoading || isLoading) {
     return (
@@ -496,7 +551,11 @@ export default function GamePage() {
             gameState={gameState}
             currentPlayerId={currentPlayerId}
             onTileClick={handleTileClick}
+            onTileActivate={handleTileActivate}
             highlightedTiles={highlightedTiles}
+            activatableTiles={activatableTiles}
+            onStrategyCardPlay={handleStrategyCardPlay3D}
+            onPass={handlePass3D}
             showPlayerStations={use3DPlayerStations}
           />
 
@@ -600,6 +659,7 @@ export default function GamePage() {
           onSkipMovement={handleSkipMovement}
           onProduceUnits={handleProduceUnits}
           onSkipProduction={handleSkipProduction}
+          hideActionButtons={use3DPlayerStations}
         />
       )}
 

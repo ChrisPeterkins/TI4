@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from './toast-store';
 import { getSocket, disconnectSocket, type TI4Socket } from '../lib/socket';
 
 interface SocketState {
@@ -38,8 +39,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       console.error('Socket connection error:', error);
     });
 
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
+    // Listen for server errors (custom event, not socket.io reserved 'error')
+    socket.on('server_error', (error: { code?: string; message?: string }) => {
+      console.error('Server error:', error);
+      const errorMsg = error?.message || 'Unknown server error';
+      toast.error(errorMsg);
     });
 
     set({ socket });

@@ -109,6 +109,12 @@ export type GameLogEntryType =
   // Trade
   | 'transaction_completed'
   | 'commodities_refreshed'
+  // Exploration
+  | 'planet_explored'
+  | 'relic_fragment_gained'
+  | 'relic_gained'
+  | 'fragments_purged'
+  | 'attachment_placed'
   // Other
   | 'promissory_note_played'
   | 'ability_triggered'
@@ -181,6 +187,17 @@ export interface GameLogDetails {
   toSystem?: string;
   unitsMoved?: Array<{ type: UnitType; count: number }>;
 
+  // Exploration details
+  explorationCardId?: string;
+  explorationCardName?: string;
+  explorationDeckType?: 'cultural' | 'industrial' | 'hazardous' | 'frontier';
+  fragmentType?: 'cultural' | 'industrial' | 'hazardous' | 'unknown';
+  fragmentCount?: number;
+  relicId?: string;
+  relicName?: string;
+  attachmentId?: string;
+  attachmentName?: string;
+
   // Generic additional data
   [key: string]: unknown;
 }
@@ -230,6 +247,21 @@ export interface GameState {
   pendingTransaction?: PendingTransaction;
   // Game event log
   gameLog: GameLogEntry[];
+  // PoK Exploration System
+  explorationDecks?: ExplorationDecks;
+  explorationDiscard?: string[];
+  relicDeck?: string[];
+  relicDiscard?: string[];
+  // Planets explored this tactical action (reset each activation)
+  planetsExploredThisTurn?: string[];
+}
+
+// PoK Exploration Deck State
+export interface ExplorationDecks {
+  cultural: string[];
+  industrial: string[];
+  hazardous: string[];
+  frontier: string[];
 }
 
 // Pending Transaction State

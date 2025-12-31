@@ -80,6 +80,7 @@ export interface ServerToClientEvents {
 
   // Errors
   error: (data: ErrorEvent) => void;
+  server_error: (data: ErrorEvent) => void;  // Custom error event (avoids socket.io reserved 'error')
 
   // Lobby
   lobby_created: (data: LobbyCreatedEvent) => void;

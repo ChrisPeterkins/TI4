@@ -365,7 +365,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error selecting faction:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
@@ -388,7 +388,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error selecting color:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
@@ -417,7 +417,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error updating ready status:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
@@ -440,7 +440,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error updating settings:', error);
-      socket.emit('error', createError('UNAUTHORIZED', (error as Error).message));
+      socket.emit('server_error', createError('UNAUTHORIZED', (error as Error).message));
     }
   });
 
@@ -450,7 +450,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       // Verify user is host
       const lobby = await lobbyRepo.getLobbyWithPlayers(data.lobbyId);
       if (!lobby || lobby.hostId !== userId) {
-        socket.emit('error', createError('UNAUTHORIZED', 'Only the host can add bots'));
+        socket.emit('server_error', createError('UNAUTHORIZED', 'Only the host can add bots'));
         return;
       }
 
@@ -476,7 +476,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       console.log(`Bot "${botName}" added to lobby ${data.lobbyId}`);
     } catch (error) {
       console.error('Error adding bot:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
@@ -486,7 +486,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       // Verify user is host
       const lobby = await lobbyRepo.getLobbyWithPlayers(data.lobbyId);
       if (!lobby || lobby.hostId !== userId) {
-        socket.emit('error', createError('UNAUTHORIZED', 'Only the host can remove bots'));
+        socket.emit('server_error', createError('UNAUTHORIZED', 'Only the host can remove bots'));
         return;
       }
 
@@ -507,7 +507,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       console.log(`Bot removed from seat ${data.seatIndex} in lobby ${data.lobbyId}`);
     } catch (error) {
       console.error('Error removing bot:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
@@ -517,7 +517,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       // Verify user is host
       const lobby = await lobbyRepo.getLobbyWithPlayers(data.lobbyId);
       if (!lobby || lobby.hostId !== userId) {
-        socket.emit('error', createError('UNAUTHORIZED', 'Only the host can update bots'));
+        socket.emit('server_error', createError('UNAUTHORIZED', 'Only the host can update bots'));
         return;
       }
 
@@ -541,7 +541,7 @@ export function registerLobbyHandlers(io: TI4Server, socket: TI4Socket): void {
       }
     } catch (error) {
       console.error('Error updating bot:', error);
-      socket.emit('error', createError('INVALID_ACTION', (error as Error).message));
+      socket.emit('server_error', createError('INVALID_ACTION', (error as Error).message));
     }
   });
 
