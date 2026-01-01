@@ -25,6 +25,10 @@ import {
   countHits,
   findDefenderId,
   getValidRetreatSystems,
+  shouldTriggerAssaultCannon,
+  getNonFighterShips,
+  applyDuraniumArmor,
+  canUseSustainDamage,
 } from '../utils/combat.js';
 import { checkTimingTrigger } from './timing-windows.js';
 
@@ -90,6 +94,47 @@ export function triggerCombatStartWindow(state: GameState): HandlerResult {
     combatId: combat.id,
     systemPosition: findCombatSystemPosition(state, combat.systemId),
   });
+}
+
+/**
+ * Check and apply Assault Cannon at start of space combat
+ * Returns info about whether opponent needs to destroy a ship
+ */
+export function checkAssaultCannon(state: GameState): {
+  attackerTriggers: boolean;
+  defenderTriggers: boolean;
+  attackerTargets: string[];
+  defenderTargets: string[];
+} {
+  const combat = state.activeCombat;
+  const result = {
+    attackerTriggers: false,
+    defenderTriggers: false,
+    attackerTargets: [] as string[],
+    defenderTargets: [] as string[],
+  };
+
+  if (!combat || combat.type !== 'space') {
+    return result;
+  }
+
+  // Check if attacker has Assault Cannon
+  if (shouldTriggerAssaultCannon(state, combat.attackerId, combat.systemId)) {
+    result.attackerTriggers = true;
+    // Defender must choose a non-fighter ship to destroy
+    result.defenderTargets = getNonFighterShips(state, combat.defenderId, combat.systemId)
+      .map(u => u.id);
+  }
+
+  // Check if defender has Assault Cannon
+  if (shouldTriggerAssaultCannon(state, combat.defenderId, combat.systemId)) {
+    result.defenderTriggers = true;
+    // Attacker must choose a non-fighter ship to destroy
+    result.attackerTargets = getNonFighterShips(state, combat.attackerId, combat.systemId)
+      .map(u => u.id);
+  }
+
+  return result;
 }
 
 /**
@@ -243,6 +288,12 @@ export function handleAssignHits(
     return { success: false, error: 'Player not found' };
   }
 
+  // Check if player can use sustain damage (Mentak's Fourth Moon blocks it)
+  const sustainAllowed = canUseSustainDamage(state, action.playerId, combat);
+
+  // Track units that sustain damage this round (for Duranium Armor)
+  const justSustainedUnitIds: string[] = [];
+
   // Validate assignments
   let assignedHits = 0;
   for (const assignment of action.assignments) {
@@ -256,10 +307,15 @@ export function handleAssignHits(
     }
 
     if (assignment.sustainDamage) {
+      // Check if sustain is blocked by Mentak's Fourth Moon
+      if (!sustainAllowed) {
+        return { success: false, error: 'Sustain Damage blocked by Fourth Moon flagship' };
+      }
       if (!canUnitSustainDamage(unit, player)) {
         return { success: false, error: `Unit ${unit.type} cannot sustain damage` };
       }
       damageUnit(state, assignment.unitId);
+      justSustainedUnitIds.push(assignment.unitId);
       assignedHits++;
     }
 
@@ -282,11 +338,19 @@ export function handleAssignHits(
     return { success: false, error: `Must assign all ${pendingHits} hits` };
   }
 
+  // Apply Duranium Armor - repair 1 damaged unit that didn't just sustain
+  const repairedUnitId = applyDuraniumArmor(state, combat, action.playerId, justSustainedUnitIds);
+
   // Clear pending hits for this player
   if (isAttacker) {
     combat.pendingHits.attacker = 0;
   } else {
     combat.pendingHits.defender = 0;
+  }
+
+  const triggeredEvents: string[] = ['hits_assigned'];
+  if (repairedUnitId) {
+    triggeredEvents.push('duranium_armor_repair');
   }
 
   // Check if both players have assigned hits
@@ -309,7 +373,8 @@ export function handleAssignHits(
 
   return {
     success: true,
-    triggeredEvents: ['hits_assigned'],
+    triggeredEvents,
+    data: repairedUnitId ? { repairedUnitId } : undefined,
   };
 }
 

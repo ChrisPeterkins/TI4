@@ -25,6 +25,7 @@ import {
 import {
   rollBombardmentDice,
   getBombardmentUnits,
+  getBombardmentOptions,
   countHits,
   findUnitById,
   removeUnit,
@@ -251,8 +252,16 @@ export function handleRollBombardment(
     };
   }
 
-  // Roll bombardment dice
-  const rolls = rollBombardmentDice(bombardmentUnits, player);
+  // Get bombardment options (Plasma Scoring, Bunker penalty)
+  // Need to find the defender for this planet
+  const targetPlanet = tile.planets.find(p =>
+    state.invasionPhase?.targetPlanets.includes(p.planetId)
+  );
+  const defenderId = targetPlanet?.controlledBy || '';
+  const bombardmentOptions = getBombardmentOptions(state, action.playerId, defenderId);
+
+  // Roll bombardment dice with technology modifiers
+  const rolls = rollBombardmentDice(bombardmentUnits, player, bombardmentOptions);
   const hits = countHits(rolls);
 
   state.invasionPhase.pendingBombardmentHits = hits;

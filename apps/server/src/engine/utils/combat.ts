@@ -130,6 +130,9 @@ export function rollDiceForPlayer(
     ? combat.attackerUnits
     : combat.defenderUnits;
 
+  // Get temporary modifiers from combat state (action cards, etc.)
+  const tempMods = combat.temporaryModifiers?.[playerId];
+
   const rolls: DiceRoll[] = [];
 
   for (const unitId of unitIds) {
@@ -137,15 +140,36 @@ export function rollDiceForPlayer(
     if (!unit) continue;
 
     const stats = getUnitStats(unit.type, player);
-    const combatValue = stats.combat;
+    let combatValue = stats.combat;
     if (combatValue === undefined) continue; // Skip non-combat units
 
-    const diceCount = getCombatDiceCount(unit.type);
-    const modifiers = calculateCombatModifiers(state, unit, player);
+    // Calculate base modifiers (faction abilities, techs, flagships)
+    const modifiers = calculateCombatModifiers(state, unit, player, combat);
+
+    // Apply action card modifiers from combat state
+    if (tempMods?.combatBonus) {
+      modifiers.total += tempMods.combatBonus;
+      modifiers.descriptions.push(`Morale Boost: +${tempMods.combatBonus}`);
+    }
+    if (tempMods?.combatPenalty) {
+      modifiers.total -= tempMods.combatPenalty;
+      modifiers.descriptions.push(`Combat penalty: -${tempMods.combatPenalty}`);
+    }
+
+    // Fighter-specific bonus (Fighter Prototype - first round only)
+    if (unit.type === 'fighter' && tempMods?.fighterBonus && combat.roundNumber === 1) {
+      modifiers.total += tempMods.fighterBonus;
+      modifiers.descriptions.push(`Fighter Prototype: +${tempMods.fighterBonus}`);
+    }
+
+    // Calculate dice count (base + any extra from action cards)
+    const baseDiceCount = getCombatDiceCount(unit.type);
+    const extraDice = tempMods?.extraDice || 0;
+    const diceCount = baseDiceCount + extraDice;
 
     for (let i = 0; i < diceCount; i++) {
       const roll = Math.floor(Math.random() * 10) + 1; // d10: 1-10
-      const modifiedCombatValue = Math.max(1, combatValue - modifiers.total);
+      const modifiedCombatValue = Math.max(1, Math.min(10, combatValue - modifiers.total));
 
       rolls.push({
         unitId: unit.id,
@@ -163,14 +187,21 @@ export function rollDiceForPlayer(
 
 /**
  * Roll Anti-Fighter Barrage dice
+ * Note: Combat modifiers do NOT apply to AFB per TI4 rules
  */
 export function rollAFBDice(
   units: UnitInstance[],
-  player: PlayerState
+  player: PlayerState,
+  options?: {
+    disabledUnits?: string[]; // Units that can't use AFB (Disable action card)
+  }
 ): DiceRoll[] {
   const rolls: DiceRoll[] = [];
 
   for (const unit of units) {
+    // Check if this unit is disabled
+    if (options?.disabledUnits?.includes(unit.id)) continue;
+
     const stats = getUnitStats(unit.type, player);
     const afb = stats.antiFighterBarrage;
     if (!afb) continue;
@@ -193,29 +224,63 @@ export function rollAFBDice(
 }
 
 /**
- * Roll Bombardment dice
+ * Roll Space Cannon dice
+ * @param plasmaScoring - If true, one unit gets +1 die
+ * @param antimassDeflectors - If target has Antimass Deflectors, -1 to hit
+ * @param gravitonLaser - If true, hits must be assigned to non-fighters
  */
-export function rollBombardmentDice(
+export function rollSpaceCannonDice(
   units: UnitInstance[],
-  player: PlayerState
+  player: PlayerState,
+  options?: {
+    plasmaScoring?: boolean;
+    antimassDeflectors?: boolean;
+    gravitonLaser?: boolean;
+  }
 ): DiceRoll[] {
   const rolls: DiceRoll[] = [];
+  let plasmaUsed = false;
 
   for (const unit of units) {
     const stats = getUnitStats(unit.type, player);
-    const bombardment = stats.bombardment;
-    if (!bombardment) continue;
+    const spaceCannon = stats.spaceCannon;
+    if (!spaceCannon) continue;
 
-    for (let i = 0; i < bombardment.count; i++) {
+    // Calculate dice count (Plasma Scoring adds +1 to first unit)
+    let diceCount = spaceCannon.count;
+    if (options?.plasmaScoring && !plasmaUsed) {
+      diceCount += 1;
+      plasmaUsed = true;
+    }
+
+    // Calculate hit value (Antimass Deflectors makes it harder)
+    let hitValue = spaceCannon.value;
+    if (options?.antimassDeflectors) {
+      hitValue += 1; // Higher = harder to hit
+    }
+    hitValue = Math.max(1, Math.min(10, hitValue));
+
+    const modifierDescriptions: string[] = ['Space Cannon'];
+    if (options?.plasmaScoring && diceCount > spaceCannon.count) {
+      modifierDescriptions.push('Plasma Scoring: +1 die');
+    }
+    if (options?.antimassDeflectors) {
+      modifierDescriptions.push('Antimass Deflectors: -1');
+    }
+    if (options?.gravitonLaser) {
+      modifierDescriptions.push('Graviton Laser: hits to non-fighters');
+    }
+
+    for (let i = 0; i < diceCount; i++) {
       const roll = Math.floor(Math.random() * 10) + 1;
 
       rolls.push({
         unitId: unit.id,
         unitType: unit.type,
         roll,
-        combatValue: bombardment.value,
-        hit: roll >= bombardment.value,
-        modifiers: ['Bombardment'],
+        combatValue: hitValue,
+        hit: roll >= hitValue,
+        modifiers: modifierDescriptions,
       });
     }
   }
@@ -224,12 +289,83 @@ export function rollBombardmentDice(
 }
 
 /**
- * Calculate combat modifiers from technologies, abilities, etc.
+ * Get units with Space Cannon ability
+ */
+export function getSpaceCannonUnits(units: UnitInstance[], player: PlayerState): UnitInstance[] {
+  return units.filter(unit => {
+    const stats = getUnitStats(unit.type, player);
+    return stats.spaceCannon !== undefined;
+  });
+}
+
+/**
+ * Roll Bombardment dice
+ * @param plasmaScoring - If true, one unit gets +1 die (player's choice - we add to first unit)
+ * @param bunkerPenalty - Penalty from Bunker action card (typically -4)
+ */
+export function rollBombardmentDice(
+  units: UnitInstance[],
+  player: PlayerState,
+  options?: {
+    plasmaScoring?: boolean;
+    bunkerPenalty?: number;
+  }
+): DiceRoll[] {
+  const rolls: DiceRoll[] = [];
+  let plasmaUsed = false;
+
+  for (const unit of units) {
+    const stats = getUnitStats(unit.type, player);
+    const bombardment = stats.bombardment;
+    if (!bombardment) continue;
+
+    // Calculate dice count (Plasma Scoring adds +1 to first unit)
+    let diceCount = bombardment.count;
+    if (options?.plasmaScoring && !plasmaUsed) {
+      diceCount += 1;
+      plasmaUsed = true;
+    }
+
+    // Calculate hit value (Bunker applies penalty)
+    let hitValue = bombardment.value;
+    if (options?.bunkerPenalty) {
+      hitValue += options.bunkerPenalty; // Higher = harder to hit
+    }
+    hitValue = Math.max(1, Math.min(10, hitValue));
+
+    const modifierDescriptions: string[] = ['Bombardment'];
+    if (options?.plasmaScoring && diceCount > bombardment.count) {
+      modifierDescriptions.push('Plasma Scoring: +1 die');
+    }
+    if (options?.bunkerPenalty) {
+      modifierDescriptions.push(`Bunker: -${options.bunkerPenalty}`);
+    }
+
+    for (let i = 0; i < diceCount; i++) {
+      const roll = Math.floor(Math.random() * 10) + 1;
+
+      rolls.push({
+        unitId: unit.id,
+        unitType: unit.type,
+        roll,
+        combatValue: hitValue,
+        hit: roll >= hitValue,
+        modifiers: modifierDescriptions,
+      });
+    }
+  }
+
+  return rolls;
+}
+
+/**
+ * Calculate combat modifiers from technologies, abilities, flagships, commanders, etc.
  */
 export function calculateCombatModifiers(
   state: GameState,
   unit: UnitInstance,
-  player: PlayerState
+  player: PlayerState,
+  combat?: CombatInstance
 ): { total: number; descriptions: string[] } {
   const descriptions: string[] = [];
   let total = 0;
@@ -237,7 +373,7 @@ export function calculateCombatModifiers(
   // Determine combat type based on unit
   const combatType = isGroundUnit(unit.type) ? 'ground' : 'space';
 
-  // Get faction combat modifiers
+  // Get faction combat modifiers (Sardakk +1, Jol-Nar -1, etc.)
   const factionModifiers = getCombatModifiers(state, player.id, combatType);
 
   // Apply hit modifier (positive = better, lowers target number)
@@ -246,13 +382,85 @@ export function calculateCombatModifiers(
     descriptions.push(...factionModifiers.descriptions);
   }
 
-  // Morale Boost tech (+1 to combat during a round)
-  if (player.technologies.includes('morale_boost')) {
-    // Morale Boost is an action card effect, not a tech - skip for now
+  // Get tile for flagship/commander checks
+  const tile = combat ? state.map.tiles.find(t => t.id === combat.systemId) : null;
+
+  // =========================================================================
+  // FLAGSHIP COMBAT ABILITIES
+  // =========================================================================
+  if (tile && combatType === 'space') {
+    const flagship = tile.units.find(u => u.ownerId === player.id && u.type === 'flagship');
+    if (flagship) {
+      switch (player.faction) {
+        case 'sardakk':
+          // C'Morran N'orr: +1 to all space combat rolls in this system
+          total += 1;
+          descriptions.push("C'Morran N'orr: +1");
+          break;
+
+        case 'letnev':
+          // Arc Secundus: No combat bonus, but repairs at start of round (handled elsewhere)
+          break;
+
+        case 'mahact':
+          // Arvicon Rex: +2 if opponent has no fleet token in this system
+          if (combat) {
+            const opponentId = combat.attackerId === player.id ? combat.defenderId : combat.attackerId;
+            if (!tile.commandTokens.includes(opponentId)) {
+              total += 2;
+              descriptions.push('Arvicon Rex: +2');
+            }
+          }
+          break;
+
+        case 'naazrokha':
+          // Visz el Vir: Mechs in space roll additional die (handled in dice count)
+          break;
+
+        // Other flagships have non-combat-roll effects
+      }
+    }
   }
 
-  // Plasma Scoring tech (+1 to bombardment and space cannon)
-  // This is handled separately in bombardment/space cannon rolls
+  // =========================================================================
+  // COMMANDER COMBAT ABILITIES
+  // =========================================================================
+  if (player.leaders?.commander.unlocked && tile) {
+    switch (player.faction) {
+      case 'winnu':
+        // Rickar Rickani: +2 in Mecatol Rex, home system, or legendary planet systems
+        const isMecatol = tile.systemId === 18;
+        const isHome = tile.systemId >= 1 && tile.systemId <= 17; // Home systems
+        const hasLegendary = tile.planets.some(p =>
+          p.planetId.includes('primor') || p.planetId.includes('mallice') ||
+          p.planetId.includes('mirage') || p.planetId.includes('hopes_end')
+        );
+        if (isMecatol || isHome || hasLegendary) {
+          total += 2;
+          descriptions.push('Rickar Rickani: +2');
+        }
+        break;
+
+      // Other commanders with combat effects can be added here
+    }
+  }
+
+  // =========================================================================
+  // OPPONENT EFFECTS (from enemy flagships/abilities)
+  // =========================================================================
+  if (combat && tile) {
+    const opponentId = combat.attackerId === player.id ? combat.defenderId : combat.attackerId;
+    const opponentPlayer = state.players.find(p => p.id === opponentId);
+
+    if (opponentPlayer) {
+      const opponentFlagship = tile.units.find(u => u.ownerId === opponentId && u.type === 'flagship');
+
+      if (opponentFlagship && opponentPlayer.faction === 'mentak') {
+        // Fourth Moon: This player cannot use sustain damage
+        // (Handled in hit assignment, not here - just noting for awareness)
+      }
+    }
+  }
 
   return { total, descriptions };
 }
@@ -444,4 +652,165 @@ export function sortUnitsByPriority(units: UnitInstance[]): UnitInstance[] {
     const bIndex = priority.indexOf(b.type);
     return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
   });
+}
+
+// ============================================================================
+// TECHNOLOGY COMBAT HELPERS
+// ============================================================================
+
+/**
+ * Get bombardment options based on player's technologies and combat state
+ */
+export function getBombardmentOptions(
+  state: GameState,
+  playerId: string,
+  defenderId: string
+): {
+  plasmaScoring: boolean;
+  bunkerPenalty: number;
+} {
+  const player = state.players.find(p => p.id === playerId);
+  const defender = state.players.find(p => p.id === defenderId);
+
+  // Check Plasma Scoring tech
+  const plasmaScoring = player?.technologies.includes('plasma_scoring') ?? false;
+
+  // Check Bunker action card effect on defender
+  const combat = state.activeCombat;
+  const bunkerPenalty = combat?.temporaryModifiers?.[defenderId]?.combatPenalty ?? 0;
+
+  return { plasmaScoring, bunkerPenalty };
+}
+
+/**
+ * Get space cannon options based on player's technologies
+ */
+export function getSpaceCannonOptions(
+  state: GameState,
+  firingPlayerId: string,
+  targetPlayerId: string
+): {
+  plasmaScoring: boolean;
+  antimassDeflectors: boolean;
+  gravitonLaser: boolean;
+} {
+  const firingPlayer = state.players.find(p => p.id === firingPlayerId);
+  const targetPlayer = state.players.find(p => p.id === targetPlayerId);
+
+  return {
+    plasmaScoring: firingPlayer?.technologies.includes('plasma_scoring') ?? false,
+    antimassDeflectors: targetPlayer?.technologies.includes('antimass_deflectors') ?? false,
+    gravitonLaser: firingPlayer?.technologies.includes('graviton_laser_system') ?? false,
+  };
+}
+
+/**
+ * Apply Duranium Armor effect - repair 1 damaged unit after assigning hits
+ * The unit must not have just used Sustain Damage this round
+ * @param justSustainedUnitIds - Unit IDs that used Sustain Damage this round
+ * @returns The ID of the repaired unit, or null if no repair was made
+ */
+export function applyDuraniumArmor(
+  state: GameState,
+  combat: CombatInstance,
+  playerId: string,
+  justSustainedUnitIds: string[]
+): string | null {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player?.technologies.includes('duranium_armor')) {
+    return null;
+  }
+
+  const tile = state.map.tiles.find(t => t.id === combat.systemId);
+  if (!tile) return null;
+
+  // Find damaged units that didn't just sustain
+  const units = combat.type === 'space'
+    ? tile.units.filter(u => u.ownerId === playerId)
+    : tile.planets.flatMap(p => p.units.filter(u => u.ownerId === playerId));
+
+  const repairableUnits = units.filter(u =>
+    u.damaged && !justSustainedUnitIds.includes(u.id)
+  );
+
+  if (repairableUnits.length === 0) {
+    return null;
+  }
+
+  // Repair the first repairable unit (could be player choice in future)
+  const unitToRepair = repairableUnits[0];
+  unitToRepair.damaged = false;
+
+  return unitToRepair.id;
+}
+
+/**
+ * Check if Assault Cannon should trigger at start of space combat
+ * Returns true if player has 3+ non-fighter ships and the tech
+ */
+export function shouldTriggerAssaultCannon(
+  state: GameState,
+  playerId: string,
+  systemId: string
+): boolean {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player?.technologies.includes('assault_cannon')) {
+    return false;
+  }
+
+  const tile = state.map.tiles.find(t => t.id === systemId);
+  if (!tile) return false;
+
+  const nonFighterShips = tile.units.filter(u =>
+    u.ownerId === playerId &&
+    isShipType(u.type) &&
+    u.type !== 'fighter'
+  );
+
+  return nonFighterShips.length >= 3;
+}
+
+/**
+ * Get non-fighter ships for Assault Cannon target selection
+ */
+export function getNonFighterShips(
+  state: GameState,
+  playerId: string,
+  systemId: string
+): UnitInstance[] {
+  const tile = state.map.tiles.find(t => t.id === systemId);
+  if (!tile) return [];
+
+  return tile.units.filter(u =>
+    u.ownerId === playerId &&
+    isShipType(u.type) &&
+    u.type !== 'fighter'
+  );
+}
+
+/**
+ * Check if Mentak's Fourth Moon flagship prevents sustain damage
+ */
+export function canUseSustainDamage(
+  state: GameState,
+  playerId: string,
+  combat: CombatInstance
+): boolean {
+  const tile = state.map.tiles.find(t => t.id === combat.systemId);
+  if (!tile) return true;
+
+  // Check for opponent's Fourth Moon (Mentak flagship)
+  const opponentId = combat.attackerId === playerId ? combat.defenderId : combat.attackerId;
+  const opponent = state.players.find(p => p.id === opponentId);
+
+  if (opponent?.faction === 'mentak') {
+    const fourthMoon = tile.units.find(u =>
+      u.ownerId === opponentId && u.type === 'flagship'
+    );
+    if (fourthMoon) {
+      return false; // Cannot sustain when Fourth Moon is present
+    }
+  }
+
+  return true;
 }
