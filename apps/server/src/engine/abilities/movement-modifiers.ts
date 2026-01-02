@@ -81,8 +81,17 @@ export function getMovementModifiers(
       modifiers.immuneToAnomalies.push('asteroid');
     }
 
-    // GRAVITY DRIVE: +1 movement when leaving a system with your units
-    // (This would need additional tracking)
+    // LIGHT/WAVE DEFLECTOR: Ships can move through systems with enemy ships
+    if (player.technologies.includes('light_wave_deflector')) {
+      modifiers.canMoveThroughEnemies = true;
+    }
+
+    // GRAVITY DRIVE: +1 movement to 1 ship after activating a system
+    // For simplicity, we apply this as a general bonus during tactical actions
+    // In full implementation, player would select which ship gets the bonus
+    if (player.technologies.includes('gravity_drive')) {
+      modifiers.movementBonus += 1;
+    }
   }
 
   return modifiers;

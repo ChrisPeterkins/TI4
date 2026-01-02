@@ -21,6 +21,7 @@ import {
   isGroundUnit,
   isStructure,
   getUnitStats,
+  createUnitInstance,
 } from '../utils/units.js';
 import {
   rollBombardmentDice,
@@ -1003,6 +1004,14 @@ export function establishControl(
   // Trigger exploration if taking control of an uncontrolled planet (not from another player)
   if (previousController === null) {
     triggerExploration(state, tile, planet, newControllerId);
+  }
+
+  // Dacxive Animators: After winning ground combat, place 1 infantry on that planet
+  // This triggers when taking control from another player (not neutral planets)
+  if (previousController !== null && newPlayer?.technologies?.includes('dacxive_animators')) {
+    const newInfantry = createUnitInstance('infantry', newControllerId);
+    newInfantry.planetId = planet.planetId;
+    planet.units.push(newInfantry);
   }
 
   // Move to next planet or complete invasion

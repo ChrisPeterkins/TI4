@@ -430,7 +430,12 @@ export function handleProduceUnits(
   }
 
   // Calculate total cost
-  const totalCost = calculateProductionCost(action.units);
+  let totalCost = calculateProductionCost(action.units);
+
+  // Sarween Tools: Reduce production cost by 1 per PRODUCTION action
+  if (player.technologies?.includes('sarween_tools')) {
+    totalCost = Math.max(0, totalCost - 1);
+  }
 
   // Exhaust planets to pay for production
   let resourcesNeeded = totalCost;

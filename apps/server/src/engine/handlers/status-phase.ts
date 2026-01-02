@@ -369,16 +369,21 @@ export function revealPublicObjective(state: GameState): string | null {
 
 /**
  * Draw action cards for all players
- * Each player draws 2 action cards in initiative order
+ * Base: 1 action card per player
+ * Neural Motivator: Draw 2 action cards instead of 1
  */
 export function drawActionCards(state: GameState): void {
-  const CARDS_TO_DRAW = 2;
+  const BASE_CARDS_TO_DRAW = 1;
 
   for (const playerId of state.initiativeOrder) {
     const player = state.players.find(p => p.id === playerId);
     if (!player) continue;
 
-    for (let i = 0; i < CARDS_TO_DRAW; i++) {
+    // Neural Motivator: Draw 2 action cards instead of 1
+    const hasNeuralMotivator = player.technologies?.includes('neural_motivator') ?? false;
+    const cardsToDraw = hasNeuralMotivator ? 2 : BASE_CARDS_TO_DRAW;
+
+    for (let i = 0; i < cardsToDraw; i++) {
       // Reshuffle discard if deck is empty
       if (state.actionCardDeck.length === 0 && state.actionCardDiscard.length > 0) {
         state.actionCardDeck = shuffleDeck([...state.actionCardDiscard]);

@@ -153,6 +153,11 @@ export function getTokenGainModifiers(
       break;
   }
 
+  // Technology: Hyper Metabolism - gain 3 command tokens instead of 2
+  if (player.technologies?.includes('hyper_metabolism')) {
+    modifiers.statusPhaseBonus += 1;
+  }
+
   return modifiers;
 }
 

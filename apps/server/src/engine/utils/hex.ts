@@ -313,6 +313,18 @@ export function findPathWithAbilities(
         continue;
       }
 
+      // Check for enemy ships blocking movement
+      // Light/Wave Deflector allows moving through systems with enemy ships
+      const hasEnemyShips = tile.units.some(
+        u => u.ownerId !== playerId && ['carrier', 'cruiser', 'destroyer', 'dreadnought', 'flagship', 'war_sun', 'fighter'].includes(u.type)
+      );
+      if (hasEnemyShips && !modifiers.canMoveThroughEnemies) {
+        // Can only enter if it's the destination (for combat)
+        if (!(tile.position.q === to.q && tile.position.r === to.r)) {
+          continue;
+        }
+      }
+
       // Calculate movement cost (accounts for nebula penalty)
       const movementCost = getMovementCostToEnter(state, playerId, currentTile, tile);
       const newMovementUsed = current.movementUsed + movementCost;
