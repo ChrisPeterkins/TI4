@@ -755,6 +755,29 @@ export function initializeGroundCombat(state: GameState): HandlerResult {
     },
   };
 
+  // Magen Defense Grid: At the start of ground combat on a planet with your
+  // Planetary Shield unit, exhaust to block opponent combat rolls for round 1
+  const defender = state.players.find(p => p.id === defenderId);
+  if (defender && !defender.exhaustedTechnologies?.includes('magen_defense_grid')) {
+    const hasMagenDefenseGrid = defender.technologies?.includes('magen_defense_grid') ?? false;
+    const hasPlanetaryShieldOnPlanet = hasPlanetaryShield(state, planet);
+
+    if (hasMagenDefenseGrid && hasPlanetaryShieldOnPlanet) {
+      // Exhaust Magen Defense Grid
+      if (!defender.exhaustedTechnologies) {
+        defender.exhaustedTechnologies = [];
+      }
+      defender.exhaustedTechnologies.push('magen_defense_grid');
+
+      // Block attacker's combat rolls for this round
+      combat.temporaryModifiers = {
+        [attackerId]: {
+          blockedFromCombat: true,
+        },
+      };
+    }
+  }
+
   state.activeCombat = combat;
 
   return {
@@ -880,6 +903,9 @@ export function handleGroundCombatAssignHits(
     // Continue to next round
     combat.roundNumber++;
     combat.state = 'combat_round_roll';
+
+    // Clear temporary modifiers (they only last for one round)
+    combat.temporaryModifiers = undefined;
   }
 
   return {
@@ -1012,6 +1038,34 @@ export function establishControl(
     const newInfantry = createUnitInstance('infantry', newControllerId);
     newInfantry.planetId = planet.planetId;
     planet.units.push(newInfantry);
+  }
+
+  // Integrated Economy: After gaining control, produce units up to planet's resource value
+  // (exhaust this card to use)
+  if (newPlayer && !newPlayer.exhaustedTechnologies?.includes('integrated_economy')) {
+    const hasIntegratedEconomy = newPlayer.technologies?.includes('integrated_economy') ?? false;
+    if (hasIntegratedEconomy) {
+      // Get planet's resource value
+      const systemData = systems[tile.systemId];
+      const planetData = systemData?.planets?.find(p => p.id === planet.planetId);
+      const resourceValue = planetData?.resources ?? 0;
+
+      if (resourceValue > 0 && newPlayer.isBot) {
+        // Exhaust Integrated Economy
+        if (!newPlayer.exhaustedTechnologies) {
+          newPlayer.exhaustedTechnologies = [];
+        }
+        newPlayer.exhaustedTechnologies.push('integrated_economy');
+
+        // For bots, auto-produce infantry up to resource value
+        for (let i = 0; i < resourceValue; i++) {
+          const infantry = createUnitInstance('infantry', newControllerId);
+          infantry.planetId = planet.planetId;
+          planet.units.push(infantry);
+        }
+      }
+      // TODO: For human players, add UI choice for production
+    }
   }
 
   // Move to next planet or complete invasion

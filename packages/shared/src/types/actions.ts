@@ -92,7 +92,7 @@ export interface ActionCardTargets {
 
 export interface ComponentAction extends BaseAction {
   type: 'component_action';
-  componentType: 'agent' | 'tech' | 'relic' | 'commander' | 'promissory';
+  componentType: 'agent' | 'tech' | 'relic' | 'commander' | 'promissory' | 'faction_ability';
   componentId: string;
   targets?: ComponentActionTargets;
 }
@@ -102,6 +102,12 @@ export interface ComponentActionTargets {
   systemPosition?: HexCoord;
   planetId?: string;
   techId?: string;
+  /** System ID for targeting specific systems (e.g., Sling Relay) - as string for compatibility */
+  systemId?: string;
+  /** Unit type for production (e.g., 'carrier', 'dreadnought') */
+  unitType?: string;
+  /** Action card ID for stealing/targeting cards (e.g., Mageon Implants) */
+  actionCardId?: string;
 }
 
 // Strategic Action

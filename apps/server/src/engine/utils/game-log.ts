@@ -676,6 +676,19 @@ export function logGameWon(state: GameState, winnerId: UUID): void {
   });
 }
 
+export function logComponentAction(
+  state: GameState,
+  playerId: UUID,
+  componentName: string,
+  effect: string
+): void {
+  const player = state.players.find(p => p.id === playerId);
+  addLogEntry(state, 'component_action', `${player?.name || 'Unknown'} used ${componentName}: ${effect}`, {
+    playerId,
+    details: { componentName, effect },
+  });
+}
+
 // =============================================================================
 // HELPERS
 // =============================================================================

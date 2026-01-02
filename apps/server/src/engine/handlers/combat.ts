@@ -369,6 +369,9 @@ export function handleAssignHits(
     // Continue to next round
     combat.roundNumber++;
     combat.state = 'announce_retreat';
+
+    // Clear temporary modifiers (they only last for one round)
+    combat.temporaryModifiers = undefined;
   }
 
   return {

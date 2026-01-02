@@ -28,6 +28,7 @@ import { units, systems } from '@ti4/game-data';
 import { hasGravityRiftDanger, rollGravityRift } from '../abilities/movement-modifiers.js';
 import { logPass, logTacticalAction, logStrategicAction, logUnitsProduced, logSystemActivated } from '../utils/game-log.js';
 import { checkAllCommanderUnlocks } from './leaders.js';
+import { handleExplore } from './exploration.js';
 import { checkPromissoryReturnsOnActivation } from './transactions.js';
 
 /**
@@ -92,6 +93,31 @@ export function handleTacticalAction(
   // Check for promissory notes that return on activation
   // (e.g., Support for Throne, Ceasefire when activating system with owner's units)
   checkPromissoryReturnsOnActivation(state, action.playerId, targetTile.id);
+
+  // Scanlink Drone Network: When you activate a system, you may explore 1 planet
+  // For now, auto-explore for bots (first unexplored planet with trait)
+  if (player.technologies?.includes('scanlink_drone_network')) {
+    const systemData = systems[targetTile.systemId];
+    if (systemData?.planets && state.explorationDecks) {
+      // Find first unexplored planet with a trait
+      for (const planet of targetTile.planets) {
+        const planetData = systemData.planets.find(p => p.id === planet.planetId);
+        if (planetData?.trait && planet.controlledBy === null) {
+          // This planet can be explored - for bots, auto-explore
+          // TODO: For human players, add UI choice
+          if (player.isBot) {
+            handleExplore(state, {
+              type: 'explore',
+              playerId: action.playerId,
+              planetId: planet.planetId,
+              timestamp: Date.now(),
+            });
+          }
+          break; // Only explore one planet
+        }
+      }
+    }
+  }
 
   // Transition to movement sub-phase
   state.subPhase = 'tactical_movement';

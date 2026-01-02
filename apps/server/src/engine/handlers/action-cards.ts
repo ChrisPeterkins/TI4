@@ -15,6 +15,7 @@ import type { HandlerResult } from '../game-machine.js';
 import { drawCards, discardCards, removeCard, hasCard } from '../utils/deck.js';
 import { checkTimingTrigger } from './timing-windows.js';
 import { applyCardEffect } from './action-card-effects.js';
+import { advanceAfterComponentAction } from './component-actions.js';
 
 // Action card hand limit
 const ACTION_CARD_HAND_LIMIT = 7;
@@ -101,6 +102,13 @@ export function handlePlayActionCard(
       // Log the error but don't fail the action
       console.warn(`Action card ${action.cardId} effect failed: ${effectResult.error}`);
       data.effectError = effectResult.error;
+    }
+
+    // If this is an ACTION: card (component action), advance to next player
+    // ACTION: cards consume the player's action for the turn
+    if (isActionComponentCard(cardData)) {
+      advanceAfterComponentAction(state);
+      triggeredEvents.push('component_action_used');
     }
   }
 
@@ -216,6 +224,16 @@ export function getPlayersNeedingDiscard(state: GameState): string[] {
   return state.players
     .filter(p => exceedsHandLimit(p))
     .map(p => p.id);
+}
+
+/**
+ * Check if an action card is a component action (ACTION: cards)
+ * These cards consume the player's action for the turn.
+ * Distinguished by having "ACTION:" at the start of their description.
+ */
+function isActionComponentCard(cardData: { description?: string }): boolean {
+  if (!cardData.description) return false;
+  return cardData.description.trim().toUpperCase().startsWith('ACTION:');
 }
 
 // Helper: Fisher-Yates shuffle

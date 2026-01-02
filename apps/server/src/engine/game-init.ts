@@ -184,6 +184,8 @@ function createPlayer(setup: PlayerSetup, seatIndex: number): PlayerState {
         purged: false,   // Heroes are purged after use
       },
     } : undefined,
+    // Bot flag - userId is null for bot players
+    isBot: setup.userId === null,
   };
 }
 

@@ -19,6 +19,7 @@ import type { HandlerResult } from '../game-machine.js';
 import { v4 as uuidv4 } from 'uuid';
 import { removeCard, discardCards } from '../utils/deck.js';
 import { applyCardEffect } from './action-card-effects.js';
+import { advanceAfterComponentAction } from './component-actions.js';
 
 // Default timing window duration in milliseconds (30 seconds)
 const DEFAULT_WINDOW_TIMEOUT = 30000;
@@ -340,12 +341,15 @@ export function resolveTimingWindow(
   // Process played cards in order (LIFO for interrupts, FIFO for effects)
   const effects: { playerId: string; cardId: string; cancelled: boolean; effectResult?: HandlerResult }[] = [];
 
+  // Track if the original card (that triggered the window) was Sabotaged
+  let originalCardSabotaged = false;
+
   // Check for Sabotage cancellations
   for (const playedCard of window.playedCards) {
     const cardData = ACTION_CARDS_BY_ID[playedCard.cardId];
     let cancelled = false;
 
-    // Check if this card was Sabotaged
+    // Check if this is a Sabotage targeting the original card
     if (window.trigger === 'action_card_played' && isSabotageCard(playedCard.cardId)) {
       // Find the nested window (if any) to see if it was counter-Sabotaged
       const nestedWindow = state.timingWindowStack.find(
@@ -360,6 +364,11 @@ export function resolveTimingWindow(
         if (counterSabotage) {
           cancelled = true;
         }
+      }
+
+      // If Sabotage was NOT cancelled, it cancels the original card
+      if (!cancelled) {
+        originalCardSabotaged = true;
       }
     }
 
@@ -381,6 +390,28 @@ export function resolveTimingWindow(
       cancelled,
       effectResult,
     });
+  }
+
+  // Handle the original card that triggered the window
+  let originalCardEffectResult: HandlerResult | undefined;
+  let originalCardAdvancedTurn = false;
+
+  if (window.trigger === 'action_card_played' && window.context?.sourceCardId) {
+    const sourceCardId = window.context.sourceCardId;
+    const sourcePlayerId = window.context.sourcePlayerId;
+    const sourceTargets = window.context.additionalData?.targets as ActionCardTargets | undefined;
+
+    if (!originalCardSabotaged && sourcePlayerId) {
+      // Apply the original card's effect
+      originalCardEffectResult = applyCardEffect(state, sourceCardId, sourcePlayerId, sourceTargets);
+
+      // If it's an ACTION: card, advance to next player
+      const sourceCardData = ACTION_CARDS_BY_ID[sourceCardId];
+      if (sourceCardData && isActionComponentCard(sourceCardData)) {
+        advanceAfterComponentAction(state);
+        originalCardAdvancedTurn = true;
+      }
+    }
   }
 
   // Pop this window from the stack
@@ -408,6 +439,12 @@ export function resolveTimingWindow(
       triggeredEvents.push(...effect.effectResult.triggeredEvents);
     }
   }
+  if (originalCardEffectResult?.triggeredEvents) {
+    triggeredEvents.push(...originalCardEffectResult.triggeredEvents);
+  }
+  if (originalCardAdvancedTurn) {
+    triggeredEvents.push('component_action_used');
+  }
 
   return {
     success: true,
@@ -416,8 +453,19 @@ export function resolveTimingWindow(
       windowId: window.id,
       playedCards: effects,
       parentWindowId: window.parentWindowId,
+      originalCardSabotaged,
+      originalCardEffectResult: originalCardEffectResult?.data,
     },
   };
+}
+
+/**
+ * Check if an action card is a component action (ACTION: cards)
+ * These cards consume the player's action for the turn.
+ */
+function isActionComponentCard(cardData: { description?: string }): boolean {
+  if (!cardData.description) return false;
+  return cardData.description.trim().toUpperCase().startsWith('ACTION:');
 }
 
 /**

@@ -359,11 +359,24 @@ export interface PlayerState {
   };
   relics?: string[];
   exhaustedRelics?: string[];
+  exhaustedTechnologies?: string[];
   leaders?: LeaderState;
   /** Political Stability - keep strategy card next round */
   keepStrategyCard?: boolean;
   /** Public Disgrace - commodity refresh blocked */
   commodityRefreshBlocked?: boolean;
+  /** Whether this player is controlled by AI */
+  isBot?: boolean;
+  /** Captured units (Vuil'Raith Vortex ability) */
+  capturedUnits?: CapturedUnit[];
+}
+
+export interface CapturedUnit {
+  id: string;
+  type: UnitType;
+  ownerId: string;
+  damaged: boolean;
+  originalOwnerId: string;
 }
 
 export interface LeaderState {
@@ -518,6 +531,8 @@ export interface CombatModifiers {
   afbHitsCancelled?: boolean;
   /** Fighter combat bonus/penalty (Fighter Prototype) */
   fighterBonus?: number;
+  /** Cannot make combat rolls this round (Magen Defense Grid) */
+  blockedFromCombat?: boolean;
 }
 
 // Timing Windows for Action Cards

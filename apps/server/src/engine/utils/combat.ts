@@ -133,6 +133,11 @@ export function rollDiceForPlayer(
   // Get temporary modifiers from combat state (action cards, etc.)
   const tempMods = combat.temporaryModifiers?.[playerId];
 
+  // Magen Defense Grid: If blocked from combat, player cannot make combat rolls
+  if (tempMods?.blockedFromCombat) {
+    return [];
+  }
+
   const rolls: DiceRoll[] = [];
 
   for (const unitId of unitIds) {

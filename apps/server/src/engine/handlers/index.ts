@@ -35,6 +35,7 @@ import type {
   UseAgentAction,
   UnlockCommanderAction,
   PurgeHeroAction,
+  ComponentAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -103,6 +104,7 @@ import {
   handleUnlockCommander,
   handlePurgeHero,
 } from './leaders.js';
+import { handleComponentAction } from './component-actions.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -123,6 +125,9 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'strategic_action':
       return handleStrategicAction(state, action);
+
+    case 'component_action':
+      return handleComponentAction(state, action as ComponentAction);
 
     case 'strategic_primary':
       return handleStrategicPrimary(state, action as StrategicPrimaryAction);

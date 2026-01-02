@@ -439,6 +439,16 @@ export function readyCards(state: GameState): void {
         player.leaders.agent.exhausted = false;
       }
     }
+
+    // Ready all exhausted technologies
+    if (player.exhaustedTechnologies) {
+      player.exhaustedTechnologies = [];
+    }
+
+    // Ready all exhausted relics
+    if (player.exhaustedRelics) {
+      player.exhaustedRelics = [];
+    }
   }
 }
 
