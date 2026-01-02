@@ -49,7 +49,11 @@ export type LeaderEffect =
 // Commander unlock condition types
 export type CommanderUnlockCondition =
   | { type: 'control_planets'; count: number; trait?: string }
+  | { type: 'control_non_home_planets'; count: number }
   | { type: 'control_mecatol' }
+  | { type: 'control_mecatol_or_combat' }
+  | { type: 'control_resources'; count: number }
+  | { type: 'control_influence'; count: number }
   | { type: 'have_technologies'; count: number; color?: string }
   | { type: 'have_trade_goods'; count: number }
   | { type: 'have_command_tokens'; count: number }
@@ -59,7 +63,12 @@ export type CommanderUnlockCondition =
   | { type: 'have_units_total'; unitType: string; count: number }
   | { type: 'have_space_docks'; count: number }
   | { type: 'have_pds'; count: number }
+  | { type: 'have_structures'; count: number }
+  | { type: 'have_scored_secrets'; count: number }
+  | { type: 'have_mechs_in_systems'; count: number }
   | { type: 'units_in_others_home'; playerCount: number }
+  | { type: 'units_in_wormhole_systems'; count: number }
+  | { type: 'neighbor_all_players' }
   | { type: 'custom'; checkerId: string };
 
 // Leader ability definition
@@ -104,6 +113,7 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'After you produce units, you may produce 1 additional infantry for its cost.',
     effect: { type: 'custom', handlerId: 'arborec_commander' },
+    // UNLOCK: Have 12 ground forces on planets you control
     unlockCondition: { type: 'have_units_total', unitType: 'infantry', count: 12 },
   },
   letani_behemoth: {
@@ -138,7 +148,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'Each system that contains an alpha or beta wormhole is adjacent to each other.',
     effect: { type: 'custom', handlerId: 'creuss_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'creuss_wormhole_token' },
+    // UNLOCK: Have units in 3 systems that contain alpha or beta wormholes
+    unlockCondition: { type: 'units_in_wormhole_systems', count: 3 },
   },
   riftwalker_meian: {
     id: 'riftwalker_meian',
@@ -173,7 +184,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'Your commodity value is increased by 1 for each player that is your neighbor.',
     effect: { type: 'custom', handlerId: 'hacan_commander' },
-    unlockCondition: { type: 'have_trade_goods', count: 6 },
+    // UNLOCK: Have 10 trade goods
+    unlockCondition: { type: 'have_trade_goods', count: 10 },
   },
   harrugh_gefhara: {
     id: 'harrugh_gefhara',
@@ -207,7 +219,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'when_researching',
     description: 'When you research a technology, you may exhaust 1 planet to ignore 1 prerequisite.',
     effect: { type: 'custom', handlerId: 'jolnar_commander' },
-    unlockCondition: { type: 'have_technologies', count: 4 },
+    // UNLOCK: Own 8 technologies
+    unlockCondition: { type: 'have_technologies', count: 8 },
   },
   rin_the_masters_legacy: {
     id: 'rin_the_masters_legacy',
@@ -275,7 +288,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When 1 or more of your units make a roll for a unit ability, you may spend 1 trade good to reroll those dice.',
     effect: { type: 'custom', handlerId: 'letnev_commander' },
-    unlockCondition: { type: 'have_units_in_system', unitType: 'ship', count: 4 },
+    // UNLOCK: Have 5 non-fighter ships in 1 system
+    unlockCondition: { type: 'have_units_in_system', unitType: 'ship', count: 5 },
   },
   darktalon_treilla: {
     id: 'darktalon_treilla',
@@ -309,7 +323,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'Before you resolve the AMBUSH ability of 1 or more of your units, you may apply +2 to the result of each of your AMBUSH rolls.',
     effect: { type: 'custom', handlerId: 'mentak_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'mentak_ambush_units' },
+    // UNLOCK: Have 4 cruisers on the game board
+    unlockCondition: { type: 'have_units_total', unitType: 'cruiser', count: 4 },
   },
   kyver_blade_and_key: {
     id: 'kyver_blade_and_key',
@@ -343,7 +358,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'Your war suns gain PRODUCTION 5.',
     effect: { type: 'custom', handlerId: 'muaat_commander' },
-    unlockCondition: { type: 'have_units_total', unitType: 'war_sun', count: 1 },
+    // UNLOCK: Produce a War Sun (triggered by production action)
+    unlockCondition: { type: 'custom', checkerId: 'muaat_produced_war_sun' },
   },
   adjudicator_baal: {
     id: 'adjudicator_baal',
@@ -377,7 +393,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'You may look at your secret objectives at any time.',
     effect: { type: 'custom', handlerId: 'naalu_commander' },
-    unlockCondition: { type: 'units_in_others_home', playerCount: 2 },
+    // UNLOCK: Have 12 fighters on the game board
+    unlockCondition: { type: 'have_units_total', unitType: 'fighter', count: 12 },
   },
   the_stillness_of_stars: {
     id: 'the_stillness_of_stars',
@@ -446,7 +463,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'Your units apply +1 to the result of each of their combat rolls during ground combat.',
     effect: { type: 'combat_bonus', value: 1, ground: true },
-    unlockCondition: { type: 'have_units_total', unitType: 'infantry', count: 5 },
+    // UNLOCK: Control 5 planets in non-home systems
+    unlockCondition: { type: 'control_non_home_planets', count: 5 },
   },
   rowl_sarrig: {
     id: 'rowl_sarrig',
@@ -514,7 +532,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'when_producing',
     description: 'After you produce 1 or more infantry, produce 1 infantry in the same system.',
     effect: { type: 'place_units', units: [{ type: 'infantry', count: 1 }] },
-    unlockCondition: { type: 'have_command_tokens', count: 6 },
+    // UNLOCK: Control planets that have a combined total of at least 12 resources
+    unlockCondition: { type: 'control_resources', count: 12 },
   },
   jace_x_4th_air_legion: {
     id: 'jace_x_4th_air_legion',
@@ -548,7 +567,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'You do not have to pay any resources when you use the secondary ability of the "Technology" strategy card.',
     effect: { type: 'custom', handlerId: 'winnu_commander' },
-    unlockCondition: { type: 'control_mecatol' },
+    // UNLOCK: Control Mecatol Rex or enter into combat in the Mecatol Rex system
+    unlockCondition: { type: 'control_mecatol_or_combat' },
   },
   mathis_mathinus: {
     id: 'mathis_mathinus',
@@ -582,7 +602,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'when_voting',
     description: 'After the speaker reveals an agenda: You may cast 1 vote from a ready planet you control.',
     effect: { type: 'custom', handlerId: 'xxcha_commander' },
-    unlockCondition: { type: 'have_laws_in_play', count: 1 },
+    // UNLOCK: Control planets that have a combined total of at least 12 influence
+    unlockCondition: { type: 'control_influence', count: 12 },
   },
   xxekir_grom: {
     id: 'xxekir_grom',
@@ -615,7 +636,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you commit 1 or more ground forces to a planet, you may place 1 infantry from your reinforcements on that planet.',
     effect: { type: 'place_units', units: [{ type: 'infantry', count: 1 }] },
-    unlockCondition: { type: 'have_units_total', unitType: 'infantry', count: 4 },
+    // UNLOCK: Use your Indoctrination faction ability
+    unlockCondition: { type: 'custom', checkerId: 'yin_indoctrination_used' },
   },
   dannel_of_the_tenth: {
     id: 'dannel_of_the_tenth',
@@ -650,7 +672,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'You may have any number of action cards in your hand.',
     effect: { type: 'custom', handlerId: 'yssaril_commander' },
-    unlockCondition: { type: 'have_action_cards', count: 6 },
+    // UNLOCK: Have 7 action cards
+    unlockCondition: { type: 'have_action_cards', count: 7 },
   },
   blackshade_infiltrator: {
     id: 'blackshade_infiltrator',
@@ -684,7 +707,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'You may use the ANTI-FIGHTER BARRAGE ability of your PDS units even if not in the active system.',
     effect: { type: 'custom', handlerId: 'argent_commander' },
-    unlockCondition: { type: 'have_pds', count: 3 },
+    // UNLOCK: Have 6 units that have ANTI-FIGHTER BARRAGE, SPACE CANNON or BOMBARDMENT
+    unlockCondition: { type: 'custom', checkerId: 'argent_ability_units' },
   },
   conservator_procyon: {
     id: 'conservator_procyon',
@@ -717,7 +741,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'After you perform a transaction with a player, you may explore 1 planet that player controls.',
     effect: { type: 'custom', handlerId: 'empyrean_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'empyrean_frontier_tokens' },
+    // UNLOCK: Be neighbors with all other players
+    unlockCondition: { type: 'neighbor_all_players' },
   },
   shield_paling: {
     id: 'shield_paling',
@@ -786,7 +811,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you explore a planet, you may explore it again.',
     effect: { type: 'custom', handlerId: 'naazrokha_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'naazrokha_relic_fragments' },
+    // UNLOCK: Have 3 mechs in 3 different systems
+    unlockCondition: { type: 'have_mechs_in_systems', count: 3 },
   },
   hesh_and_prit: {
     id: 'hesh_and_prit',
@@ -820,7 +846,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you produce units in a system that does not contain any of your space docks, reduce the combined cost of those units by 1 for each unit you already have in that system.',
     effect: { type: 'custom', handlerId: 'nomad_commander' },
-    unlockCondition: { type: 'control_planets', count: 3, trait: 'cultural' },
+    // UNLOCK: Have 1 scored secret objective
+    unlockCondition: { type: 'have_scored_secrets', count: 1 },
   },
   navarch_feng: {
     id: 'navarch_feng',
@@ -854,7 +881,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you would be dealt a damage from a source other than combat, cancel that damage.',
     effect: { type: 'custom', handlerId: 'titans_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'titans_sleeper_tokens' },
+    // UNLOCK: Have 5 structures on the game board
+    unlockCondition: { type: 'have_structures', count: 5 },
   },
   ul_the_progenitor: {
     id: 'ul_the_progenitor',
@@ -888,7 +916,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you produce units, you may destroy any number of your captured units. For each unit destroyed, reduce the combined cost of the units you produce by the cost of that destroyed unit.',
     effect: { type: 'custom', handlerId: 'cabal_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'cabal_captured_units' },
+    // UNLOCK: Have units in 3 Gravity Rifts
+    unlockCondition: { type: 'custom', checkerId: 'cabal_gravity_rifts' },
   },
   hecatoncheires: {
     id: 'hecatoncheires',
@@ -923,7 +952,8 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     timing: 'passive',
     description: 'When you cast at least 1 vote, cast 1 additional vote for each other player\'s planet you control.',
     effect: { type: 'custom', handlerId: 'keleres_commander' },
-    unlockCondition: { type: 'custom', checkerId: 'keleres_influence' },
+    // UNLOCK: Spend 1 trade good after you play an action card that has a component action
+    unlockCondition: { type: 'custom', checkerId: 'keleres_component_action' },
   },
   sula_mentarion: {
     id: 'sula_mentarion',

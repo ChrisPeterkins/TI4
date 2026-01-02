@@ -179,6 +179,76 @@ export function canUnlockCommander(
       return { canUnlock: false, reason: 'Must control Mecatol Rex' };
     }
 
+    case 'control_mecatol_or_combat': {
+      // Winnu: Control Mecatol Rex or enter into combat in Mecatol Rex system
+      const mecatolTile2 = state.map.tiles.find(t => t.systemId === 18);
+      if (!mecatolTile2) {
+        return { canUnlock: false, reason: 'Mecatol Rex not found' };
+      }
+      const mecatolPlanet2 = mecatolTile2.planets.find(p => p.planetId === 'mecatol_rex');
+      if (mecatolPlanet2?.controlledBy === playerId) {
+        return { canUnlock: true };
+      }
+      // Check if player has had combat in Mecatol system (tracked via flag)
+      if (player.hadCombatInMecatol) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must control Mecatol Rex or fight in Mecatol system' };
+    }
+
+    case 'control_non_home_planets': {
+      // Count planets in non-home systems
+      let nonHomePlanetCount = 0;
+      for (const tile of state.map.tiles) {
+        // Home systems are typically systemId 1-17 (faction home systems)
+        // Skip home system tiles (simplified check - home systems have systemId in specific ranges)
+        const isHomeSystem = tile.systemId !== undefined && tile.systemId <= 17 && tile.systemId >= 1;
+        if (!isHomeSystem) {
+          for (const planet of tile.planets) {
+            if (planet.controlledBy === playerId) {
+              nonHomePlanetCount++;
+            }
+          }
+        }
+      }
+      if (nonHomePlanetCount >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need ${condition.count} non-home system planets, have ${nonHomePlanetCount}` };
+    }
+
+    case 'control_resources': {
+      // Calculate total resources from controlled planets
+      let totalResources = 0;
+      for (const tile of state.map.tiles) {
+        for (const planet of tile.planets) {
+          if (planet.controlledBy === playerId) {
+            totalResources += planet.resources || 0;
+          }
+        }
+      }
+      if (totalResources >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need ${condition.count} total resources, have ${totalResources}` };
+    }
+
+    case 'control_influence': {
+      // Calculate total influence from controlled planets
+      let totalInfluence = 0;
+      for (const tile of state.map.tiles) {
+        for (const planet of tile.planets) {
+          if (planet.controlledBy === playerId) {
+            totalInfluence += planet.influence || 0;
+          }
+        }
+      }
+      if (totalInfluence >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need ${condition.count} total influence, have ${totalInfluence}` };
+    }
+
     case 'have_technologies': {
       const techCount = player.technologies?.length || 0;
       if (techCount >= condition.count) {
@@ -289,6 +359,87 @@ export function canUnlockCommander(
         return { canUnlock: true };
       }
       return { canUnlock: false, reason: `Need ${condition.count} PDS, have ${pdsCount}` };
+    }
+
+    case 'have_structures': {
+      // Count structures (space docks and PDS)
+      let structureCount = 0;
+      for (const tile of state.map.tiles) {
+        for (const planet of tile.planets) {
+          for (const unit of planet.units) {
+            if (unit.ownerId === playerId && (unit.type === 'space_dock' || unit.type === 'pds')) {
+              structureCount++;
+            }
+          }
+        }
+      }
+      if (structureCount >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need ${condition.count} structures, have ${structureCount}` };
+    }
+
+    case 'have_scored_secrets': {
+      // Count scored secret objectives
+      const secretCount = player.scoredSecretObjectives?.length || 0;
+      if (secretCount >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need ${condition.count} scored secret objectives, have ${secretCount}` };
+    }
+
+    case 'have_mechs_in_systems': {
+      // Count systems that have at least one mech
+      const systemsWithMechs = new Set<string>();
+      for (const tile of state.map.tiles) {
+        for (const planet of tile.planets) {
+          if (planet.units.some(u => u.ownerId === playerId && u.type === 'mech')) {
+            systemsWithMechs.add(tile.id);
+          }
+        }
+      }
+      if (systemsWithMechs.size >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need mechs in ${condition.count} systems, have ${systemsWithMechs.size}` };
+    }
+
+    case 'units_in_wormhole_systems': {
+      // Count wormhole systems that have player units
+      let wormholeSystemsWithUnits = 0;
+      for (const tile of state.map.tiles) {
+        if (tile.wormhole && (tile.wormhole === 'alpha' || tile.wormhole === 'beta')) {
+          const hasPlayerUnits = tile.units.some(u => u.ownerId === playerId) ||
+            tile.planets.some(p => p.units.some(u => u.ownerId === playerId));
+          if (hasPlayerUnits) {
+            wormholeSystemsWithUnits++;
+          }
+        }
+      }
+      if (wormholeSystemsWithUnits >= condition.count) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need units in ${condition.count} wormhole systems, have ${wormholeSystemsWithUnits}` };
+    }
+
+    case 'neighbor_all_players': {
+      // Check if player is neighbor to all other players
+      // Two players are neighbors if they have units/planets in adjacent systems
+      const otherPlayers = state.players.filter(p => p.id !== playerId);
+      const playerSystems = new Set<string>();
+
+      // Find all systems where player has units or controls planets
+      for (const tile of state.map.tiles) {
+        const hasPresence = tile.units.some(u => u.ownerId === playerId) ||
+          tile.planets.some(p => p.controlledBy === playerId);
+        if (hasPresence) {
+          playerSystems.add(tile.id);
+        }
+      }
+
+      // For now, simplified check - would need adjacency calculation
+      // This is a placeholder that returns false for not implemented
+      return { canUnlock: false, reason: 'Neighbor check not fully implemented' };
     }
 
     case 'units_in_others_home': {

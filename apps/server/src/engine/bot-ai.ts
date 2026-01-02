@@ -31,9 +31,11 @@ import type {
   UnitType,
   RedistributeTokensAction,
 } from '@ti4/shared';
-import { systems, factions } from '@ti4/game-data';
+import { systems, factions, technologies } from '@ti4/game-data';
 import { findTileAtPosition, getAdjacentPositions, hexDistance, findPathWithAbilities } from './utils/hex.js';
 import { getUnitMoveValue, isShipType, isGroundUnit, getUnitCapacity, countsTowardsFleetSupply } from './utils/units.js';
+import { getAvailableTechnologies } from './handlers/technology.js';
+import { checkObjectiveRequirement } from './utils/objectives.js';
 
 /**
  * Bot difficulty levels
@@ -367,11 +369,14 @@ function generateTacticalActionChoice(gameState: GameState, player: PlayerState)
   // Sort by score and pick highest
   candidates.sort((a, b) => b.score - a.score);
 
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    return null;
+  }
 
   // Check if we can reach the best target with any ships
   for (const candidate of candidates) {
-    if (canReachSystem(gameState, player, candidate.tile)) {
+    const canReach = canReachSystem(gameState, player, candidate.tile);
+    if (canReach) {
       return {
         type: 'tactical_action',
         playerId: player.id,
@@ -429,7 +434,222 @@ function calculateSystemValue(gameState: GameState, tile: MapTile, player: Playe
     value *= 0.3;
   }
 
+  // Add objective-based bonuses
+  value += calculateObjectiveBonus(gameState, tile, player);
+
   return value;
+}
+
+/**
+ * Calculate bonus value for a system based on revealed objectives
+ */
+function calculateObjectiveBonus(gameState: GameState, tile: MapTile, player: PlayerState): number {
+  let bonus = 0;
+
+  // Get revealed public objectives
+  const revealedObjectives = [
+    ...gameState.objectives.publicStageI.filter(o => o.revealed),
+    ...gameState.objectives.publicStageII.filter(o => o.revealed),
+  ];
+
+  // Also consider player's secret objectives
+  const secretObjectives = player.secretObjectives || [];
+
+  // Count current state for comparison
+  const controlledPlanets = countControlledPlanets(gameState, player.id);
+  const techSpecialtyPlanets = countTechSpecialtyPlanets(gameState, player.id);
+  const traitCounts = countPlanetTraits(gameState, player.id);
+
+  for (const objInstance of revealedObjectives) {
+    // Skip if already scored
+    if (player.scoredObjectives?.includes(objInstance.id)) continue;
+
+    // Get objective data
+    const objectiveId = objInstance.id;
+
+    // "Expand Borders" - Control 6 planets in non-home systems
+    if (objectiveId === 'expand_borders') {
+      const isNonHome = !isPlayerHomeSystem(tile, player);
+      if (isNonHome && tile.planets.length > 0) {
+        const hasUnclaimedPlanets = tile.planets.some(p => p.controlledBy !== player.id);
+        if (hasUnclaimedPlanets && controlledPlanets.nonHome < 6) {
+          bonus += 5; // High priority if we need more planets
+        }
+      }
+    }
+
+    // "Found Research Outposts" - Control 3 planets with tech specialties
+    if (objectiveId === 'found_research_outposts') {
+      for (const planet of tile.planets) {
+        if (planet.controlledBy !== player.id) {
+          const planetData = findPlanetData(planet.planetId);
+          if (planetData?.techSpecialty && techSpecialtyPlanets < 3) {
+            bonus += 6; // Tech specialty planets are valuable
+          }
+        }
+      }
+    }
+
+    // "Corner the Market" / "Unify the Colonies" - Control 4+ planets with same trait
+    if (objectiveId === 'corner_the_market' || objectiveId === 'unify_the_colonies') {
+      for (const planet of tile.planets) {
+        if (planet.controlledBy !== player.id) {
+          const planetData = findPlanetData(planet.planetId);
+          if (planetData?.trait) {
+            const currentCount = traitCounts[planetData.trait] || 0;
+            // Bonus if this trait is close to threshold
+            if (currentCount >= 2 && currentCount < 4) {
+              bonus += 4;
+            }
+          }
+        }
+      }
+    }
+
+    // "Intimidate Council" - Ships in 2 systems adjacent to Mecatol
+    if (objectiveId === 'intimidate_council') {
+      if (isAdjacentToMecatol(tile)) {
+        bonus += 4;
+      }
+    }
+
+    // "Control the Borderlands" - Control 5 planets in non-home systems, same trait
+    if (objectiveId === 'control_the_borderlands') {
+      const isNonHome = !isPlayerHomeSystem(tile, player);
+      if (isNonHome && tile.planets.length > 0) {
+        bonus += 3;
+      }
+    }
+
+    // Stage II: "Hold Vast Reserves" - Spend 6/6/6
+    // Not directly system-related, skip
+
+    // Stage II: "Establish a Perimeter" - Control 4 planets with structures
+    if (objectiveId === 'establish_a_perimeter') {
+      // Prioritize systems we already control (for building)
+      const hasOurPlanet = tile.planets.some(p => p.controlledBy === player.id);
+      if (hasOurPlanet) {
+        bonus += 2;
+      }
+    }
+
+    // "Become a Legend" - Have units in 4 special systems (legendary, anomaly, Mecatol)
+    if (objectiveId === 'become_a_legend' || objectiveId === 'explore_deep_space') {
+      const system = systems[tile.systemId];
+      if (system) {
+        const isSpecial = system.anomaly ||
+          system.type === 'mecatol' ||
+          system.planets?.some(p => p.legendary);
+        if (isSpecial) {
+          bonus += 5;
+        }
+      }
+    }
+
+    // "Discover Lost Outposts" - Control 3 legendary planets or planets with attachments
+    if (objectiveId === 'discover_lost_outposts') {
+      for (const planet of tile.planets) {
+        if (planet.controlledBy !== player.id) {
+          const planetData = findPlanetData(planet.planetId);
+          if (planetData?.legendary) {
+            bonus += 8; // Legendary planets are very valuable
+          }
+        }
+      }
+    }
+  }
+
+  // Check if adjacent to Mecatol (always valuable for positioning)
+  if (isAdjacentToMecatol(tile)) {
+    bonus += 2;
+  }
+
+  return bonus;
+}
+
+/**
+ * Check if a tile is adjacent to Mecatol Rex
+ */
+function isAdjacentToMecatol(tile: MapTile): boolean {
+  // Mecatol is at center (0, 0)
+  const mecatolPos = { q: 0, r: 0 };
+  const distance = hexDistance(tile.position, mecatolPos);
+  return distance === 1;
+}
+
+/**
+ * Check if a tile is the player's home system
+ */
+function isPlayerHomeSystem(tile: MapTile, player: PlayerState): boolean {
+  const faction = factions[player.faction];
+  if (!faction) return false;
+  return tile.systemId === faction.homeSystemId;
+}
+
+/**
+ * Count planets controlled by player in different categories
+ */
+function countControlledPlanets(gameState: GameState, playerId: string): { total: number; nonHome: number } {
+  let total = 0;
+  let nonHome = 0;
+
+  const player = gameState.players.find(p => p.id === playerId);
+  const faction = player ? factions[player.faction] : null;
+  const homeSystemId = faction?.homeSystemId;
+
+  for (const tile of gameState.map.tiles) {
+    const isHome = tile.systemId === homeSystemId;
+    for (const planet of tile.planets) {
+      if (planet.controlledBy === playerId) {
+        total++;
+        if (!isHome) {
+          nonHome++;
+        }
+      }
+    }
+  }
+
+  return { total, nonHome };
+}
+
+/**
+ * Count planets with tech specialties controlled by player
+ */
+function countTechSpecialtyPlanets(gameState: GameState, playerId: string): number {
+  let count = 0;
+
+  for (const tile of gameState.map.tiles) {
+    for (const planet of tile.planets) {
+      if (planet.controlledBy === playerId) {
+        const planetData = findPlanetData(planet.planetId);
+        if (planetData?.techSpecialty) {
+          count++;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Count planets by trait for the player
+ */
+function countPlanetTraits(gameState: GameState, playerId: string): Record<string, number> {
+  const counts: Record<string, number> = {};
+
+  for (const tile of gameState.map.tiles) {
+    for (const planet of tile.planets) {
+      if (planet.controlledBy === playerId) {
+        const planetData = findPlanetData(planet.planetId);
+        if (planetData?.trait) {
+          counts[planetData.trait] = (counts[planetData.trait] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  return counts;
 }
 
 function canReachSystem(gameState: GameState, player: PlayerState, targetTile: MapTile): boolean {
@@ -443,7 +663,9 @@ function canReachSystem(gameState: GameState, player: PlayerState, targetTile: M
 
       const moveValue = getUnitMoveValue(unit.type, player);
       const path = findPathWithAbilities(gameState, player.id, tile.position, targetTile.position, moveValue);
-      if (path) return true;
+      if (path) {
+        return true;
+      }
     }
   }
 
@@ -615,7 +837,8 @@ function generateProductionAction(gameState: GameState, player: PlayerState): Pr
     return { type: 'skip_production', playerId: player.id, timestamp: Date.now() };
   }
 
-  // Simple production strategy: produce infantry and fighters
+  // Analyze current situation
+  const analysis = analyzeProductionNeeds(gameState, player, tile);
   const units: { type: UnitType; count: number }[] = [];
   let resourcesRemaining = availableResources;
 
@@ -623,13 +846,15 @@ function generateProductionAction(gameState: GameState, player: PlayerState): Pr
   const productionCapacity = calculateProductionCapacity(tile, player);
   let unitsProduced = 0;
 
-  // Prioritize infantry if we have unclaimed/enemy planets
-  const needsGround = tile.planets.some(p => p.controlledBy !== player.id);
-  if (needsGround && resourcesRemaining >= 1 && unitsProduced < productionCapacity) {
+  const fleetSupply = calculateFleetSupply(player);
+  const totalFleet = countTotalFleetUnits(gameState, player.id);
+
+  // Priority 1: Infantry if we need ground forces for invasion/control
+  if (analysis.needsGroundForces && resourcesRemaining >= 1 && unitsProduced < productionCapacity) {
     const infantryCount = Math.min(
       Math.floor(resourcesRemaining / 0.5),
       productionCapacity - unitsProduced,
-      4 // Max 4 infantry per production
+      analysis.groundForcesNeeded
     );
     if (infantryCount > 0) {
       units.push({ type: 'infantry', count: infantryCount });
@@ -638,28 +863,77 @@ function generateProductionAction(gameState: GameState, player: PlayerState): Pr
     }
   }
 
-  // Then fighters if we have capacity
+  // Priority 2: Carriers if we need expansion capability
+  if (analysis.needsCarriers && resourcesRemaining >= 3 && unitsProduced < productionCapacity && totalFleet < fleetSupply) {
+    units.push({ type: 'carrier', count: 1 });
+    resourcesRemaining -= 3;
+    unitsProduced++;
+  }
+
+  // Priority 3: Combat ships if threatened or need offensive power
+  if (analysis.needsCombatShips && unitsProduced < productionCapacity && totalFleet < fleetSupply) {
+    // Dreadnought if we have lots of resources (strong defensive/offensive)
+    if (resourcesRemaining >= 4 && analysis.threatLevel >= 2) {
+      units.push({ type: 'dreadnought', count: 1 });
+      resourcesRemaining -= 4;
+      unitsProduced++;
+    }
+    // Cruisers for balanced combat power
+    else if (resourcesRemaining >= 2 && totalFleet < fleetSupply) {
+      const cruiserCount = Math.min(
+        Math.floor(resourcesRemaining / 2),
+        productionCapacity - unitsProduced,
+        fleetSupply - totalFleet,
+        2
+      );
+      if (cruiserCount > 0) {
+        units.push({ type: 'cruiser', count: cruiserCount });
+        resourcesRemaining -= cruiserCount * 2;
+        unitsProduced += cruiserCount;
+      }
+    }
+  }
+
+  // Priority 4: Destroyers for anti-fighter if enemy has fighters
+  if (analysis.enemyHasFighters && resourcesRemaining >= 1 && unitsProduced < productionCapacity && totalFleet < fleetSupply) {
+    units.push({ type: 'destroyer', count: 1 });
+    resourcesRemaining -= 1;
+    unitsProduced++;
+  }
+
+  // Priority 5: Fighters to fill capacity (cheap combat power)
   if (resourcesRemaining >= 1 && unitsProduced < productionCapacity) {
-    const fighterCount = Math.min(
+    const carrierCapacity = calculateCarrierCapacity(gameState, player);
+    const currentFighters = countFighters(gameState, player.id);
+    const fightersNeeded = Math.max(0, carrierCapacity - currentFighters);
+
+    if (fightersNeeded > 0) {
+      const fighterCount = Math.min(
+        Math.floor(resourcesRemaining / 0.5),
+        productionCapacity - unitsProduced,
+        fightersNeeded,
+        4
+      );
+      if (fighterCount > 0) {
+        units.push({ type: 'fighter', count: fighterCount });
+        resourcesRemaining -= fighterCount * 0.5;
+        unitsProduced += fighterCount;
+      }
+    }
+  }
+
+  // Priority 6: More infantry if we still have resources (always useful)
+  if (resourcesRemaining >= 1 && unitsProduced < productionCapacity) {
+    const infantryCount = Math.min(
       Math.floor(resourcesRemaining / 0.5),
       productionCapacity - unitsProduced,
       3
     );
-    if (fighterCount > 0) {
-      units.push({ type: 'fighter', count: fighterCount });
-      resourcesRemaining -= fighterCount * 0.5;
-      unitsProduced += fighterCount;
+    if (infantryCount > 0) {
+      units.push({ type: 'infantry', count: infantryCount });
+      resourcesRemaining -= infantryCount * 0.5;
+      unitsProduced += infantryCount;
     }
-  }
-
-  // Then ships if we have resources
-  const fleetSupply = calculateFleetSupply(player);
-  const currentFleet = countFleetUnits(tile.units, player.id);
-
-  if (resourcesRemaining >= 3 && unitsProduced < productionCapacity && currentFleet < fleetSupply) {
-    // Produce a cruiser
-    units.push({ type: 'cruiser', count: 1 });
-    unitsProduced++;
   }
 
   if (units.length === 0) {
@@ -674,6 +948,142 @@ function generateProductionAction(gameState: GameState, player: PlayerState): Pr
     planetId: spaceDockPlanet,
     units,
   };
+}
+
+/**
+ * Analyze what the bot needs to produce
+ */
+function analyzeProductionNeeds(
+  gameState: GameState,
+  player: PlayerState,
+  currentTile: MapTile
+): {
+  needsGroundForces: boolean;
+  groundForcesNeeded: number;
+  needsCarriers: boolean;
+  needsCombatShips: boolean;
+  threatLevel: number;
+  enemyHasFighters: boolean;
+} {
+  // Count current forces
+  let totalInfantry = 0;
+  let totalCarriers = 0;
+  let totalCombatShips = 0;
+
+  for (const tile of gameState.map.tiles) {
+    for (const unit of tile.units) {
+      if (unit.ownerId !== player.id) continue;
+      if (unit.type === 'carrier') totalCarriers++;
+      if (['cruiser', 'dreadnought', 'destroyer', 'flagship', 'war_sun'].includes(unit.type)) {
+        totalCombatShips++;
+      }
+    }
+    for (const planet of tile.planets) {
+      for (const unit of planet.units) {
+        if (unit.ownerId !== player.id) continue;
+        if (unit.type === 'infantry') totalInfantry++;
+      }
+    }
+  }
+
+  // Count unclaimed/enemy planets nearby
+  let unclaimedPlanetsNearby = 0;
+  const adjacentPositions = getAdjacentPositions(currentTile.position);
+  for (const pos of adjacentPositions) {
+    const adjTile = findTileAtPosition(gameState.map, pos);
+    if (adjTile) {
+      for (const planet of adjTile.planets) {
+        if (planet.controlledBy !== player.id) {
+          unclaimedPlanetsNearby++;
+        }
+      }
+    }
+  }
+
+  // Assess threat level
+  let threatLevel = 0;
+  let enemyHasFighters = false;
+  for (const tile of gameState.map.tiles) {
+    // Count enemy ships near our systems
+    const enemyShips = tile.units.filter(u => u.ownerId !== player.id && isShipType(u.type));
+    if (enemyShips.length > 0) {
+      // Check if this system is near our systems
+      const ourNearby = gameState.map.tiles.some(t =>
+        t.units.some(u => u.ownerId === player.id) &&
+        hexDistance(t.position, tile.position) <= 2
+      );
+      if (ourNearby) {
+        threatLevel += enemyShips.length;
+      }
+      if (enemyShips.some(u => u.type === 'fighter')) {
+        enemyHasFighters = true;
+      }
+    }
+  }
+
+  // Determine needs
+  const needsGroundForces = totalInfantry < 6 || unclaimedPlanetsNearby > 0;
+  const groundForcesNeeded = Math.max(4, unclaimedPlanetsNearby * 2);
+
+  // Need carriers if we don't have enough for expansion
+  const needsCarriers = totalCarriers < 2 || (unclaimedPlanetsNearby > 2 && totalCarriers < 3);
+
+  // Need combat ships if threatened or if we want to take Mecatol
+  const needsCombatShips = threatLevel > 2 || totalCombatShips < 3;
+
+  return {
+    needsGroundForces,
+    groundForcesNeeded,
+    needsCarriers,
+    needsCombatShips,
+    threatLevel,
+    enemyHasFighters,
+  };
+}
+
+/**
+ * Count total fleet units (for fleet supply)
+ */
+function countTotalFleetUnits(gameState: GameState, playerId: string): number {
+  let count = 0;
+  for (const tile of gameState.map.tiles) {
+    for (const unit of tile.units) {
+      if (unit.ownerId === playerId && countsTowardsFleetSupply(unit.type)) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Calculate total carrier capacity
+ */
+function calculateCarrierCapacity(gameState: GameState, player: PlayerState): number {
+  let capacity = 0;
+  for (const tile of gameState.map.tiles) {
+    for (const unit of tile.units) {
+      if (unit.ownerId === player.id) {
+        capacity += getUnitCapacity(unit.type, player);
+      }
+    }
+  }
+  return capacity;
+}
+
+/**
+ * Count total fighters
+ */
+function countFighters(gameState: GameState, playerId: string): number {
+  let count = 0;
+  for (const tile of gameState.map.tiles) {
+    for (const unit of tile.units) {
+      if (unit.ownerId === playerId && unit.type === 'fighter') {
+        count++;
+      }
+    }
+  }
+  return count;
 }
 
 // ============================================================================
@@ -1073,8 +1483,110 @@ function generateWarfarePrimaryChoices(gameState: GameState, player: PlayerState
 }
 
 function generateTechnologyPrimaryChoices(gameState: GameState, player: PlayerState): StrategicPrimaryChoices {
-  // Just skip if no clear tech choice
+  // Get technologies the bot can actually research (meets prerequisites)
+  const availableTechs = getAvailableTechnologies(gameState, player.id);
+
+  if (availableTechs.length === 0) {
+    return {};
+  }
+
+  // Score each technology by usefulness
+  const scoredTechs = availableTechs.map(tech => ({
+    tech,
+    score: calculateTechValue(tech, player),
+  }));
+
+  // Sort by score descending
+  scoredTechs.sort((a, b) => b.score - a.score);
+
+  // Pick the best technology
+  const bestTech = scoredTechs[0];
+  if (bestTech && bestTech.score > 0) {
+    return {
+      techId: bestTech.tech.id,
+    };
+  }
+
   return {};
+}
+
+/**
+ * Calculate the value of a technology for a bot
+ */
+function calculateTechValue(tech: typeof technologies[string], player: PlayerState): number {
+  let score = 0;
+
+  // Base value by tier (higher tier = more powerful but less accessible)
+  const prereqCount = tech.prerequisites?.length || 0;
+  const tier = prereqCount === 0 ? 1 : prereqCount <= 1 ? 2 : prereqCount <= 2 ? 3 : 4;
+
+  // Prefer lower tier techs early (easier to get)
+  score += (5 - tier) * 2;
+
+  // Faction technologies are very valuable
+  if (tech.factionId === player.faction) {
+    score += 15;
+  }
+
+  // Unit upgrades are good for combat
+  if (tech.type === 'unit_upgrade') {
+    score += 8;
+    // Cruiser II and Dreadnought II are particularly good
+    if (tech.id === 'cruiser_ii' || tech.id === 'dreadnought_ii') {
+      score += 5;
+    }
+    // Carrier II for expansion
+    if (tech.id === 'carrier_ii') {
+      score += 4;
+    }
+  }
+
+  // Value by color - prioritize based on general usefulness
+  if (tech.color === 'blue') {
+    // Blue (Propulsion) - mobility is crucial
+    score += 6;
+    // Gravity Drive is excellent
+    if (tech.id === 'gravity_drive') score += 4;
+    // Fleet Logistics is game-changing
+    if (tech.id === 'fleet_logistics') score += 6;
+  } else if (tech.color === 'green') {
+    // Green (Biotic) - economy and cards
+    score += 5;
+    // Neural Motivator for card draw
+    if (tech.id === 'neural_motivator') score += 4;
+    // Hyper Metabolism for tokens
+    if (tech.id === 'hyper_metabolism') score += 5;
+  } else if (tech.color === 'yellow') {
+    // Yellow (Cybernetic) - production
+    score += 4;
+    // Sarween Tools saves resources
+    if (tech.id === 'sarween_tools') score += 4;
+    // Transit Diodes for infantry movement
+    if (tech.id === 'transit_diodes') score += 3;
+  } else if (tech.color === 'red') {
+    // Red (Warfare) - combat
+    score += 4;
+    // Plasma Scoring for PDS/bombardment
+    if (tech.id === 'plasma_scoring') score += 3;
+    // Magen Defense Grid for defense
+    if (tech.id === 'magen_defense_grid') score += 2;
+  }
+
+  // Avoid technologies we already have the color coverage for (diversify)
+  const techCounts: Record<string, number> = { blue: 0, green: 0, yellow: 0, red: 0 };
+  for (const ownedTechId of player.technologies) {
+    const ownedTech = technologies[ownedTechId];
+    if (ownedTech?.color) {
+      techCounts[ownedTech.color]++;
+    }
+  }
+
+  // Slight bonus for colors we have fewer of (diversification for objectives)
+  if (tech.color && techCounts[tech.color] < 2) {
+    score += 3;
+  }
+
+  return score;
 }
 
 function generateImperialPrimaryChoices(gameState: GameState, player: PlayerState): StrategicPrimaryChoices {
@@ -1101,7 +1613,7 @@ function generateStatusPhaseAction(gameState: GameState, player: PlayerState): G
       return generateScoringAction(gameState, player);
 
     case 'gain_redistribute_tokens':
-      return generateRedistributeTokensAction(player);
+      return generateRedistributeTokensAction(gameState, player);
 
     default:
       return null;
@@ -1131,28 +1643,147 @@ function generateScoringAction(gameState: GameState, player: PlayerState): Score
 }
 
 function findScorableObjective(gameState: GameState, player: PlayerState): string | undefined {
-  // Check public objectives
-  for (const obj of [...gameState.objectives.publicStageI, ...gameState.objectives.publicStageII]) {
+  // Track scored objectives for this player
+  const alreadyScored = new Set(player.scoredObjectives || []);
+
+  // Check public Stage I objectives first (worth 1 VP each)
+  for (const obj of gameState.objectives.publicStageI) {
     if (!obj.revealed) continue;
-    if (obj.scoredBy.includes(player.id)) continue;
-    // Would need objective validation here - for now just return first unscored
-    // This is simplified; real implementation would check requirements
-    return obj.id;
+    if (alreadyScored.has(obj.id)) continue;
+    if (obj.scoredBy?.includes(player.id)) continue;
+
+    // Validate the objective requirements
+    const result = checkObjectiveRequirement(gameState, player.id, obj.id);
+    if (result.canScore) {
+      return obj.id;
+    }
   }
+
+  // Check public Stage II objectives (worth 2 VP each)
+  for (const obj of gameState.objectives.publicStageII) {
+    if (!obj.revealed) continue;
+    if (alreadyScored.has(obj.id)) continue;
+    if (obj.scoredBy?.includes(player.id)) continue;
+
+    // Validate the objective requirements
+    const result = checkObjectiveRequirement(gameState, player.id, obj.id);
+    if (result.canScore) {
+      return obj.id;
+    }
+  }
+
+  // Check secret objectives
+  for (const secretId of player.secretObjectives || []) {
+    if (alreadyScored.has(secretId)) continue;
+
+    // Validate the secret objective requirements
+    const result = checkObjectiveRequirement(gameState, player.id, secretId);
+    if (result.canScore) {
+      return secretId;
+    }
+  }
+
   return undefined;
 }
 
-function generateRedistributeTokensAction(player: PlayerState): RedistributeTokensAction {
+function generateRedistributeTokensAction(gameState: GameState, player: PlayerState): RedistributeTokensAction {
+  // Total tokens available (current + 2 gained in status phase)
   const total = player.commandTokens.tactics + player.commandTokens.fleet + player.commandTokens.strategy + 2;
+
+  // Analyze needs based on game state
+  const analysis = analyzeTokenNeeds(gameState, player);
+
+  // Calculate distribution based on needs
+  let tactics = 0;
+  let fleet = 0;
+  let strategy = 0;
+
+  // Minimum allocations
+  const minTactics = 2;  // Always need some tactics for actions
+  const minFleet = Math.max(2, analysis.currentFleetSize - 1);  // Support current fleet
+  const minStrategy = 1; // Always want at least 1 for secondaries
+
+  // Start with minimums
+  tactics = Math.min(minTactics, total);
+  let remaining = total - tactics;
+
+  fleet = Math.min(minFleet, remaining);
+  remaining -= fleet;
+
+  strategy = Math.min(minStrategy, remaining);
+  remaining -= strategy;
+
+  // Distribute remaining tokens based on priorities
+  while (remaining > 0) {
+    if (analysis.needsExpansion && tactics < 4) {
+      // Prioritize tactics for expansion/aggression
+      tactics++;
+      remaining--;
+    } else if (analysis.currentFleetSize > fleet && fleet < 6) {
+      // Need more fleet supply for our ships
+      fleet++;
+      remaining--;
+    } else if (analysis.wantsSecondaries && strategy < 3) {
+      // Want to use secondaries
+      strategy++;
+      remaining--;
+    } else if (tactics < 5) {
+      // Default: more tactics is always useful
+      tactics++;
+      remaining--;
+    } else if (fleet < 5) {
+      // Build up fleet supply
+      fleet++;
+      remaining--;
+    } else {
+      // Dump remaining into strategy
+      strategy++;
+      remaining--;
+    }
+  }
+
   return {
     type: 'redistribute_tokens',
     playerId: player.id,
     timestamp: Date.now(),
-    distribution: {
-      tactics: Math.ceil(total / 2),
-      fleet: Math.floor(total / 4) + 1,
-      strategy: total - Math.ceil(total / 2) - Math.floor(total / 4) - 1,
-    },
+    distribution: { tactics, fleet, strategy },
+  };
+}
+
+/**
+ * Analyze what token distribution the bot needs
+ */
+function analyzeTokenNeeds(
+  gameState: GameState,
+  player: PlayerState
+): {
+  needsExpansion: boolean;
+  currentFleetSize: number;
+  wantsSecondaries: boolean;
+} {
+  // Count current fleet size
+  let currentFleetSize = 0;
+  for (const tile of gameState.map.tiles) {
+    for (const unit of tile.units) {
+      if (unit.ownerId === player.id && countsTowardsFleetSupply(unit.type)) {
+        currentFleetSize++;
+      }
+    }
+  }
+
+  // Check if we need to expand
+  const controlledPlanets = countControlledPlanets(gameState, player.id);
+  const needsExpansion = controlledPlanets.nonHome < 4 || gameState.round <= 3;
+
+  // Check if we want secondaries (based on strategy cards available)
+  // Early game: want secondaries for tech, production
+  // Late game: less important
+  const wantsSecondaries = gameState.round <= 4 || player.technologies.length < 6;
+
+  return {
+    needsExpansion,
+    currentFleetSize,
+    wantsSecondaries,
   };
 }
 
@@ -1169,23 +1800,14 @@ function generateAgendaPhaseAction(gameState: GameState, player: PlayerState): C
     return null;
   }
 
-  // Simple voting: vote with all available influence
+  // Calculate available influence
   const availableInfluence = calculateAvailableInfluence(gameState, player);
   const exhaustedPlanets = player.planets
     .filter(p => !p.exhausted)
     .map(p => p.planetId);
 
-  // Determine outcome based on election type
-  let outcome = 'for';
-  if (agenda.currentElectionType === 'for_against') {
-    outcome = 'for';
-  } else if (agenda.currentElectionType === 'player') {
-    // Vote for self
-    outcome = player.id;
-  } else if (agenda.currentElectionType === 'planet') {
-    // Vote for one of our planets
-    outcome = player.planets[0]?.planetId || '';
-  }
+  // Evaluate and determine best outcome
+  const { outcome, shouldAbstain } = evaluateAgendaOutcome(gameState, player, agenda);
 
   return {
     type: 'cast_vote',
@@ -1193,8 +1815,224 @@ function generateAgendaPhaseAction(gameState: GameState, player: PlayerState): C
     timestamp: Date.now(),
     outcome,
     exhaustedPlanets,
-    abstain: availableInfluence === 0,
+    abstain: shouldAbstain || availableInfluence === 0,
   };
+}
+
+/**
+ * Evaluate the best outcome for an agenda based on its effects
+ */
+function evaluateAgendaOutcome(
+  gameState: GameState,
+  player: PlayerState,
+  agenda: NonNullable<GameState['agendaPhase']>
+): { outcome: string; shouldAbstain: boolean } {
+  const agendaId = agenda.currentAgendaId;
+  const electionType = agenda.currentElectionType;
+
+  // For/Against agendas - evaluate if the effect helps or hurts us
+  if (electionType === 'for_against') {
+    const preference = evaluateForAgainstAgenda(gameState, player, agendaId);
+    return { outcome: preference, shouldAbstain: false };
+  }
+
+  // Player elections - choose strategically
+  if (electionType === 'player') {
+    const targetPlayer = evaluatePlayerElection(gameState, player, agendaId);
+    return { outcome: targetPlayer, shouldAbstain: false };
+  }
+
+  // Planet elections - choose based on agenda effect
+  if (electionType === 'planet') {
+    const targetPlanet = evaluatePlanetElection(gameState, player, agendaId);
+    return { outcome: targetPlanet, shouldAbstain: !targetPlanet };
+  }
+
+  // Secret objective elections
+  if (electionType === 'scored_secret') {
+    // Just pick the first available if any
+    const scoredSecrets = gameState.players.flatMap(p => p.scoredObjectives || []);
+    return { outcome: scoredSecrets[0] || '', shouldAbstain: scoredSecrets.length === 0 };
+  }
+
+  // Default: vote for if unknown
+  return { outcome: 'for', shouldAbstain: false };
+}
+
+/**
+ * Evaluate for/against agendas based on their effects
+ */
+function evaluateForAgainstAgenda(
+  gameState: GameState,
+  player: PlayerState,
+  agendaId: string
+): 'for' | 'against' {
+  // Agendas that are generally BAD for players (vote against)
+  const badAgendas = [
+    'anti_intellectual_revolution',  // Hurts tech research
+    'executive_sanctions',           // Limits action cards
+    'fleet_regulations',             // Limits fleet size
+    'enforced_travel_ban',           // Limits wormhole movement
+    'regulated_conscription',        // Limits infantry
+    'research_team_biotic',          // Locks out green tech
+    'research_team_cybernetic',      // Locks out yellow tech
+    'research_team_propulsion',      // Locks out blue tech
+    'research_team_warfare',         // Locks out red tech
+  ];
+
+  // Agendas that are generally GOOD for players (vote for)
+  const goodAgendas = [
+    'articles_of_war',               // Protects non-home systems from bombardment
+    'conventions_of_war',            // Protects cultural planets
+    'publicize_weapon_schematics',   // Everyone gets a tech
+    'shared_research',               // Cheaper tech
+    'wormhole_reconstruction',       // More wormhole connections
+  ];
+
+  // Context-specific evaluation
+  if (badAgendas.includes(agendaId)) {
+    return 'against';
+  }
+
+  if (goodAgendas.includes(agendaId)) {
+    return 'for';
+  }
+
+  // Specific evaluations based on player state
+  if (agendaId === 'ixthian_artifact') {
+    // Risky - vote against unless we're winning
+    const isWinning = player.victoryPoints >= 8;
+    return isWinning ? 'for' : 'against';
+  }
+
+  if (agendaId === 'unconventional_measures') {
+    // Skip action cards - bad if we have many
+    return (player.actionCards?.length || 0) > 3 ? 'against' : 'for';
+  }
+
+  if (agendaId === 'clandestine_operations') {
+    // Limits action cards to 3 - bad if we have more
+    return (player.actionCards?.length || 0) > 3 ? 'against' : 'for';
+  }
+
+  // Default: vote for (most agendas are neutral or slightly positive)
+  return 'for';
+}
+
+/**
+ * Choose a player for player elections
+ */
+function evaluatePlayerElection(
+  gameState: GameState,
+  player: PlayerState,
+  agendaId: string
+): string {
+  // Positive elections - vote for self
+  const positiveElections = [
+    'committee_formation',           // Extra vote
+    'representative_government',     // Become speaker
+    'political_censure',             // Target loses a secret objective (vote for enemy)
+    'minister_of_commerce',          // Gain trade goods
+    'minister_of_exploration',       // Gain exploration card
+    'minister_of_industry',          // Production bonus
+    'minister_of_peace',             // Defense bonus
+    'minister_of_policy',            // Action card bonus
+    'minister_of_sciences',          // Tech discount
+    'minister_of_war',               // Combat bonus
+  ];
+
+  if (positiveElections.includes(agendaId)) {
+    // If it's beneficial, vote for self
+    if (!agendaId.startsWith('political_')) {
+      return player.id;
+    }
+    // For negative effects like political_censure, vote for the leader
+    const leader = findLeadingPlayer(gameState, player.id);
+    return leader?.id || player.id;
+  }
+
+  // Negative elections - vote for enemy
+  const negativeElections = [
+    'political_censure',             // Target loses secret objective
+    'assassinate_representative',    // Target loses a card
+  ];
+
+  if (negativeElections.includes(agendaId)) {
+    const leader = findLeadingPlayer(gameState, player.id);
+    return leader?.id || gameState.players.find(p => p.id !== player.id)?.id || player.id;
+  }
+
+  // Default: vote for self
+  return player.id;
+}
+
+/**
+ * Choose a planet for planet elections
+ */
+function evaluatePlanetElection(
+  gameState: GameState,
+  player: PlayerState,
+  agendaId: string
+): string {
+  // Positive effects - choose our own planet
+  const positiveElections = [
+    'core_mining',                   // +2 resources
+    'holy_planet_of_ixth',           // +influence
+    'terraforming_initiative',       // Gain trade goods
+    'seed_of_an_empire',             // VP location
+  ];
+
+  if (positiveElections.includes(agendaId)) {
+    // Pick our best planet
+    const ourPlanets = player.planets || [];
+    if (ourPlanets.length > 0) {
+      // For core_mining, pick hazardous planet
+      // For holy_planet, pick cultural planet
+      // Default: pick any of our planets
+      return ourPlanets[0].planetId;
+    }
+  }
+
+  // Negative effects - choose enemy planet
+  const negativeElections = [
+    'demilitarized_zone',            // Can't produce units
+    'research_team_biotic',          // Locks tech color
+    'research_team_cybernetic',
+    'research_team_propulsion',
+    'research_team_warfare',
+  ];
+
+  if (negativeElections.includes(agendaId)) {
+    // Find an enemy planet
+    for (const tile of gameState.map.tiles) {
+      for (const planet of tile.planets) {
+        if (planet.controlledBy && planet.controlledBy !== player.id) {
+          return planet.planetId;
+        }
+      }
+    }
+  }
+
+  // Default: pick any planet we own
+  return player.planets?.[0]?.planetId || '';
+}
+
+/**
+ * Find the player with the most victory points (excluding self)
+ */
+function findLeadingPlayer(gameState: GameState, excludePlayerId: string): PlayerState | null {
+  let leader: PlayerState | null = null;
+  let maxVP = -1;
+
+  for (const p of gameState.players) {
+    if (p.id === excludePlayerId) continue;
+    if (p.victoryPoints > maxVP) {
+      maxVP = p.victoryPoints;
+      leader = p;
+    }
+  }
+
+  return leader;
 }
 
 // ============================================================================
