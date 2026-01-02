@@ -369,19 +369,19 @@ export function revealPublicObjective(state: GameState): string | null {
 
 /**
  * Draw action cards for all players
- * Base: 1 action card per player
- * Neural Motivator: Draw 2 action cards instead of 1
+ * Base: 2 action cards per player (per TI4 rules)
+ * Neural Motivator: Draw 1 additional action card (3 total)
  */
 export function drawActionCards(state: GameState): void {
-  const BASE_CARDS_TO_DRAW = 1;
+  const BASE_CARDS_TO_DRAW = 2;
 
   for (const playerId of state.initiativeOrder) {
     const player = state.players.find(p => p.id === playerId);
     if (!player) continue;
 
-    // Neural Motivator: Draw 2 action cards instead of 1
+    // Neural Motivator: Draw 1 additional action card (3 total)
     const hasNeuralMotivator = player.technologies?.includes('neural_motivator') ?? false;
-    const cardsToDraw = hasNeuralMotivator ? 2 : BASE_CARDS_TO_DRAW;
+    const cardsToDraw = hasNeuralMotivator ? 3 : BASE_CARDS_TO_DRAW;
 
     for (let i = 0; i < cardsToDraw; i++) {
       // Reshuffle discard if deck is empty

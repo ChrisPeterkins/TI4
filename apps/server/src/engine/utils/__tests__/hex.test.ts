@@ -389,9 +389,16 @@ describe('Hex Utilities', () => {
     });
 
     it('should default to 6-player positions for unsupported player count', () => {
-      const positions = getHomeSystemPositions(8);
+      // 9+ players is not supported, should default to 6
+      const positions = getHomeSystemPositions(9);
 
       expect(positions).toHaveLength(6);
+    });
+
+    it('should support 8-player maps', () => {
+      const positions = getHomeSystemPositions(8);
+
+      expect(positions).toHaveLength(8);
     });
   });
 });
