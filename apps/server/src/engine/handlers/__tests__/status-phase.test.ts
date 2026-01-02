@@ -557,16 +557,16 @@ describe('Status Phase Handlers', () => {
   });
 
   describe('drawActionCards', () => {
-    it('should give each player 2 action cards in initiative order', () => {
+    it('should give each player 1 action card in initiative order', () => {
       const state = createMockGameState();
 
       drawActionCards(state);
 
-      // Per TI4 rules, each player draws 2 action cards during Status Phase
-      expect(state.players[0].actionCards).toHaveLength(2);
-      expect(state.players[1].actionCards).toHaveLength(2);
-      expect(state.players[2].actionCards).toHaveLength(2);
-      expect(state.players[3].actionCards).toHaveLength(2);
+      // Base: each player draws 1 action card during Status Phase
+      expect(state.players[0].actionCards).toHaveLength(1);
+      expect(state.players[1].actionCards).toHaveLength(1);
+      expect(state.players[2].actionCards).toHaveLength(1);
+      expect(state.players[3].actionCards).toHaveLength(1);
     });
 
     it('should draw from the action card deck', () => {
@@ -575,27 +575,37 @@ describe('Status Phase Handlers', () => {
 
       drawActionCards(state);
 
-      // 2 cards per player × 4 players = 8 cards drawn
-      expect(state.actionCardDeck).toHaveLength(initialDeckSize - 8);
+      // 1 card per player × 4 players = 4 cards drawn
+      expect(state.actionCardDeck).toHaveLength(initialDeckSize - 4);
     });
 
     it('should give cards in initiative order', () => {
       const state = createMockGameState();
       state.initiativeOrder = ['player3', 'player1', 'player4', 'player2'];
-      // Need 8 cards for 4 players × 2 cards each
-      state.actionCardDeck = ['card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'card7', 'card8'];
+      // Need 4 cards for 4 players × 1 card each
+      state.actionCardDeck = ['card1', 'card2', 'card3', 'card4'];
 
       drawActionCards(state);
 
-      // player3 gets cards 1-2, player1 gets cards 3-4, etc.
+      // player3 gets card1, player1 gets card2, etc.
       expect(state.players[2].actionCards).toContain('card1'); // player3
-      expect(state.players[2].actionCards).toContain('card2'); // player3
-      expect(state.players[0].actionCards).toContain('card3'); // player1
-      expect(state.players[0].actionCards).toContain('card4'); // player1
-      expect(state.players[3].actionCards).toContain('card5'); // player4
-      expect(state.players[3].actionCards).toContain('card6'); // player4
-      expect(state.players[1].actionCards).toContain('card7'); // player2
-      expect(state.players[1].actionCards).toContain('card8'); // player2
+      expect(state.players[0].actionCards).toContain('card2'); // player1
+      expect(state.players[3].actionCards).toContain('card3'); // player4
+      expect(state.players[1].actionCards).toContain('card4'); // player2
+    });
+
+    it('should draw 2 cards with Neural Motivator', () => {
+      const state = createMockGameState();
+      state.players[0].technologies = ['neural_motivator'];
+      state.actionCardDeck = ['card1', 'card2', 'card3', 'card4', 'card5', 'card6', 'card7'];
+
+      drawActionCards(state);
+
+      // Player with Neural Motivator gets 2 cards, others get 1
+      expect(state.players[0].actionCards).toHaveLength(2);
+      expect(state.players[1].actionCards).toHaveLength(1);
+      expect(state.players[2].actionCards).toHaveLength(1);
+      expect(state.players[3].actionCards).toHaveLength(1);
     });
   });
 
