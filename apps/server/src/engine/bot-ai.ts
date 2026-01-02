@@ -23,6 +23,7 @@ import type {
   CastVoteAction,
   ScoreObjectiveAction,
   SkipScoringAction,
+  SelectSecretObjectiveAction,
   TimingWindowResponseAction,
   HexCoord,
   MapTile,
@@ -160,6 +161,8 @@ export function generateBotAction(
   }
 
   switch (gameState.phase) {
+    case 'setup':
+      return generateSetupPhaseAction(gameState, player);
     case 'strategy':
       return generateStrategyPhaseAction(gameState, player);
     case 'action':
@@ -187,6 +190,30 @@ export function getBotActionDelay(difficulty: BotDifficulty): number {
     default:
       return 1500;
   }
+}
+
+// ============================================================================
+// SETUP PHASE
+// ============================================================================
+
+function generateSetupPhaseAction(gameState: GameState, player: PlayerState): SelectSecretObjectiveAction | null {
+  // During setup, bots need to select which secret objective to keep
+  if (player.secretObjectives.length !== 2) {
+    return null; // Already selected or no secrets to select from
+  }
+
+  // Simple heuristic: pick the first secret objective
+  // A more sophisticated bot would evaluate which objective is easier to score
+  const selectedObjectiveId = player.secretObjectives[0];
+  const discardedObjectiveId = player.secretObjectives[1];
+
+  return {
+    type: 'select_secret_objective',
+    playerId: player.id,
+    timestamp: Date.now(),
+    selectedObjectiveId,
+    discardedObjectiveId,
+  };
 }
 
 // ============================================================================

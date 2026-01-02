@@ -21,6 +21,8 @@ import {
   getInitialExplorationDeck,
   getInitialRelicDeck,
   FACTION_LEADERS,
+  createActionCardDeck,
+  createAgendaDeck,
 } from '@ti4/shared';
 import { factions, systems, strategyCards } from '@ti4/game-data';
 import { getHomeSystemPositions, generateStandardMapPositions } from './utils/hex.js';
@@ -84,9 +86,9 @@ export function createGame(options: GameSetupOptions): GameState {
     strategyCards: strategyCardStates,
     objectives,
     agendas: createAgendaState(),
-    actionCardDeck: shuffleArray(createActionCardDeck()),
+    actionCardDeck: shuffleArray(createActionCardDeck('base')),
     actionCardDiscard: [],
-    agendaDeck: shuffleArray(createAgendaDeck()),
+    agendaDeck: shuffleArray(createAgendaDeck('base')),
     agendaDiscard: [],
     laws: [],
     custodiansTaken: false,
@@ -400,29 +402,6 @@ function createAgendaState(): AgendaState {
   };
 }
 
-/**
- * Create action card deck (placeholder IDs)
- */
-function createActionCardDeck(): string[] {
-  // TODO: Create actual action card deck based on expansions
-  const deck: string[] = [];
-  for (let i = 0; i < 80; i++) {
-    deck.push(`action_card_${i}`);
-  }
-  return deck;
-}
-
-/**
- * Create agenda deck (placeholder IDs)
- */
-function createAgendaDeck(): string[] {
-  // TODO: Create actual agenda deck based on expansions
-  const deck: string[] = [];
-  for (let i = 0; i < 40; i++) {
-    deck.push(`agenda_${i}`);
-  }
-  return deck;
-}
 
 /**
  * Place starting units for a player

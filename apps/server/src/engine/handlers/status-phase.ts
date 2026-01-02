@@ -3,6 +3,7 @@ import type {
   ScoreObjectiveAction,
   SkipScoringAction,
   RedistributeTokensAction,
+  SelectSecretObjectiveAction,
   StatusPhaseState,
   UUID,
 } from '@ti4/shared';
@@ -156,6 +157,64 @@ export function handleSkipScoring(
   return {
     success: true,
     triggeredEvents: ['scoring_skipped'],
+  };
+}
+
+/**
+ * Handle selecting which secret objective to keep during setup
+ * Players are dealt 2 secrets and must keep 1, returning the other to bottom of deck
+ */
+export function handleSelectSecretObjective(
+  state: GameState,
+  action: SelectSecretObjectiveAction
+): HandlerResult {
+  const player = state.players.find(p => p.id === action.playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Verify player has exactly 2 secret objectives to choose from
+  if (player.secretObjectives.length !== 2) {
+    return { success: false, error: 'Player does not have 2 secrets to choose from' };
+  }
+
+  // Verify selected objective is one of the player's secrets
+  if (!player.secretObjectives.includes(action.selectedObjectiveId)) {
+    return { success: false, error: 'Selected objective is not in player\'s hand' };
+  }
+
+  // Verify discarded objective is the other one
+  if (!player.secretObjectives.includes(action.discardedObjectiveId)) {
+    return { success: false, error: 'Discarded objective is not in player\'s hand' };
+  }
+
+  if (action.selectedObjectiveId === action.discardedObjectiveId) {
+    return { success: false, error: 'Cannot select and discard the same objective' };
+  }
+
+  // Keep the selected objective, return discarded to bottom of deck
+  player.secretObjectives = [action.selectedObjectiveId];
+  state.objectives.secretDeck.push(action.discardedObjectiveId);
+
+  // Check if all players have made their selection
+  const playersStillSelecting = state.players.filter(p => p.secretObjectives.length === 2);
+
+  if (playersStillSelecting.length === 0) {
+    // All players done - if in setup phase, transition to strategy phase
+    if (state.phase === 'setup') {
+      state.phase = 'strategy';
+      state.round = 1;
+      state.activePlayerId = state.speakerId;
+    }
+  } else {
+    // Move to next player who needs to select
+    const nextPlayer = playersStillSelecting[0];
+    state.activePlayerId = nextPlayer.id;
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['secret_objective_selected'],
   };
 }
 

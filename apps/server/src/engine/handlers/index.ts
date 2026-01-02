@@ -5,6 +5,7 @@ import type {
   AnnounceRetreatAction,
   ScoreObjectiveAction,
   SkipScoringAction,
+  SelectSecretObjectiveAction,
   RedistributeTokensAction,
   CastVoteAction,
   SpeakerTiebreakAction,
@@ -55,6 +56,7 @@ import {
   handleScoreObjective,
   handleSkipScoring,
   handleRedistributeTokens,
+  handleSelectSecretObjective,
 } from './status-phase.js';
 import {
   handleRevealAgenda,
@@ -160,6 +162,9 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'redistribute_tokens':
       return handleRedistributeTokens(state, action as RedistributeTokensAction);
+
+    case 'select_secret_objective':
+      return handleSelectSecretObjective(state, action as SelectSecretObjectiveAction);
 
     // Agenda Phase
     case 'reveal_agenda':

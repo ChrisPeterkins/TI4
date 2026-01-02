@@ -482,3 +482,13 @@ export function getAgendasByType(type: 'law' | 'directive'): AgendaCardData[] {
 export function getAgendasByElectionType(electionType: AgendaCardData['electionType']): AgendaCardData[] {
   return ALL_AGENDAS.filter(a => a.electionType === electionType);
 }
+
+/**
+ * Create the initial agenda deck for a game
+ * Returns array of agenda IDs to shuffle
+ */
+export function createAgendaDeck(expansion: 'base' | 'pok' = 'base'): string[] {
+  return ALL_AGENDAS
+    .filter(a => a.expansion === expansion || a.expansion === 'base')
+    .map(a => a.id);
+}
