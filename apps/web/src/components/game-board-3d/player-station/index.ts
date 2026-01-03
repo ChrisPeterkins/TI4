@@ -51,7 +51,10 @@ export { ExplorationMat3D, EXPLORATION_MAT_DIMENSIONS } from './ExplorationMat3D
 export type { ExplorationMat3DProps, ExplorationCardData, ExplorationType } from './ExplorationMat3D';
 
 export { LeaderCardsDisplay3D, LEADER_CARDS_DIMENSIONS } from './LeaderCardsDisplay3D';
-export type { LeaderCardsDisplay3DProps, LeaderCardData, LeaderCardState, LeaderType } from './LeaderCardsDisplay3D';
+export type { LeaderCardsDisplay3DProps, LeaderCardData, LeaderCardState, LeaderType, UnlockProgress } from './LeaderCardsDisplay3D';
+
+export { PlayerTargetSelector3D } from './PlayerTargetSelector3D';
+export type { PlayerTargetSelector3DProps, TargetablePlayer } from './PlayerTargetSelector3D';
 
 export { RelicFragmentDisplay3D, RELIC_FRAGMENT_DIMENSIONS } from './RelicFragmentDisplay3D';
 export type { RelicFragmentDisplay3DProps, RelicFragments, FragmentType } from './RelicFragmentDisplay3D';

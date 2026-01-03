@@ -8,6 +8,7 @@ import { Text, Html } from '@react-three/drei';
 import { animated, useSpring } from '@react-spring/three';
 import { getLeaderCardUrl, getLeaderCardBackUrl } from '@/lib/assets';
 import { configureHighQualityTexture } from '../textureUtils';
+import { PlayerTargetSelector3D, type TargetablePlayer } from './PlayerTargetSelector3D';
 
 // Leader card dimensions (wider aspect ratio)
 const CARD_WIDTH = 1.4;
@@ -18,11 +19,19 @@ const CARD_SPACING = 1.5;
 // Leader types
 export type LeaderType = 'agent' | 'commander' | 'hero';
 
+// Commander unlock progress tracking
+export interface UnlockProgress {
+  current: number;
+  required: number;
+  description: string;  // e.g., "infantry on planets", "technologies", "trade goods"
+}
+
 // Leader state
 export interface LeaderCardState {
   unlocked: boolean;
   exhausted?: boolean; // Only for agents
   purged?: boolean;    // Only for heroes (used)
+  unlockProgress?: UnlockProgress; // Commander unlock progress
 }
 
 // Leader card data
@@ -31,6 +40,8 @@ export interface LeaderCardData {
   name: string;
   type: LeaderType;
   state: LeaderCardState;
+  abilityDescription?: string; // The ability text
+  canTargetOthers?: boolean;   // Whether this leader can target other players
 }
 
 export interface LeaderCardsDisplay3DProps {
@@ -39,8 +50,15 @@ export interface LeaderCardsDisplay3DProps {
   rotation?: [number, number, number];
   scale?: number;
   faceUp?: boolean;
+  /** Called when a leader is clicked (for non-targeting abilities or inspection) */
   onLeaderClick?: (leaderId: string, leaderType: LeaderType) => void;
+  /** Called when a leader ability targets another player */
+  onLeaderTargetPlayer?: (leaderId: string, leaderType: LeaderType, targetPlayerId: string) => void;
   onLeaderHover?: (leaderId: string | null) => void;
+  /** List of players that can be targeted (required for targeting abilities) */
+  targetablePlayers?: TargetablePlayer[];
+  /** The current player's ID (used to exclude self from targeting) */
+  currentPlayerId?: string;
 }
 
 // Leader type colors for visual distinction
@@ -228,27 +246,68 @@ function LeaderCard({
         </Text>
       </group>
 
-      {/* Lock overlay for locked leaders */}
+      {/* Lock overlay for locked leaders - show unlock progress for commanders */}
       {isLocked && (
         <group position={[0, 0.03, 0]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.15 * scale, 32]} />
-            <meshStandardMaterial
-              color="#1a1a1a"
-              transparent
-              opacity={0.9}
-            />
-          </mesh>
-          <Text
-            position={[0, 0.01, 0]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            fontSize={0.12 * scale}
-            color="#666666"
-            anchorX="center"
-            anchorY="middle"
-          >
-            🔒
-          </Text>
+          {leader.type === 'commander' && leader.state.unlockProgress ? (
+            // Show unlock progress bar for commanders
+            <>
+              {/* Progress bar background */}
+              <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <planeGeometry args={[cardWidth * 0.7, 0.08 * scale]} />
+                <meshStandardMaterial color="#1a1a1a" transparent opacity={0.9} />
+              </mesh>
+              {/* Progress bar fill */}
+              <mesh
+                position={[
+                  -cardWidth * 0.35 * (1 - leader.state.unlockProgress.current / leader.state.unlockProgress.required),
+                  0.001,
+                  0
+                ]}
+                rotation={[-Math.PI / 2, 0, 0]}
+              >
+                <planeGeometry args={[
+                  cardWidth * 0.7 * Math.min(1, leader.state.unlockProgress.current / leader.state.unlockProgress.required),
+                  0.06 * scale
+                ]} />
+                <meshStandardMaterial color={typeColor} transparent opacity={0.8} />
+              </mesh>
+              {/* Progress text */}
+              <Text
+                position={[0, 0.015, 0]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                fontSize={0.04 * scale}
+                color="white"
+                anchorX="center"
+                anchorY="middle"
+                fontWeight="bold"
+              >
+                {`${leader.state.unlockProgress.current}/${leader.state.unlockProgress.required}`}
+              </Text>
+            </>
+          ) : (
+            // Default lock icon for agents and heroes
+            <>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.15 * scale, 32]} />
+                <meshStandardMaterial
+                  color="#1a1a1a"
+                  transparent
+                  opacity={0.9}
+                />
+              </mesh>
+              <Text
+                position={[0, 0.01, 0]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                fontSize={0.12 * scale}
+                color="#666666"
+                anchorX="center"
+                anchorY="middle"
+              >
+                🔒
+              </Text>
+            </>
+          )}
         </group>
       )}
 
@@ -277,19 +336,49 @@ function LeaderCard({
         </group>
       )}
 
-      {/* Hover tooltip */}
+      {/* Hover tooltip with ability description */}
       {isHovered && (
         <Html position={[0, 0.25, 0]} center>
-          <div className="bg-gray-900/95 text-white text-xs px-3 py-2 rounded whitespace-nowrap max-w-48">
-            <div className="font-bold" style={{ color: typeColor }}>
+          <div className="bg-gray-900/95 text-white text-xs px-3 py-2 rounded max-w-64 shadow-lg border border-gray-700">
+            {/* Header with type and name */}
+            <div className="font-bold text-sm" style={{ color: typeColor }}>
               {LEADER_TYPE_LABELS[leader.type]}
             </div>
-            <div className="text-white font-medium">{leader.name}</div>
-            <div className="text-gray-400 mt-1 text-[10px]">
-              {isLocked && 'Locked - unlock condition not met'}
-              {!isLocked && isExhausted && 'Exhausted - used this round'}
-              {!isLocked && isPurged && 'Purged - hero ability used'}
-              {!isLocked && !isExhausted && !isPurged && 'Ready'}
+            <div className="text-white font-medium text-sm mb-1">{leader.name}</div>
+
+            {/* Ability description */}
+            {leader.abilityDescription && (
+              <div className="text-gray-300 text-[10px] leading-relaxed mb-2 border-t border-gray-700 pt-1 mt-1">
+                {leader.abilityDescription}
+              </div>
+            )}
+
+            {/* Status indicator */}
+            <div className="text-[10px] font-medium pt-1 border-t border-gray-700">
+              {isLocked && leader.type === 'commander' && leader.state.unlockProgress && (
+                <div className="text-amber-400">
+                  Unlock: {leader.state.unlockProgress.current}/{leader.state.unlockProgress.required} {leader.state.unlockProgress.description}
+                </div>
+              )}
+              {isLocked && (!leader.state.unlockProgress || leader.type !== 'commander') && (
+                <div className="text-gray-500">
+                  {leader.type === 'agent' && '🔒 Agents are unlocked at game start'}
+                  {leader.type === 'commander' && '🔒 Unlock condition not met'}
+                  {leader.type === 'hero' && '🔒 Score 3 objectives to unlock'}
+                </div>
+              )}
+              {!isLocked && isExhausted && (
+                <div className="text-gray-500">⏸️ Exhausted - refreshes in Status Phase</div>
+              )}
+              {!isLocked && isPurged && (
+                <div className="text-red-400">✖ Purged - hero ability used</div>
+              )}
+              {!isLocked && !isExhausted && !isPurged && (
+                <div className="text-green-400">
+                  ✓ Ready
+                  {leader.canTargetOthers && <span className="text-blue-400 ml-1">(can target players)</span>}
+                </div>
+              )}
             </div>
           </div>
         </Html>
@@ -321,9 +410,17 @@ function FallbackCard({
   );
 }
 
+// State for tracking which leader is currently selecting a target
+interface TargetingState {
+  leaderId: string;
+  leaderType: LeaderType;
+  leaderName: string;
+}
+
 /**
  * Display of leader cards (Agent, Commander, Hero)
  * Shows 3 cards side by side with state indicators
+ * Supports target selection for abilities that can target other players
  */
 export function LeaderCardsDisplay3D({
   leaders,
@@ -332,9 +429,13 @@ export function LeaderCardsDisplay3D({
   scale = 1,
   faceUp = true,
   onLeaderClick,
+  onLeaderTargetPlayer,
   onLeaderHover,
+  targetablePlayers = [],
+  currentPlayerId,
 }: LeaderCardsDisplay3DProps) {
   const [hoveredLeaderId, setHoveredLeaderId] = useState<string | null>(null);
+  const [targetingState, setTargetingState] = useState<TargetingState | null>(null);
 
   // Sort leaders by type order: agent, commander, hero
   const sortedLeaders = useMemo(() => {
@@ -352,8 +453,40 @@ export function LeaderCardsDisplay3D({
   }, [sortedLeaders.length, scale]);
 
   const handleLeaderClick = useCallback((leaderId: string, leaderType: LeaderType) => {
+    const leader = leaders.find(l => l.id === leaderId);
+
+    // If this leader can target other players and we have players to target
+    if (leader?.canTargetOthers && targetablePlayers.length > 0 && onLeaderTargetPlayer) {
+      // Check if the leader is usable (unlocked, not exhausted/purged)
+      const isUsable = leader.state.unlocked &&
+        !(leader.type === 'agent' && leader.state.exhausted) &&
+        !(leader.type === 'hero' && leader.state.purged);
+
+      if (isUsable) {
+        // Open target selection
+        setTargetingState({
+          leaderId,
+          leaderType,
+          leaderName: leader.name,
+        });
+        return;
+      }
+    }
+
+    // Otherwise, just call the regular click handler (for inspection, etc.)
     onLeaderClick?.(leaderId, leaderType);
-  }, [onLeaderClick]);
+  }, [leaders, targetablePlayers, onLeaderTargetPlayer, onLeaderClick]);
+
+  const handleTargetSelect = useCallback((targetPlayerId: string) => {
+    if (targetingState && onLeaderTargetPlayer) {
+      onLeaderTargetPlayer(targetingState.leaderId, targetingState.leaderType, targetPlayerId);
+    }
+    setTargetingState(null);
+  }, [targetingState, onLeaderTargetPlayer]);
+
+  const handleTargetCancel = useCallback(() => {
+    setTargetingState(null);
+  }, []);
 
   const handleLeaderHover = useCallback((leaderId: string | null) => {
     setHoveredLeaderId(leaderId);
@@ -412,6 +545,20 @@ export function LeaderCardsDisplay3D({
           />
         </Suspense>
       ))}
+
+      {/* Target selection popup */}
+      {targetingState && (
+        <PlayerTargetSelector3D
+          position={[0, 0.6, 0]}
+          players={targetablePlayers}
+          onSelect={handleTargetSelect}
+          onCancel={handleTargetCancel}
+          title={`Use ${targetingState.leaderName}`}
+          description="Select a player to target"
+          currentPlayerId={currentPlayerId}
+          allowSelf={false}
+        />
+      )}
     </group>
   );
 }

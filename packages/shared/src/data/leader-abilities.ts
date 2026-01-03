@@ -1,6 +1,8 @@
 /**
  * TI4 Leader Abilities Data
  * Defines all agent, commander, and hero abilities for every faction
+ *
+ * Data sourced from: https://twilight-imperium.fandom.com/wiki/Leaders
  */
 
 // Timing types for leader abilities
@@ -90,10 +92,14 @@ export interface LeaderAbility {
 
 /**
  * All leader abilities indexed by leader ID
+ * IDs match those in leaders.ts
  */
 export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
   // ============================================
   // ARBOREC
+  // Agent: Letani Ospha
+  // Commander: Dirzuga Rophal
+  // Hero: Letani Miasmiala
   // ============================================
   letani_ospha: {
     id: 'letani_ospha',
@@ -105,9 +111,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'place_units', units: [{ type: 'infantry', count: 1 }] },
     canTargetOthers: true,
   },
-  letani_miasmiala: {
-    id: 'letani_miasmiala',
-    name: 'Letani Miasmiala',
+  dirzuga_rophal: {
+    id: 'dirzuga_rophal',
+    name: 'Dirzuga Rophal',
     factionId: 'arborec',
     type: 'commander',
     timing: 'passive',
@@ -116,9 +122,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Have 12 ground forces on planets you control
     unlockCondition: { type: 'have_units_total', unitType: 'infantry', count: 12 },
   },
-  letani_behemoth: {
-    id: 'letani_behemoth',
-    name: 'Letani Behemoth',
+  letani_miasmiala: {
+    id: 'letani_miasmiala',
+    name: 'Letani Miasmiala',
     factionId: 'arborec',
     type: 'hero',
     timing: 'action',
@@ -129,10 +135,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // GHOSTS OF CREUSS
+  // Agent: Emissary Taivra
+  // Commander: Sai Seravus
+  // Hero: Riftwalker Me'ian
   // ============================================
-  icarus_drive: {
-    id: 'icarus_drive',
-    name: 'Icarus Drive',
+  emissary_taivra: {
+    id: 'emissary_taivra',
+    name: 'Emissary Taivra',
     factionId: 'creuss',
     type: 'agent',
     timing: 'after_activated',
@@ -140,9 +149,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'creuss_agent' },
     canTargetOthers: true,
   },
-  emissary_taivra: {
-    id: 'emissary_taivra',
-    name: 'Emissary Taivra',
+  sai_seravus: {
+    id: 'sai_seravus',
+    name: 'Sai Seravus',
     factionId: 'creuss',
     type: 'commander',
     timing: 'passive',
@@ -164,10 +173,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // EMIRATES OF HACAN
+  // Agent: Carth of Golden Sands
+  // Commander: Gila the Silvertongue
+  // Hero: Harrugh Gefhara
   // ============================================
-  gila_the_silvertongue: {
-    id: 'gila_the_silvertongue',
-    name: 'Gila the Silvertongue',
+  carth_of_golden_sands: {
+    id: 'carth_of_golden_sands',
+    name: 'Carth of Golden Sands',
     factionId: 'hacan',
     type: 'agent',
     timing: 'action',
@@ -176,9 +188,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     canTargetOthers: true,
     isComponentAction: true,
   },
-  carth_of_golden_sands: {
-    id: 'carth_of_golden_sands',
-    name: 'Carth of Golden Sands',
+  gila_the_silvertongue: {
+    id: 'gila_the_silvertongue',
+    name: 'Gila the Silvertongue',
     factionId: 'hacan',
     type: 'commander',
     timing: 'passive',
@@ -200,10 +212,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // UNIVERSITIES OF JOL-NAR
+  // Agent: Doctor Sucaban
+  // Commander: Ta Zern
+  // Hero: Rin, The Master's Legacy
   // ============================================
-  ta_zern: {
-    id: 'ta_zern',
-    name: 'Ta Zern',
+  doctor_sucaban: {
+    id: 'doctor_sucaban',
+    name: 'Doctor Sucaban',
     factionId: 'jolnar',
     type: 'agent',
     timing: 'when_researching',
@@ -211,9 +226,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'draw_action_cards', count: 1 },
     canTargetOthers: true,
   },
-  doctor_sucaban: {
-    id: 'doctor_sucaban',
-    name: 'Doctor Sucaban',
+  ta_zern: {
+    id: 'ta_zern',
+    name: 'Ta Zern',
     factionId: 'jolnar',
     type: 'commander',
     timing: 'when_researching',
@@ -235,6 +250,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // L1Z1X MINDNET
+  // Agent: I48S
+  // Commander: 2RAM
+  // Hero: The Helmsman
   // ============================================
   i48s: {
     id: 'i48s',
@@ -256,9 +274,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'l1z1x_commander' },
     unlockCondition: { type: 'have_units_total', unitType: 'dreadnought', count: 4 },
   },
-  annihilator: {
-    id: 'annihilator',
-    name: 'Annihilator',
+  the_helmsman: {
+    id: 'the_helmsman',
+    name: 'The Helmsman',
     factionId: 'l1z1x',
     type: 'hero',
     timing: 'action',
@@ -269,6 +287,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // BARONY OF LETNEV
+  // Agent: Viscount Unlenn
+  // Commander: Rear Admiral Farran
+  // Hero: Darktalon Treilla
   // ============================================
   viscount_unlenn: {
     id: 'viscount_unlenn',
@@ -293,7 +314,7 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
   },
   darktalon_treilla: {
     id: 'darktalon_treilla',
-    name: 'Dark Talon Treilla',
+    name: 'Darktalon Treilla',
     factionId: 'letnev',
     type: 'hero',
     timing: 'action',
@@ -304,10 +325,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // MENTAK COALITION
+  // Agent: Suffi An
+  // Commander: S'Ula Mentarion
+  // Hero: Ipswitch, Loose Cannon
   // ============================================
-  zeu: {
-    id: 'zeu',
-    name: 'Zeu',
+  suffi_an: {
+    id: 'suffi_an',
+    name: 'Suffi An',
     factionId: 'mentak',
     type: 'agent',
     timing: 'when_other_activates',
@@ -315,9 +339,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'mentak_agent' },
     canTargetOthers: true,
   },
-  ipswitch_loose_cannon: {
-    id: 'ipswitch_loose_cannon',
-    name: 'Ipswitch, Loose Cannon',
+  sula_mentarion: {
+    id: 'sula_mentarion',
+    name: "S'Ula Mentarion",
     factionId: 'mentak',
     type: 'commander',
     timing: 'passive',
@@ -326,9 +350,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Have 4 cruisers on the game board
     unlockCondition: { type: 'have_units_total', unitType: 'cruiser', count: 4 },
   },
-  kyver_blade_and_key: {
-    id: 'kyver_blade_and_key',
-    name: 'Kyver, Blade and Key',
+  ipswitch_loose_cannon: {
+    id: 'ipswitch_loose_cannon',
+    name: 'Ipswitch, Loose Cannon',
     factionId: 'mentak',
     type: 'hero',
     timing: 'action',
@@ -339,10 +363,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // EMBERS OF MUAAT
+  // Agent: Umbat
+  // Commander: Magmus
+  // Hero: Adjudicator Ba'al
   // ============================================
-  magmus: {
-    id: 'magmus',
-    name: 'Magmus',
+  umbat: {
+    id: 'umbat',
+    name: 'Umbat',
     factionId: 'muaat',
     type: 'agent',
     timing: 'when_producing',
@@ -350,9 +377,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'muaat_agent' },
     canTargetOthers: true,
   },
-  ember_colossus: {
-    id: 'ember_colossus',
-    name: 'Ember Colossus',
+  magmus: {
+    id: 'magmus',
+    name: 'Magmus',
     factionId: 'muaat',
     type: 'commander',
     timing: 'passive',
@@ -374,10 +401,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // NAALU COLLECTIVE
+  // Agent: Z'eu
+  // Commander: M'aban
+  // Hero: The Oracle
   // ============================================
-  acamar: {
-    id: 'acamar',
-    name: 'Acamar',
+  zeu: {
+    id: 'zeu',
+    name: "Z'eu",
     factionId: 'naalu',
     type: 'agent',
     timing: 'when_combat_start',
@@ -385,20 +415,20 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'naalu_agent' },
     canTargetOthers: false,
   },
-  the_oracle: {
-    id: 'the_oracle',
-    name: 'The Oracle',
+  maban: {
+    id: 'maban',
+    name: "M'aban",
     factionId: 'naalu',
     type: 'commander',
     timing: 'passive',
-    description: 'You may look at your secret objectives at any time.',
+    description: 'You may look at your opponents\' secret objectives at any time.',
     effect: { type: 'custom', handlerId: 'naalu_commander' },
     // UNLOCK: Have 12 fighters on the game board
     unlockCondition: { type: 'have_units_total', unitType: 'fighter', count: 12 },
   },
-  the_stillness_of_stars: {
-    id: 'the_stillness_of_stars',
-    name: 'The Stillness of Stars',
+  the_oracle: {
+    id: 'the_oracle',
+    name: 'The Oracle',
     factionId: 'naalu',
     type: 'hero',
     timing: 'action',
@@ -409,6 +439,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // NEKRO VIRUS
+  // Agent: Nekro Malleon
+  // Commander: Nekro Acidos
+  // Hero: UNIT.DSGN.FLAYESH
   // ============================================
   nekro_malleon: {
     id: 'nekro_malleon',
@@ -444,21 +477,24 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // SARDAKK N'ORR
+  // Agent: T'ro
+  // Commander: G'hom Sek'kus
+  // Hero: Sh'val, Harbinger
   // ============================================
   tro: {
     id: 'tro',
-    name: "T'Ro",
-    factionId: 'norr',
+    name: "T'ro",
+    factionId: 'sardakk',
     type: 'agent',
     timing: 'when_combat_start',
     description: 'At the start of a ground combat round: You may exhaust this card to choose 1 ground force in that combat. That ground force rolls 1 additional die during that combat round.',
     effect: { type: 'reroll_dice', count: 1 },
     canTargetOthers: true,
   },
-  shval_harbinger: {
-    id: 'shval_harbinger',
-    name: "Sh'val, Harbinger",
-    factionId: 'norr',
+  ghom_sekkus: {
+    id: 'ghom_sekkus',
+    name: "G'hom Sek'kus",
+    factionId: 'sardakk',
     type: 'commander',
     timing: 'passive',
     description: 'Your units apply +1 to the result of each of their combat rolls during ground combat.',
@@ -466,18 +502,21 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Control 5 planets in non-home systems
     unlockCondition: { type: 'control_non_home_planets', count: 5 },
   },
-  rowl_sarrig: {
-    id: 'rowl_sarrig',
-    name: 'Rowl Sarrig',
-    factionId: 'norr',
+  shval_harbinger: {
+    id: 'shval_harbinger',
+    name: "Sh'val, Harbinger",
+    factionId: 'sardakk',
     type: 'hero',
     timing: 'when_combat_start',
     description: 'At the start of space combat: Destroy all of your opponent\'s fighters in this system. Then, purge this card.',
-    effect: { type: 'custom', handlerId: 'norr_hero' },
+    effect: { type: 'custom', handlerId: 'sardakk_hero' },
   },
 
   // ============================================
   // CLAN OF SAAR
+  // Agent: Captain Mendosa
+  // Commander: Rowl Sarrig
+  // Hero: Gurno Aggero
   // ============================================
   captain_mendosa: {
     id: 'captain_mendosa',
@@ -490,9 +529,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     canTargetOthers: true,
     isComponentAction: true,
   },
-  starlancer: {
-    id: 'starlancer',
-    name: 'Starlancer',
+  rowl_sarrig: {
+    id: 'rowl_sarrig',
+    name: 'Rowl Sarrig',
     factionId: 'saar',
     type: 'commander',
     timing: 'passive',
@@ -513,6 +552,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // FEDERATION OF SOL
+  // Agent: Evelyn Delouis
+  // Commander: Claire Gibson
+  // Hero: Jace X. 4th Air Legion
   // ============================================
   evelyn_delouis: {
     id: 'evelyn_delouis',
@@ -548,6 +590,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // WINNU
+  // Agent: Berekar Berekon
+  // Commander: Rickar Rickani
+  // Hero: Mathis Mathinus
   // ============================================
   berekar_berekon: {
     id: 'berekar_berekon',
@@ -583,10 +628,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // XXCHA KINGDOM
+  // Agent: Ggrocuto Rinn
+  // Commander: Elder Qanoj
+  // Hero: Xxekir Grom
   // ============================================
   ggrocuto_rinn: {
     id: 'ggrocuto_rinn',
-    name: "G'grocuto Rinn",
+    name: 'Ggrocuto Rinn',
     factionId: 'xxcha',
     type: 'agent',
     timing: 'when_voting',
@@ -617,6 +665,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // YIN BROTHERHOOD
+  // Agent: Brother Milor
+  // Commander: Brother Omar
+  // Hero: Dannel of the Tenth
   // ============================================
   brother_milor: {
     id: 'brother_milor',
@@ -652,10 +703,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // YSSARIL TRIBES
+  // Agent: Clever Clever Ssruu
+  // Commander: So Ata
+  // Hero: Kyver, Blade and Key
   // ============================================
   ssruu: {
     id: 'ssruu',
-    name: 'Ssruu',
+    name: 'Clever Clever Ssruu',
     factionId: 'yssaril',
     type: 'agent',
     timing: 'action',
@@ -675,9 +729,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Have 7 action cards
     unlockCondition: { type: 'have_action_cards', count: 7 },
   },
-  blackshade_infiltrator: {
-    id: 'blackshade_infiltrator',
-    name: 'Blackshade Infiltrator',
+  kyver_blade_and_key: {
+    id: 'kyver_blade_and_key',
+    name: 'Kyver, Blade and Key',
     factionId: 'yssaril',
     type: 'hero',
     timing: 'action',
@@ -688,10 +742,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // ARGENT FLIGHT (PoK)
+  // Agent: Trilossa Aun Mirik
+  // Commander: Trrakan Aun Zulok
+  // Hero: Mirik Aun Sissiri
   // ============================================
-  aerie_sentinel: {
-    id: 'aerie_sentinel',
-    name: 'Aerie Sentinel',
+  trilossa_aun_mirik: {
+    id: 'trilossa_aun_mirik',
+    name: 'Trilossa Aun Mirik',
     factionId: 'argent',
     type: 'agent',
     timing: 'when_combat_start',
@@ -699,9 +756,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'argent_agent' },
     canTargetOthers: true,
   },
-  darth_and_tai: {
-    id: 'darth_and_tai',
-    name: 'Darth and Tai',
+  trrakan_aun_zulok: {
+    id: 'trrakan_aun_zulok',
+    name: 'Trrakan Aun Zulok',
     factionId: 'argent',
     type: 'commander',
     timing: 'passive',
@@ -710,9 +767,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Have 6 units that have ANTI-FIGHTER BARRAGE, SPACE CANNON or BOMBARDMENT
     unlockCondition: { type: 'custom', checkerId: 'argent_ability_units' },
   },
-  conservator_procyon: {
-    id: 'conservator_procyon',
-    name: 'Conservator Procyon',
+  mirik_aun_sissiri: {
+    id: 'mirik_aun_sissiri',
+    name: 'Mirik Aun Sissiri',
     factionId: 'argent',
     type: 'hero',
     timing: 'when_voting',
@@ -722,10 +779,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // EMPYREAN (PoK)
+  // Agent: Acamar
+  // Commander: Xuange
+  // Hero: Conservator Procyon
   // ============================================
-  umbat: {
-    id: 'umbat',
-    name: 'Umbat',
+  acamar: {
+    id: 'acamar',
+    name: 'Acamar',
     factionId: 'empyrean',
     type: 'agent',
     timing: 'when_other_activates',
@@ -733,9 +793,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'empyrean_agent' },
     canTargetOthers: false,
   },
-  sai_seravus: {
-    id: 'sai_seravus',
-    name: 'Sai Seravus',
+  xuange: {
+    id: 'xuange',
+    name: 'Xuange',
     factionId: 'empyrean',
     type: 'commander',
     timing: 'passive',
@@ -744,9 +804,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Be neighbors with all other players
     unlockCondition: { type: 'neighbor_all_players' },
   },
-  shield_paling: {
-    id: 'shield_paling',
-    name: 'Shield Paling',
+  conservator_procyon: {
+    id: 'conservator_procyon',
+    name: 'Conservator Procyon',
     factionId: 'empyrean',
     type: 'hero',
     timing: 'action',
@@ -757,10 +817,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // MAHACT GENE-SORCERERS (PoK)
+  // Agent: Jae Mir Kan
+  // Commander: Il Na Viroset
+  // Hero: Airo Shir Aur
   // ============================================
-  il_na_viroset: {
-    id: 'il_na_viroset',
-    name: 'Il Na Viroset',
+  jae_mir_kan: {
+    id: 'jae_mir_kan',
+    name: 'Jae Mir Kan',
     factionId: 'mahact',
     type: 'agent',
     timing: 'action',
@@ -769,9 +832,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     canTargetOthers: true,
     isComponentAction: true,
   },
-  airo_shir_aur: {
-    id: 'airo_shir_aur',
-    name: 'Airo Shir Aur',
+  il_na_viroset: {
+    id: 'il_na_viroset',
+    name: 'Il Na Viroset',
     factionId: 'mahact',
     type: 'commander',
     timing: 'passive',
@@ -779,9 +842,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'mahact_commander' },
     unlockCondition: { type: 'custom', checkerId: 'mahact_command_tokens' },
   },
-  maban: {
-    id: 'maban',
-    name: 'Maban',
+  airo_shir_aur: {
+    id: 'airo_shir_aur',
+    name: 'Airo Shir Aur',
     factionId: 'mahact',
     type: 'hero',
     timing: 'action',
@@ -792,6 +855,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // NAAZ-ROKHA ALLIANCE (PoK)
+  // Agent: Garv and Gunn
+  // Commander: Dart and Tai
+  // Hero: Hesh and Prit
   // ============================================
   garv_and_gunn: {
     id: 'garv_and_gunn',
@@ -827,7 +893,30 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // NOMAD (PoK)
+  // Has 3 Agents: Artuno the Betrayer, Field Marshall Mercer, The Thundarian
+  // Commander: Navarch Feng
+  // Hero: Ahk-Syl Siven
   // ============================================
+  artuno_the_betrayer: {
+    id: 'artuno_the_betrayer',
+    name: 'Artuno the Betrayer',
+    factionId: 'nomad',
+    type: 'agent',
+    timing: 'when_other_activates',
+    description: 'After another player activates a system: You may exhaust this card to allow that player to place 1 cruiser from their reinforcements in the active system.',
+    effect: { type: 'place_units', units: [{ type: 'cruiser', count: 1 }] },
+    canTargetOthers: true,
+  },
+  field_marshal_mercer: {
+    id: 'field_marshal_mercer',
+    name: 'Field Marshal Mercer',
+    factionId: 'nomad',
+    type: 'agent',
+    timing: 'when_combat_start',
+    description: 'At the start of a combat: You may exhaust this card to choose 1 of your units in the active system. That unit rolls 1 additional die during this combat.',
+    effect: { type: 'custom', handlerId: 'nomad_agent_mercer' },
+    canTargetOthers: false,
+  },
   the_thundarian: {
     id: 'the_thundarian',
     name: 'The Thundarian',
@@ -835,12 +924,12 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     type: 'agent',
     timing: 'when_moving',
     description: 'At the start of a player\'s turn: You may exhaust this card. If you do, during this turn, that player\'s ships may move through systems that contain other players\' ships.',
-    effect: { type: 'custom', handlerId: 'nomad_agent' },
+    effect: { type: 'custom', handlerId: 'nomad_agent_thundarian' },
     canTargetOthers: true,
   },
-  artuno_the_betrayer: {
-    id: 'artuno_the_betrayer',
-    name: 'Artuno the Betrayer',
+  navarch_feng: {
+    id: 'navarch_feng',
+    name: 'Navarch Feng',
     factionId: 'nomad',
     type: 'commander',
     timing: 'passive',
@@ -849,9 +938,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Have 1 scored secret objective
     unlockCondition: { type: 'have_scored_secrets', count: 1 },
   },
-  navarch_feng: {
-    id: 'navarch_feng',
-    name: 'Navarch Feng',
+  ahksyl_siven: {
+    id: 'ahksyl_siven',
+    name: 'Ahk-Syl Siven',
     factionId: 'nomad',
     type: 'hero',
     timing: 'action',
@@ -862,10 +951,13 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // TITANS OF UL (PoK)
+  // Agent: Tellurian
+  // Commander: Tungstantus
+  // Hero: Ul the Progenitor (special - attaches to Elysium)
   // ============================================
-  dunlain_reaper: {
-    id: 'dunlain_reaper',
-    name: 'Dunlain Reaper',
+  tellurian: {
+    id: 'tellurian',
+    name: 'Tellurian',
     factionId: 'titans',
     type: 'agent',
     timing: 'when_combat_start',
@@ -897,6 +989,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
 
   // ============================================
   // VUIL'RAITH CABAL (PoK)
+  // Agent: It Feeds on Carrion
+  // Commander: That Which Molds Flesh
+  // Hero: Hecatoncheires
   // ============================================
   it_feeds_on_carrion: {
     id: 'it_feeds_on_carrion',
@@ -931,11 +1026,14 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
   },
 
   // ============================================
-  // COUNCIL KELERES (PoK)
+  // COUNCIL KELERES (Codex III)
+  // Agent: Xander Alexin Victori III
+  // Commander: Odlynn Myrr
+  // Hero: Kuuasi Aun Jalatai (Argent), Harka Leeds (Mentak), or Odlynn Myrr (Xxcha)
   // ============================================
-  tellurian: {
-    id: 'tellurian',
-    name: 'Tellurian',
+  xander_alexin_victori_iii: {
+    id: 'xander_alexin_victori_iii',
+    name: 'Xander Alexin Victori III',
     factionId: 'keleres',
     type: 'agent',
     timing: 'action',
@@ -944,9 +1042,9 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     canTargetOthers: true,
     isComponentAction: true,
   },
-  suffi_an: {
-    id: 'suffi_an',
-    name: 'Suffi An',
+  odlynn_myrr: {
+    id: 'odlynn_myrr',
+    name: 'Odlynn Myrr',
     factionId: 'keleres',
     type: 'commander',
     timing: 'passive',
@@ -955,14 +1053,35 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     // UNLOCK: Spend 1 trade good after you play an action card that has a component action
     unlockCondition: { type: 'custom', checkerId: 'keleres_component_action' },
   },
-  sula_mentarion: {
-    id: 'sula_mentarion',
-    name: 'Sula Mentarion',
+  // Keleres has 3 possible heroes depending on sub-faction
+  kuuasi_aun_jalatai: {
+    id: 'kuuasi_aun_jalatai',
+    name: 'Kuuasi Aun Jalatai',
     factionId: 'keleres',
     type: 'hero',
     timing: 'action',
-    description: 'ACTION: Elect a law in play. Discard all cards in the law deck and all cards in the law discard pile. Draw an agenda card. That agenda becomes a law in play. Then, purge this card.',
-    effect: { type: 'custom', handlerId: 'keleres_hero' },
+    description: 'ACTION: Each other player must give you 1 promissory note from their hand. You may trade any promissory notes in your hand to any player. Then, purge this card.',
+    effect: { type: 'custom', handlerId: 'keleres_hero_argent' },
+    isComponentAction: true,
+  },
+  harka_leeds: {
+    id: 'harka_leeds',
+    name: 'Harka Leeds',
+    factionId: 'keleres',
+    type: 'hero',
+    timing: 'action',
+    description: 'ACTION: Each other player must give you 1 promissory note from their hand. You may trade any promissory notes in your hand to any player. Then, purge this card.',
+    effect: { type: 'custom', handlerId: 'keleres_hero_mentak' },
+    isComponentAction: true,
+  },
+  odlynn_myrr_hero: {
+    id: 'odlynn_myrr_hero',
+    name: 'Odlynn Myrr',
+    factionId: 'keleres',
+    type: 'hero',
+    timing: 'action',
+    description: 'ACTION: Each other player must give you 1 promissory note from their hand. You may trade any promissory notes in your hand to any player. Then, purge this card.',
+    effect: { type: 'custom', handlerId: 'keleres_hero_xxcha' },
     isComponentAction: true,
   },
 };

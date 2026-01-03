@@ -36,6 +36,7 @@ import {
   type StationLayoutPositions,
   type RelicFragments,
   type RelicCardData,
+  type TargetablePlayer,
 } from './player-station';
 import { getFactionLeaderInfo, getLeaderName, getRelic } from '@ti4/shared';
 
@@ -49,6 +50,8 @@ interface PlayerStationCallbacks {
   onPromissoryClick?: (playerId: string, cardId: string) => void;
   onTechClick?: (playerId: string, techId: string) => void;
   onLeaderClick?: (playerId: string, leaderId: string, leaderType: LeaderType) => void;
+  /** Called when a leader ability targets another player */
+  onLeaderTargetPlayer?: (playerId: string, leaderId: string, leaderType: LeaderType, targetPlayerId: string) => void;
   onTradeGoodsClick?: (playerId: string) => void;
   onStationFocus?: (playerId: string, position: THREE.Vector3, rotation: number) => void;
   onRelicFragmentPurge?: (playerId: string, fragmentType: string) => void;
@@ -308,6 +311,7 @@ function EnhancedPlayerStation3D({
   onPromissoryClick,
   onTechClick,
   onLeaderClick,
+  onLeaderTargetPlayer,
   onTradeGoodsClick,
   onStationFocus,
   onRelicFragmentPurge,
@@ -350,6 +354,20 @@ function EnhancedPlayerStation3D({
   const leaderCards = useMemo(() => getLeaderCards(player), [player.faction, player.leaders]);
   const relicFragments = useMemo(() => getRelicFragments(player), [player.relicFragments]);
   const relicCards = useMemo(() => getRelicCards(player), [player.relics, player.exhaustedRelics]);
+
+  // Prepare targetable players for leader abilities (all players except self)
+  const targetablePlayers: TargetablePlayer[] = useMemo(() => {
+    return gameState.players.map(p => {
+      const pFaction = factions[p.faction];
+      return {
+        id: p.id,
+        name: p.name,
+        faction: p.faction,
+        factionShortName: pFaction?.shortName,
+        color: p.color,
+      };
+    });
+  }, [gameState.players]);
 
   // Calculate non-overlapping layout based on component dimensions
   const layout: StationLayoutPositions = useMemo(
@@ -431,6 +449,10 @@ function EnhancedPlayerStation3D({
   const handleLeaderClick = useCallback((leaderId: string, leaderType: LeaderType) => {
     onLeaderClick?.(player.id, leaderId, leaderType);
   }, [player.id, onLeaderClick]);
+
+  const handleLeaderTargetPlayer = useCallback((leaderId: string, leaderType: LeaderType, targetPlayerId: string) => {
+    onLeaderTargetPlayer?.(player.id, leaderId, leaderType, targetPlayerId);
+  }, [player.id, onLeaderTargetPlayer]);
 
   const handleTradeGoodsClick = useCallback(() => {
     onTradeGoodsClick?.(player.id);
@@ -571,6 +593,9 @@ function EnhancedPlayerStation3D({
             scale={layout.leaders.scale}
             faceUp={isCurrentPlayer}
             onLeaderClick={handleLeaderClick}
+            onLeaderTargetPlayer={handleLeaderTargetPlayer}
+            targetablePlayers={targetablePlayers}
+            currentPlayerId={player.id}
           />
         </Suspense>
       )}
@@ -915,6 +940,7 @@ export function PlayerStation3D({
   onPromissoryClick,
   onTechClick,
   onLeaderClick,
+  onLeaderTargetPlayer,
   onTradeGoodsClick,
   onStationFocus,
   enhanced = true, // Default to enhanced mode
@@ -944,6 +970,7 @@ export function PlayerStation3D({
       onPromissoryClick={onPromissoryClick}
       onTechClick={onTechClick}
       onLeaderClick={onLeaderClick}
+      onLeaderTargetPlayer={onLeaderTargetPlayer}
       onTradeGoodsClick={onTradeGoodsClick}
       onStationFocus={onStationFocus}
       isInspectingCard={isInspectingCard}
@@ -1003,6 +1030,7 @@ export function PlayerStations3D({
   onPromissoryClick,
   onTechClick,
   onLeaderClick,
+  onLeaderTargetPlayer,
   onTradeGoodsClick,
   onStationFocus,
   onRelicFragmentPurge,
@@ -1029,6 +1057,7 @@ export function PlayerStations3D({
           onPromissoryClick={onPromissoryClick}
           onTechClick={onTechClick}
           onLeaderClick={onLeaderClick}
+          onLeaderTargetPlayer={onLeaderTargetPlayer}
           onTradeGoodsClick={onTradeGoodsClick}
           onStationFocus={onStationFocus}
           onRelicFragmentPurge={onRelicFragmentPurge}
