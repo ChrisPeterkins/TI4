@@ -12,6 +12,7 @@ import type {
   PlayerColor,
   UnitInstance,
   UnitType,
+  Expansion,
 } from '@ti4/shared';
 import {
   STAGE_I_OBJECTIVES,
@@ -20,6 +21,8 @@ import {
   getGenericNoteIdsForColor,
   getInitialExplorationDeck,
   getInitialRelicDeck,
+  isExplorationEnabled,
+  areRelicsEnabled,
   FACTION_LEADERS,
   createActionCardDeck,
   createAgendaDeck,
@@ -72,6 +75,13 @@ export function createGame(options: GameSetupOptions): GameState {
   // Create objectives
   const objectives = createObjectives(options.expansions || ['base']);
 
+  // Normalize expansions to Expansion type array
+  const expansions = (options.expansions || ['base']) as Expansion[];
+
+  // Create exploration and relic decks based on enabled expansions
+  const explorationEnabled = isExplorationEnabled(expansions);
+  const relicsEnabled = areRelicsEnabled(expansions);
+
   // Create initial game state
   const gameState: GameState = {
     id: gameId,
@@ -86,9 +96,9 @@ export function createGame(options: GameSetupOptions): GameState {
     strategyCards: strategyCardStates,
     objectives,
     agendas: createAgendaState(),
-    actionCardDeck: shuffleArray(createActionCardDeck('base')),
+    actionCardDeck: shuffleArray(createActionCardDeck('base')), // TODO: Pass expansions when action cards support it
     actionCardDiscard: [],
-    agendaDeck: shuffleArray(createAgendaDeck('base')),
+    agendaDeck: shuffleArray(createAgendaDeck('base')), // TODO: Pass expansions when agendas support it
     agendaDiscard: [],
     laws: [],
     custodiansTaken: false,
@@ -97,15 +107,22 @@ export function createGame(options: GameSetupOptions): GameState {
     activeTimingWindow: null,
     winner: null,
     gameLog: [],
-    // PoK exploration decks
-    explorationDecks: {
-      cultural: shuffleArray(getInitialExplorationDeck('cultural')),
-      industrial: shuffleArray(getInitialExplorationDeck('industrial')),
-      hazardous: shuffleArray(getInitialExplorationDeck('hazardous')),
-      frontier: shuffleArray(getInitialExplorationDeck('frontier')),
-    },
+    // PoK exploration decks - only populated if PoK or later expansion is enabled
+    explorationDecks: explorationEnabled
+      ? {
+          cultural: shuffleArray(getInitialExplorationDeck('cultural', expansions)),
+          industrial: shuffleArray(getInitialExplorationDeck('industrial', expansions)),
+          hazardous: shuffleArray(getInitialExplorationDeck('hazardous', expansions)),
+          frontier: shuffleArray(getInitialExplorationDeck('frontier', expansions)),
+        }
+      : {
+          cultural: [],
+          industrial: [],
+          hazardous: [],
+          frontier: [],
+        },
     explorationDiscard: [],
-    relicDeck: shuffleArray(getInitialRelicDeck()),
+    relicDeck: relicsEnabled ? shuffleArray(getInitialRelicDeck(expansions)) : [],
     relicDiscard: [],
   };
 

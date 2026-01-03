@@ -1,15 +1,23 @@
 /**
  * TI4 Prophecy of Kings - Relic Card Data
  *
- * 10 unique relic cards that can be acquired by purging 3 relic fragments.
- * Each relic has powerful abilities that can be used once or passively.
+ * Relics are powerful artifacts acquired by purging 3 relic fragments.
+ * Each relic has unique abilities that can be used once or passively.
+ *
+ * Cards are tagged with their expansion:
+ * - 'pok' - Prophecy of Kings base relics (10)
+ * - 'codex1' - Codex I: Ordinian additions (1)
+ * - 'codex2' - Codex II: Affinity additions (2)
+ * - 'codex3' - Codex III: Vigil additions (0)
  */
+
+import type { Expansion } from '../types/common.js';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type RelicTiming = 'action' | 'passive' | 'combat' | 'agenda' | 'status';
+export type RelicTiming = 'action' | 'passive' | 'combat' | 'agenda' | 'status' | 'tactical';
 export type RelicUsage = 'exhaust' | 'purge' | 'passive';
 
 export interface RelicDef {
@@ -20,22 +28,25 @@ export interface RelicDef {
   timing: RelicTiming;
   usage: RelicUsage;
   victoryPoints?: number;
-  imageId: string; // Matches filename in /images/cards/relic/
+  isAgent?: boolean; // For JR-XS455-0
+  imageId: string;
+  expansion: Expansion;
 }
 
 // ============================================================================
-// Relic Definitions
+// Prophecy of Kings Relics (10)
 // ============================================================================
 
-export const RELIC_CARDS: RelicDef[] = [
+const POK_RELICS: RelicDef[] = [
   {
     id: 'dominus_orb',
     name: 'Dominus Orb',
     description:
       'Before you move units during a tactical action, you may purge this card to move and transport units from systems that contain 1 of your command tokens.',
-    timing: 'action',
+    timing: 'tactical',
     usage: 'purge',
     imageId: 'dominus_orb',
+    expansion: 'pok',
   },
   {
     id: 'maw_of_worlds',
@@ -45,6 +56,7 @@ export const RELIC_CARDS: RelicDef[] = [
     timing: 'agenda',
     usage: 'purge',
     imageId: 'maw_of_worlds',
+    expansion: 'pok',
   },
   {
     id: 'scepter_of_emelpar',
@@ -54,16 +66,18 @@ export const RELIC_CARDS: RelicDef[] = [
     timing: 'action',
     usage: 'exhaust',
     imageId: 'scepter_of_emelpar',
+    expansion: 'pok',
   },
   {
     id: 'shard_of_the_throne',
     name: 'Shard of the Throne',
     description:
-      'When you gain this card, gain 1 victory point. When you lose this card, lose 1 victory point. When a player gains control of a legendary planet you control, that player gains this card.',
+      'When you gain this card, gain 1 victory point. When you lose this card, lose 1 victory point. When a player gains control of a legendary planet or a planet in your home system, that player gains this card.',
     timing: 'passive',
     usage: 'passive',
     victoryPoints: 1,
     imageId: 'shard_of_the_throne',
+    expansion: 'pok',
   },
   {
     id: 'stellar_converter',
@@ -73,6 +87,7 @@ export const RELIC_CARDS: RelicDef[] = [
     timing: 'action',
     usage: 'purge',
     imageId: 'stellar_converter',
+    expansion: 'pok',
   },
   {
     id: 'the_codex',
@@ -82,24 +97,27 @@ export const RELIC_CARDS: RelicDef[] = [
     timing: 'action',
     usage: 'purge',
     imageId: 'the_codex',
+    expansion: 'pok',
   },
   {
     id: 'the_crown_of_emphidia',
     name: 'The Crown of Emphidia',
     description:
       'After you perform a tactical action, you may exhaust this card to explore 1 planet you control. At the end of the status phase, if you control the "Tomb of Emphidia", you may purge this card to gain 1 victory point.',
-    timing: 'action',
+    timing: 'tactical',
     usage: 'exhaust',
     imageId: 'the_crown_of_emphidia',
+    expansion: 'pok',
   },
   {
     id: 'the_crown_of_thalnos',
     name: 'The Crown of Thalnos',
     description:
-      'During combat, you may reroll any number of your dice. You must destroy 1 of your non-fighter ships in the active system for each die you reroll.',
+      'During combat, you may reroll any number of your dice. You must destroy 1 of your non-fighter ships in the active system for each die that does not produce a hit after the reroll.',
     timing: 'combat',
     usage: 'passive',
     imageId: 'the_crown_of_thalnos',
+    expansion: 'pok',
   },
   {
     id: 'the_obsidian',
@@ -109,16 +127,74 @@ export const RELIC_CARDS: RelicDef[] = [
     timing: 'passive',
     usage: 'passive',
     imageId: 'the_obsidian',
+    expansion: 'pok',
   },
   {
     id: 'the_prophets_tears',
     name: "The Prophet's Tears",
     description:
-      'When you research a technology, you may exhaust this card to ignore 1 prerequisite on that technology.',
+      'When you research a technology, you may exhaust this card to ignore 1 prerequisite on that technology. When you would gain a technology, you may exhaust this card to draw 1 action card instead.',
     timing: 'action',
     usage: 'exhaust',
     imageId: 'the_prophets_tears',
+    expansion: 'pok',
   },
+];
+
+// ============================================================================
+// Codex I: Ordinian Relics (1)
+// ============================================================================
+
+const CODEX1_RELICS: RelicDef[] = [
+  {
+    id: 'dynamis_core',
+    name: 'Dynamis Core',
+    description:
+      'While this card is in your play area, your commodity value is increased by 2. ACTION: Purge this card to gain trade goods equal to your printed commodity value plus 2.',
+    timing: 'action',
+    usage: 'purge',
+    imageId: 'dynamis_core',
+    expansion: 'codex1',
+  },
+];
+
+// ============================================================================
+// Codex II: Affinity Relics (2)
+// ============================================================================
+
+const CODEX2_RELICS: RelicDef[] = [
+  {
+    id: 'jr_xs455_o',
+    name: 'JR-XS455-O',
+    description:
+      'This card is a Titan agent. At the start of your turn: You may exhaust this agent and choose a player and a planet they control; that player may place 1 structure on that planet. If they do not, they gain 1 trade good.',
+    flavor: 'Lost Titan Prototype',
+    timing: 'action',
+    usage: 'exhaust',
+    isAgent: true,
+    imageId: 'jr_xs455_o',
+    expansion: 'codex2',
+  },
+  {
+    id: 'nano_forge',
+    name: 'Nano-Forge',
+    description:
+      'ACTION: Attach this card to a non-legendary, non-home planet you control; its resource and influence values are each increased by 2 and it is a legendary planet.',
+    timing: 'action',
+    usage: 'purge', // Effectively purged as it becomes attached
+    imageId: 'nano_forge',
+    expansion: 'codex2',
+  },
+];
+
+// ============================================================================
+// All Relic Cards
+// ============================================================================
+
+export const RELIC_CARDS: RelicDef[] = [
+  ...POK_RELICS,
+  ...CODEX1_RELICS,
+  ...CODEX2_RELICS,
 ];
 
 // ============================================================================
@@ -149,10 +225,22 @@ export function getRelicName(relicId: string): string {
 }
 
 /**
- * Get all relic IDs for initial deck setup
+ * Get all relic IDs for initial deck setup, filtered by expansions
  */
-export function getInitialRelicDeck(): string[] {
-  return RELIC_CARDS.map((relic) => relic.id);
+export function getInitialRelicDeck(expansions: Expansion[] = ['pok']): string[] {
+  return RELIC_CARDS
+    .filter((relic) => expansions.includes(relic.expansion))
+    .map((relic) => relic.id);
+}
+
+/**
+ * Get all relics, optionally filtered by expansions
+ */
+export function getRelics(expansions?: Expansion[]): RelicDef[] {
+  if (!expansions) {
+    return RELIC_CARDS;
+  }
+  return RELIC_CARDS.filter((relic) => expansions.includes(relic.expansion));
 }
 
 /**
@@ -182,6 +270,25 @@ export function getRelicVictoryPoints(relicId: string): number {
 /**
  * Get relics by timing (when they can be used)
  */
-export function getRelicsByTiming(timing: RelicTiming): RelicDef[] {
-  return RELIC_CARDS.filter((relic) => relic.timing === timing);
+export function getRelicsByTiming(timing: RelicTiming, expansions?: Expansion[]): RelicDef[] {
+  let relics = RELIC_CARDS.filter((relic) => relic.timing === timing);
+  if (expansions) {
+    relics = relics.filter((relic) => expansions.includes(relic.expansion));
+  }
+  return relics;
+}
+
+/**
+ * Check if a relic is an agent (JR-XS455-O)
+ */
+export function isRelicAgent(relicId: string): boolean {
+  const relic = RELICS_BY_ID[relicId];
+  return relic?.isAgent === true;
+}
+
+/**
+ * Check if relics are enabled (requires PoK or later expansions)
+ */
+export function areRelicsEnabled(expansions: Expansion[]): boolean {
+  return expansions.some((exp) => exp === 'pok' || exp.startsWith('codex') || exp === 'thunders_edge');
 }
