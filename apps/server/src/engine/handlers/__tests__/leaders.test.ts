@@ -909,4 +909,161 @@ describe('Leader Handlers', () => {
       expect(unlocked).toHaveLength(0);
     });
   });
+
+  describe('Special Hero Effects', () => {
+    it('should not purge Titans hero (attaches to Elysium instead)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'titans',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              planets: [
+                { id: 'e1', planetId: 'elysium', controlledBy: 'player1', units: [], exhausted: false, attachments: [] } as any,
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      // Titans hero should NOT be purged - it attaches to Elysium
+      expect(state.players[0].leaders!.hero.purged).toBe(false);
+      // The hero should be attached to Elysium
+      const elysium = state.map.tiles[0].planets.find(p => p.planetId === 'elysium');
+      expect(elysium?.attachments).toContain('titans_hero');
+    });
+
+    it('should apply Cabal hero effect (capture all enemy units on controlled planets)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'cabal',
+            capturedUnits: [],
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player2',
+            faction: 'sol',
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              planets: [
+                {
+                  id: 'p1',
+                  planetId: 'planet1',
+                  controlledBy: 'player1', // Cabal controls this planet
+                  units: [
+                    { id: 'i1', type: 'infantry', ownerId: 'player2', damaged: false }, // Enemy infantry
+                    { id: 'i2', type: 'infantry', ownerId: 'player2', damaged: false }, // Enemy infantry
+                    { id: 'm1', type: 'mech', ownerId: 'player2', damaged: false }, // Enemy mech
+                    { id: 'sd1', type: 'space_dock', ownerId: 'player2', damaged: false }, // Structure - not captured
+                  ],
+                  exhausted: false,
+                  attachments: [],
+                } as any,
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      // Should have captured 3 units (2 infantry + 1 mech, not the space dock)
+      expect(state.players[0].capturedUnits?.length).toBe(3);
+      // Planet should only have the structure left
+      const planet = state.map.tiles[0].planets[0];
+      expect(planet.units.length).toBe(1);
+      expect(planet.units[0].type).toBe('space_dock');
+    });
+
+    it('should apply Mahact hero effect (purge collected tokens for trade goods)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'mahact',
+            tradeGoods: 2,
+            collectedCommandTokens: { player2: 3, player3: 2 }, // 5 tokens total
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      // Should have gained 5 trade goods from purging 5 command tokens
+      expect(state.players[0].tradeGoods).toBe(7); // 2 + 5 = 7
+      // Collected tokens should be cleared
+      expect(Object.keys(state.players[0].collectedCommandTokens || {}).length).toBe(0);
+    });
+
+    it('should apply Naaz-Rokha hero effect (gain relic)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'naazrokha',
+            relics: [],
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+        relicDeck: ['shard_of_the_throne', 'the_obsidian'],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      // Should have gained the top relic
+      expect(state.players[0].relics).toContain('shard_of_the_throne');
+      expect(state.relicDeck).not.toContain('shard_of_the_throne');
+    });
+  });
 });

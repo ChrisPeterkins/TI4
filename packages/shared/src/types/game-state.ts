@@ -369,6 +369,15 @@ export interface PlayerState {
   isBot?: boolean;
   /** Captured units (Vuil'Raith Vortex ability) */
   capturedUnits?: CapturedUnit[];
+  // Commander unlock tracking
+  /** Whether player has produced a War Sun this game (Muaat unlock) */
+  producedWarSun?: boolean;
+  /** Whether player has had combat in Mecatol Rex system (Winnu unlock) */
+  hadCombatInMecatol?: boolean;
+  /** Tracking faction ability usage for unlock conditions */
+  usedFactionAbility?: Record<string, boolean>;
+  /** Command tokens collected from other players (Mahact - playerId -> count) */
+  collectedCommandTokens?: Record<string, number>;
 }
 
 export interface CapturedUnit {

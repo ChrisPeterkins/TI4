@@ -511,55 +511,146 @@ function checkCustomUnlockCondition(
   playerId: string,
   checkerId: string
 ): { canUnlock: boolean; reason?: string } {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) {
+    return { canUnlock: false, reason: 'Player not found' };
+  }
+
   switch (checkerId) {
-    case 'creuss_wormhole_token':
-      // Creuss: Have a wormhole token in a system
-      // TODO: Implement when wormhole tokens are added
-      return { canUnlock: false, reason: 'Wormhole token tracking not implemented' };
+    case 'muaat_produced_war_sun': {
+      // Muaat: Produce a War Sun
+      if (player.producedWarSun) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must produce a War Sun' };
+    }
 
-    case 'mentak_ambush_units':
-      // Mentak: Have 2+ units with AMBUSH ability
-      // Cruisers have AMBUSH
-      return { canUnlock: false, reason: 'AMBUSH unit tracking not implemented' };
+    case 'yin_indoctrination_used': {
+      // Yin: Use your Indoctrination faction ability
+      if (player.usedFactionAbility?.['indoctrination']) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must use Indoctrination faction ability' };
+    }
 
-    case 'empyrean_frontier_tokens':
-      // Empyrean: Have 2 frontier tokens
-      return { canUnlock: false, reason: 'Frontier token tracking not implemented' };
-
-    case 'naazrokha_relic_fragments':
-      // Naaz-Rokha: Have 2 relic fragments
-      const player = state.players.find(p => p.id === playerId);
-      if (player?.relicFragments) {
-        const totalFragments =
-          player.relicFragments.cultural +
-          player.relicFragments.industrial +
-          player.relicFragments.hazardous +
-          player.relicFragments.unknown;
-        if (totalFragments >= 2) {
-          return { canUnlock: true };
+    case 'argent_ability_units': {
+      // Argent: Have 6 units with ANTI-FIGHTER BARRAGE, SPACE CANNON, or BOMBARDMENT
+      // Units with these abilities: Destroyer (AFB), PDS (Space Cannon), War Sun/Dreadnought (Bombardment)
+      // Also: Cruiser has AFB with Argent faction ability, Fighters have AFB with Argent tech
+      let abilityUnitCount = 0;
+      for (const tile of state.map.tiles) {
+        for (const unit of tile.units) {
+          if (unit.ownerId === playerId && hasAbilityType(unit.type, player.faction)) {
+            abilityUnitCount++;
+          }
+        }
+        for (const planet of tile.planets) {
+          for (const unit of planet.units) {
+            if (unit.ownerId === playerId && hasAbilityType(unit.type, player.faction)) {
+              abilityUnitCount++;
+            }
+          }
         }
       }
-      return { canUnlock: false, reason: 'Need 2 relic fragments' };
+      if (abilityUnitCount >= 6) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need 6 units with AFB/SPACE CANNON/BOMBARDMENT, have ${abilityUnitCount}` };
+    }
 
-    case 'titans_sleeper_tokens':
-      // Titans: Have 2 sleeper tokens
-      return { canUnlock: false, reason: 'Sleeper token tracking not implemented' };
+    case 'mahact_command_tokens': {
+      // Mahact: Have 2 other players' command tokens in your fleet pool
+      const totalCollected = Object.values(player.collectedCommandTokens || {}).reduce((sum, count) => sum + count, 0);
+      if (totalCollected >= 2) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need 2 other players' command tokens, have ${totalCollected}` };
+    }
 
-    case 'cabal_captured_units':
-      // Cabal: Have 2 captured units
-      return { canUnlock: false, reason: 'Captured unit tracking not implemented' };
+    case 'cabal_gravity_rifts': {
+      // Cabal: Have units in 3 systems that contain Gravity Rifts
+      let gravityRiftSystemsWithUnits = 0;
+      for (const tile of state.map.tiles) {
+        if (tile.anomaly === 'gravity_rift') {
+          const hasPlayerUnits = tile.units.some(u => u.ownerId === playerId) ||
+            tile.planets.some(p => p.units.some(u => u.ownerId === playerId));
+          if (hasPlayerUnits) {
+            gravityRiftSystemsWithUnits++;
+          }
+        }
+      }
+      if (gravityRiftSystemsWithUnits >= 3) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need units in 3 Gravity Rift systems, have ${gravityRiftSystemsWithUnits}` };
+    }
 
-    case 'mahact_command_tokens':
-      // Mahact: Have 2 other players' command tokens
-      return { canUnlock: false, reason: 'Mahact command token tracking not implemented' };
+    case 'cabal_captured_units': {
+      // Alternative Cabal condition: Have 2+ captured units
+      const capturedCount = player.capturedUnits?.length || 0;
+      if (capturedCount >= 2) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need 2 captured units, have ${capturedCount}` };
+    }
 
-    case 'keleres_influence':
-      // Keleres: Have 12+ influence
-      return { canUnlock: false, reason: 'Influence calculation not implemented' };
+    case 'keleres_component_action': {
+      // Keleres: Spend 1 trade good after you play an action card that has a component action
+      // This is tracked via usedFactionAbility
+      if (player.usedFactionAbility?.['keleres_component_spent']) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must spend 1 TG after playing action card with component action' };
+    }
+
+    // These are already handled by other condition types in the main function
+    case 'creuss_wormhole_token': {
+      // Creuss commander is 'units_in_wormhole_systems' - already handled
+      return { canUnlock: false, reason: 'Use units_in_wormhole_systems condition' };
+    }
+
+    case 'empyrean_frontier_tokens': {
+      // Empyrean commander is 'neighbor_all_players' - already handled
+      return { canUnlock: false, reason: 'Use neighbor_all_players condition' };
+    }
+
+    case 'titans_sleeper_tokens': {
+      // Titans commander is 'have_structures' - already handled
+      return { canUnlock: false, reason: 'Use have_structures condition' };
+    }
 
     default:
       return { canUnlock: false, reason: `Unknown custom condition: ${checkerId}` };
   }
+}
+
+/**
+ * Check if a unit type has ANTI-FIGHTER BARRAGE, SPACE CANNON, or BOMBARDMENT
+ */
+function hasAbilityType(unitType: string, factionId: string): boolean {
+  // Base units with abilities:
+  // AFB: Destroyer
+  // Space Cannon: PDS
+  // Bombardment: Dreadnought, War Sun
+  const baseAbilityUnits = ['destroyer', 'pds', 'dreadnought', 'war_sun'];
+
+  if (baseAbilityUnits.includes(unitType)) {
+    return true;
+  }
+
+  // Argent Flight specific: Destroyers gain enhanced AFB, Strike Wing Alpha (fighters) get AFB
+  if (factionId === 'argent') {
+    // Argent fighters have AFB with their faction tech
+    if (unitType === 'fighter') {
+      return true; // Assume Strike Wing Alpha is researched for counting purposes
+    }
+  }
+
+  // L1Z1X: Dreadnought II gains Bombardment 5
+  // Titans: Cruiser II gains Space Cannon 5
+  // These are faction upgrades that add abilities
+
+  return false;
 }
 
 /**

@@ -1082,4 +1082,235 @@ describe('Leader Validators', () => {
       expect(result.canUnlock).toBe(true);
     });
   });
+
+  describe('Custom Commander Unlock Conditions', () => {
+    // Muaat - Produce a War Sun
+    it('should check muaat_produced_war_sun condition', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'muaat',
+            producedWarSun: true,
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+
+    it('should fail muaat_produced_war_sun if not produced', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'muaat',
+            producedWarSun: false,
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(false);
+      expect(result.reason).toBe('Must produce a War Sun');
+    });
+
+    // Yin - Use Indoctrination
+    it('should check yin_indoctrination_used condition', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'yin',
+            usedFactionAbility: { indoctrination: true },
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+
+    it('should fail yin_indoctrination_used if not used', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'yin',
+            usedFactionAbility: {},
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(false);
+      expect(result.reason).toBe('Must use Indoctrination faction ability');
+    });
+
+    // Argent - 6 units with abilities
+    it('should check argent_ability_units condition (6 units with AFB/SC/Bombardment)', () => {
+      const units = [
+        { id: 'd1', type: 'destroyer' as const, ownerId: 'player1', damaged: false },
+        { id: 'd2', type: 'destroyer' as const, ownerId: 'player1', damaged: false },
+        { id: 'dr1', type: 'dreadnought' as const, ownerId: 'player1', damaged: false },
+        { id: 'dr2', type: 'dreadnought' as const, ownerId: 'player1', damaged: false },
+        { id: 'ws1', type: 'war_sun' as const, ownerId: 'player1', damaged: false },
+        { id: 'ws2', type: 'war_sun' as const, ownerId: 'player1', damaged: false },
+      ];
+      const state = createMockGameState({
+        players: [createMockPlayer({ faction: 'argent' })],
+        map: {
+          tiles: [createMockTile({ q: 0, r: 0 }, { units })],
+          playerCount: 6,
+        },
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+
+    it('should fail argent_ability_units if not enough ability units', () => {
+      const units = [
+        { id: 'd1', type: 'destroyer' as const, ownerId: 'player1', damaged: false },
+        { id: 'd2', type: 'destroyer' as const, ownerId: 'player1', damaged: false },
+        { id: 'c1', type: 'cruiser' as const, ownerId: 'player1', damaged: false }, // No ability
+        { id: 'c2', type: 'cruiser' as const, ownerId: 'player1', damaged: false }, // No ability
+      ];
+      const state = createMockGameState({
+        players: [createMockPlayer({ faction: 'argent' })],
+        map: {
+          tiles: [createMockTile({ q: 0, r: 0 }, { units })],
+          playerCount: 6,
+        },
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(false);
+    });
+
+    // Mahact - 2 other players' command tokens
+    it('should check mahact_command_tokens condition', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'mahact',
+            collectedCommandTokens: { player2: 1, player3: 1 },
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+
+    it('should fail mahact_command_tokens if not enough tokens', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'mahact',
+            collectedCommandTokens: { player2: 1 },
+          }),
+        ],
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(false);
+    });
+
+    // Cabal - Units in 3 Gravity Rift systems
+    it('should check cabal_gravity_rifts condition', () => {
+      const state = createMockGameState({
+        players: [createMockPlayer({ faction: 'cabal' })],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              units: [{ id: 'c1', type: 'cruiser', ownerId: 'player1', damaged: false }],
+            }),
+            createMockTile({ q: 1, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              units: [{ id: 'c2', type: 'cruiser', ownerId: 'player1', damaged: false }],
+            }),
+            createMockTile({ q: 2, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              units: [{ id: 'c3', type: 'cruiser', ownerId: 'player1', damaged: false }],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+
+    it('should fail cabal_gravity_rifts if not enough systems', () => {
+      const state = createMockGameState({
+        players: [createMockPlayer({ faction: 'cabal' })],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              units: [{ id: 'c1', type: 'cruiser', ownerId: 'player1', damaged: false }],
+            }),
+            createMockTile({ q: 1, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              units: [{ id: 'c2', type: 'cruiser', ownerId: 'player1', damaged: false }],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(false);
+    });
+
+    // Cabal with combined conditions (gravity rifts + units)
+    it('should check cabal gravity rifts with units on planets', () => {
+      const state = createMockGameState({
+        players: [createMockPlayer({ faction: 'cabal' })],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              planets: [
+                { id: 'p1', planetId: 'planet1', controlledBy: 'player1', exhausted: false, attachments: [], units: [
+                  { id: 'i1', type: 'infantry' as const, ownerId: 'player1', damaged: false }
+                ]} as any,
+              ],
+            }),
+            createMockTile({ q: 1, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              planets: [
+                { id: 'p2', planetId: 'planet2', controlledBy: 'player1', exhausted: false, attachments: [], units: [
+                  { id: 'i2', type: 'infantry' as const, ownerId: 'player1', damaged: false }
+                ]} as any,
+              ],
+            }),
+            createMockTile({ q: 2, r: 0 }, {
+              anomaly: 'gravity_rift' as const,
+              planets: [
+                { id: 'p3', planetId: 'planet3', controlledBy: 'player1', exhausted: false, attachments: [], units: [
+                  { id: 'i3', type: 'infantry' as const, ownerId: 'player1', damaged: false }
+                ]} as any,
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const result = canUnlockCommander(state, 'player1');
+
+      expect(result.canUnlock).toBe(true);
+    });
+  });
 });
