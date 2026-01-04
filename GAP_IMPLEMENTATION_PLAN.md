@@ -17,15 +17,22 @@ These issues can cause game-breaking scenarios or incorrect rule enforcement.
 ### 1.1 Action Card Edge Cases
 **Complexity: M | Files: `action-card-effects.ts`, `action-cards.ts`**
 
-- [ ] **Ion Storm Token Tracking**
-  - Add `ionStormTokens` to GameState
-  - Implement placement/removal in affected systems
-  - Block fighter movement through Ion Storm systems
+- [ ] **Ion Storm Wormhole Token** *(CORRECTED per official rules)*
+  - Add `ionStormToken: { systemId: string, side: 'alpha' | 'beta' } | null` to GameState
+  - Ion Storm is a WORMHOLE token placed in frontier systems (not a blocker)
+  - Has alpha on one side, beta on the other
+  - FLIPS to opposite side when ships pass through it during Move Ships or Retreat
+  - Active player chooses initial side when placed
+  - Does NOT flip for Skilled Retreat action card
+  - Source: [BGG Ion Storm Thread](https://boardgamegeek.com/thread/2643063/ion-storm)
 
-- [ ] **Mirage Planet Implementation**
-  - Add Mirage as attachable exploration card
-  - Implement "appears as planet" mechanics
-  - Handle control/exploration triggers
+- [ ] **Mirage Planet Implementation** *(CORRECTED per official rules)*
+  - Mirage is a FRONTIER exploration card (not cultural/hazardous/industrial)
+  - When drawn: Place Mirage planet token in the empty system, gain Mirage planet card (ready), purge exploration card
+  - Mirage stays permanently (does not disappear)
+  - Legendary Ability "Flight Academy": Create 2 fighters in any system where you have a ship
+  - Planet stats: 1 Resource / 2 Influence, Cultural trait
+  - Source: [TI Rules - Exploration](https://www.tirules.com/R_exploration)
 
 - [ ] **Infantry Hit Application**
   - Fix cards that deal infantry hits (Plague, etc.)
@@ -74,31 +81,57 @@ These issues can cause game-breaking scenarios or incorrect rule enforcement.
 ### 2.1 High-Impact Faction Abilities
 **Complexity: L | Files: `abilities/handlers/`, faction-specific files**
 
-#### Nekro Virus
-- [ ] **Valefar Assimilator X/Y** - Track copied faction techs
-- [ ] **Tech Steal on Combat Win** - Auto-trigger after winning combat
-- [ ] **Cannot Research** - Already blocked; verify edge cases
-- [ ] **Copy faction unit abilities** - Track which units are copied
+#### Nekro Virus *(CORRECTED per official rules)*
+- [ ] **Galactic Threat** - When winning combat against a player, copy ONE of their technologies
+  - Cannot copy faction technologies this way (use Valefar Assimilator for that)
+  - Source: [TI Rules - Nekro](https://www.tirules.com/F_nekro)
+- [ ] **Valefar Assimilator X/Y** - Used to copy FACTION technologies specifically
+  - Place token on opponent's faction tech when gaining tech via faction abilities
+  - Assimilator gains that tech's text while token is placed
+  - Cannot copy mechs or printed faction units (e.g., Muaat Prototype War Sun I)
+  - If copying unit upgrade of same type, must reuse same Assimilator token
+- [ ] **Cannot Research** - Already blocked; verify Focused Research and other card edge cases
+- [ ] **Valefar State Tracking** - Track which faction techs are currently copied
 
-#### Hacan
-- [ ] **Trade Convoys** - Action card trading without neighbor requirement
-- [ ] **Guild Ships** - Flagship commodities refresh
-- [ ] **Arbiters** - Commander ability automation
+#### Hacan *(CORRECTED per official rules)*
+- [ ] **Arbiters** - Passive ability allowing action card trading (not Trade Convoys)
+  - Can trade action cards even with Political Secret played against them
+  - Cannot trade when over hand limit (must discard first)
+  - Can broker trades between other players
+  - Source: [TI Rules - Hacan](https://www.tirules.com/F_hacan)
+- [ ] **Trade Convoys (Promissory)** - Allows transactions with non-neighbors
+  - Returns when holder activates system with Hacan units
+- [ ] **Guild Ships** - Flagship refreshes commodities
 
-#### Yssaril Tribes
-- [ ] **Stall Tactics** - Draw action card when other players pass
-- [ ] **Scheming** - Draw 2 action cards, return 1 to deck
-- [ ] **Crafty** - No hand limit enforcement
+#### Yssaril Tribes *(CORRECTED per official rules)*
+- [ ] **Stall Tactics** - ACTION: Discard 1 action card from hand
+  - This is an ACTION you take, NOT triggered by others passing
+  - Allows "stalling" without committing to real actions
+  - Source: [TI Rules - Yssaril](https://www.tirules.com/F_yssaril)
+- [ ] **Scheming** - When drawing 1+ action cards, draw 1 ADDITIONAL card, then discard 1
+  - Triggers each time cards are drawn (not just status phase)
+  - Does NOT trigger for Mageon Implants (looking, not drawing)
+- [ ] **Crafty** - No hand limit enforcement (already may be implemented)
 
-#### L1Z1X Mindnet
-- [ ] **Assimilate** - Replace infantry with Harrow ability
-- [ ] **Dreadnought Production Chain** - Harrow triggers
+#### L1Z1X Mindnet *(CORRECTED per official rules)*
+- [ ] **Assimilate** - When gaining control of planet, REPLACE enemy PDS/Space Docks with yours
+  - Not about infantry; replaces STRUCTURES
+  - Only replaces if you have units in reinforcements
+  - Source: [TI Rules - L1Z1X](https://www.tirules.com/F_lizix)
+- [ ] **Harrow** - At END of each ground combat round, ships may use Bombardment
+  - Only works when L1Z1X is ATTACKER (active player)
+  - All ships with Bombardment can fire at the combat planet
+  - Works with X-89 Bacterial Weapon
 - [ ] **Inheritance Systems** - Commander unlock automation
 
-#### Naalu Collective
-- [ ] **Telepathic** - Cannot win ground combat with only fighters
-- [ ] **Foresight** - Look at agenda before others
-- [ ] **0 Initiative** - Already handled; verify in all contexts
+#### Naalu Collective *(VERIFIED correct)*
+- [ ] **Telepathic** - 0 Initiative token mechanics
+  - Token stays with Naalu even if strategy card is exchanged
+  - Source: [TI Rules - Naalu](https://www.tirules.com/F_naalu)
+- [ ] **Matriarch Flagship** - Fighters commit to ground combat but return to space when combat ENDS
+  - Cannot win with only fighters (results in DRAW, not victory)
+  - Does NOT work with Dacxive Animators (draw = no trigger)
+- [ ] **Foresight** - Look at top agenda before others (agent ability)
 
 ### 2.2 Medium-Impact Faction Abilities
 **Complexity: M | Files: `abilities/handlers/`**
@@ -199,22 +232,26 @@ const SHORTCUTS = {
   - Trade Convoys - Hacan action card trading
   - Antivirus - Nekro blocking
 
-### 4.2 Relic Fragment System
+### 4.2 Relic Fragment System *(VERIFIED per official rules)*
 **Complexity: M | Files: `relics.ts`, `exploration.ts`**
+**Source: [TI Rules - Relics](https://www.tirules.com/R_relics)**
 
 - [ ] **Fragment Tracking**
   - Add `relicFragments: { cultural: number, industrial: number, hazardous: number, unknown: number }` to PlayerState
   - Track fragment gains from exploration
+  - Fragments can be traded as part of transactions
 
 - [ ] **Purge Mechanics**
-  - UI to select 3 matching fragments
-  - Draw from relic deck on purge
-  - Unknown fragments as wild
+  - ACTION: Purge 3 fragments of the same type to gain 1 relic
+  - Unknown fragments are WILD but at least ONE must be cultural/hazardous/industrial
+  - CANNOT purge 3 unknown fragments alone
+  - Draw from relic deck; if empty, no relic gained but fragments still purged
+  - Naaz-Rokha special: Can purge 2 fragments OR purge 1 for a command token
 
 - [ ] **Relic Activation**
   - Complete all relic effects
-  - Exhaustion tracking
-  - Purge vs exhaust distinction
+  - Exhaustion tracking (exhaust vs purge usage types)
+  - When player eliminated: relics purged, fragments discarded
 
 ---
 
@@ -238,15 +275,23 @@ Add missing PoK action cards:
 - [ ] Solar Flare
 - [ ] War Machine (verify count)
 
-### 5.2 Legendary Planet Abilities
+### 5.2 Legendary Planet Abilities *(CORRECTED per official rules)*
 **Complexity: M | Files: `systems.ts`, new `legendary-planets.ts`**
+**Source: [TI Rules - Legendary Planets](https://www.tirules.com/R_legendary_planets)**
 
-- [ ] **Mallice** - Wormhole manipulation
-- [ ] **Primor** - Infantry production bonus
-- [ ] **Hope's End** - Relic fragment bonus
-- [ ] **Mirage** - Appears/disappears mechanics
-- [ ] Add `legendaryAbility` field to planet data
-- [ ] Implement ability triggers
+- [ ] **Primor** (2/1, Hazardous) - "The Atrament"
+  - Exhaust at END of your turn to place up to 2 infantry on any planet you control
+- [ ] **Mallice** (0/3, Cultural) - "Exterrix Headquarters"
+  - Exhaust at END of your turn to gain 2 trade goods OR convert all commodities to trade goods
+  - Connected via Gamma wormhole (exists in pocket dimension)
+- [ ] **Hope's End** (3/0, Hazardous) - "Imperial Arms Vault"
+  - Exhaust to gain 1 relic fragment of any type
+- [ ] **Mirage** (1/2, Cultural) - "Flight Academy"
+  - Exhaust to place 2 fighters in any system where you have a ship with capacity
+  - Placed via Frontier exploration (see Ion Storm section)
+- [ ] Add `legendaryAbility: { name: string, timing: string, effect: string }` to planet data
+- [ ] Legendary planets are claimed EXHAUSTED when invaded
+- [ ] Implement exhaust-based ability triggers
 
 ### 5.3 Tech Specialty Population
 **Complexity: S | Files: `systems.ts`**
@@ -442,3 +487,34 @@ Add missing PoK action cards:
 - Consider creating integration tests for complex faction abilities
 - Document new keyboard shortcuts in help modal
 - Keep accessibility in mind during all UI work
+
+---
+
+## Rules Reference Sources
+
+The following sources were consulted to verify and correct this implementation plan (January 2026):
+
+### Primary Sources
+- [TI4 Rules Reference](https://ti4rules.github.io/) - Comprehensive searchable rules
+- [TI Rules Help](https://www.tirules.com/) - Detailed rules with FAQ
+- [Twilight Imperium Wiki](https://twilight-imperium.fandom.com/) - Community wiki with card text
+- [BoardGameGeek TI4 Forums](https://boardgamegeek.com/boardgame/233078/) - Official FAQ threads
+
+### Key Corrections Made
+
+| Topic | Original Assumption | Correct Rule |
+|-------|---------------------|--------------|
+| Ion Storm | Blocks fighter movement | Is a WORMHOLE token that flips between alpha/beta |
+| Yssaril Stall Tactics | Triggered when others pass | Is an ACTION: Discard 1 card |
+| L1Z1X Assimilate | Replaces infantry | Replaces PDS and Space Docks |
+| Hacan Trading | Trade Convoys enables action cards | Arbiters enables action cards; Trade Convoys enables non-neighbor |
+| Mirage | Appears/disappears | Placed permanently via Frontier exploration |
+| Naalu Fighters | Can win ground combat | Cannot win; results in DRAW |
+| Relic Fragments | 3 unknown = 1 relic | At least 1 must be cultural/hazardous/industrial |
+
+### Faction-Specific Rule Sources
+- [Nekro Virus](https://www.tirules.com/F_nekro)
+- [Hacan](https://www.tirules.com/F_hacan)
+- [Yssaril](https://www.tirules.com/F_yssaril)
+- [L1Z1X](https://www.tirules.com/F_lizix)
+- [Naalu](https://www.tirules.com/F_naalu)
