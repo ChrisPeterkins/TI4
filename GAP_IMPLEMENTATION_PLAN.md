@@ -64,7 +64,10 @@ These issues can cause game-breaking scenarios or incorrect rule enforcement.
 
 - [ ] **Carrier Capacity Overflow**
   - When carrier destroyed, excess fighters must be assigned to other capacity or destroyed
-  - Prompt player for fighter assignment
+  - Also applies to transported ground forces (infantry/mechs in space)
+  - Prompt player for unit assignment to remaining capacity
+  - If no capacity available, excess units are destroyed
+  - Source: [TI Rules - Capacity](https://www.tirules.com/R_capacity)
 
 - [ ] **Graviton Laser System**
   - Block movement through systems with enemy PDS II
@@ -73,6 +76,42 @@ These issues can cause game-breaking scenarios or incorrect rule enforcement.
 - [ ] **PDS Deep Space Cannon**
   - PDS II can fire into adjacent systems
   - Validate targeting for space cannon offense
+
+### 1.4 Unit Reinforcement Limits
+**Complexity: S | Files: `units.ts`, production validators**
+**Source: [TI Rules - Reinforcements](https://www.tirules.com/R_reinforcements)**
+
+- [ ] **Track Unit Maximums Per Player**
+  - Infantry: 12 (base game) / 20 (with PoK)
+  - Fighters: 10
+  - Carriers: 4
+  - Destroyers: 8
+  - Cruisers: 8
+  - Dreadnoughts: 5
+  - PDS: 6
+  - Space Docks: 3
+  - War Suns: 2
+  - Mechs: 4 (PoK only)
+  - Flagship: 1
+
+- [ ] **Enforce During Production**
+  - Validate production doesn't exceed reinforcement limits
+  - Show remaining units available in production UI
+
+- [ ] **Handle "Out of Reinforcements"**
+  - Cannot produce if no units available in reinforcements
+  - Some abilities let you "borrow" from destroyed units
+
+### 1.5 Space Dock Placement Rules
+**Complexity: S | Files: `production.ts`, validators**
+
+- [ ] **One Space Dock Per Planet**
+  - Validate cannot place second space dock on same planet
+  - Exception: Some faction abilities may modify this
+
+- [ ] **Cannot Build in Opponent's Home System**
+  - Validate space dock construction location
+  - Exception: Specific action cards or abilities
 
 ---
 
@@ -433,6 +472,8 @@ Add missing PoK action cards:
 1. Action Card Edge Cases (1.1)
 2. Production System Completion (1.2)
 3. Combat Edge Cases (1.3)
+4. Unit Reinforcement Limits (1.4)
+5. Space Dock Placement Rules (1.5)
 
 ### Sprint 2: Faction Abilities (Week 3-4)
 1. Nekro Virus automation (2.1)
@@ -511,6 +552,17 @@ The following sources were consulted to verify and correct this implementation p
 | Mirage | Appears/disappears | Placed permanently via Frontier exploration |
 | Naalu Fighters | Can win ground combat | Cannot win; results in DRAW |
 | Relic Fragments | 3 unknown = 1 relic | At least 1 must be cultural/hazardous/industrial |
+
+### Verified Implementations
+
+| System | Status | Notes |
+|--------|--------|-------|
+| Unit Location Tracking | ✅ CORRECT | `MapTile.units[]` for space, `PlanetInstance.units[]` for planets |
+| Capacity System | ✅ CORRECT | Validates fighters/ground forces against carrier capacity |
+| Fleet Supply | ✅ CORRECT | Validates ships against fleet tokens + 3 (+ faction bonuses) |
+| Movement Validation | ✅ CORRECT | Requires carriers for fighters/ground between systems |
+| Production Placement | ✅ CORRECT | Ships → space, ground forces → planet with dock |
+| Invasion Ground Forces | ✅ CORRECT | Moves units from space to planet correctly |
 
 ### Faction-Specific Rule Sources
 - [Nekro Virus](https://www.tirules.com/F_nekro)
