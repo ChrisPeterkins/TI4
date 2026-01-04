@@ -20,7 +20,7 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     color: 'blue',
     isBot: true,
     seatPosition: 0,
-    victoryPoints: 0,
+    score: 0,
     resources: 0,
     influence: 0,
     tradeGoods: 0,
@@ -68,7 +68,16 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
     id: 'test-game',
     phase: 'action',
     subPhase: 'awaiting_action',
-    round: 1,
+    agendaNumber: 1,
+          currentStep: 'voting',
+          currentAgendaType: 'directive',
+          votingComplete: [],
+          voteTallies: {},
+          riders: [],
+          vetoed: false,
+          electedOutcome: null,
+          electedPlayer: null,
+          electedPlanet: null,
     turn: 1,
     activePlayerId: 'player1',
     version: 1,
@@ -105,9 +114,7 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      revealedCount: 0,
       secretDeck: [],
       publicStageI: [],
       publicStageII: [],
@@ -216,8 +223,8 @@ describe('Bot AI', () => {
         ],
         strategicActionState: {
           cardNumber: 7,
-          playerId: 'player1',
-          primaryComplete: false,
+          
+          primaryResolved: false,
           secondaryOrder: [],
           currentSecondaryIndex: 0,
           secondaryResponses: {},
@@ -230,7 +237,7 @@ describe('Bot AI', () => {
       expect(action?.type).toBe('strategic_primary');
       // Should pick a tech (tier 1 tech since no prerequisites)
       const primaryAction = action as any;
-      expect(primaryAction.choices?.techId).toBeDefined();
+      expect(primaryAction.choices?.firstTechId).toBeDefined();
     });
 
     it('should prefer high-value technologies like Neural Motivator and Sarween Tools', () => {
@@ -245,8 +252,8 @@ describe('Bot AI', () => {
         ],
         strategicActionState: {
           cardNumber: 7,
-          playerId: 'player1',
-          primaryComplete: false,
+          
+          primaryResolved: false,
           secondaryOrder: [],
           currentSecondaryIndex: 0,
           secondaryResponses: {},
@@ -267,7 +274,7 @@ describe('Bot AI', () => {
         'scanlink_drone_network',
         'ai_development_algorithm',
       ];
-      expect(goodTier1Techs).toContain(primaryAction.choices?.techId);
+      expect(goodTier1Techs).toContain(primaryAction.choices?.firstTechId);
     });
 
     it('should prioritize faction technologies when available', () => {
@@ -284,8 +291,8 @@ describe('Bot AI', () => {
         ],
         strategicActionState: {
           cardNumber: 7,
-          playerId: 'player1',
-          primaryComplete: false,
+          
+          primaryResolved: false,
           secondaryOrder: [],
           currentSecondaryIndex: 0,
           secondaryResponses: {},
@@ -297,7 +304,7 @@ describe('Bot AI', () => {
 
       // Sol's faction tech (spec_ops_ii) should be highly valued
       // It requires 2 green which we have
-      expect(primaryAction.choices?.techId).toBe('spec_ops_ii');
+      expect(primaryAction.choices?.firstTechId).toBe('spec_ops_ii');
     });
   });
 
@@ -305,9 +312,7 @@ describe('Bot AI', () => {
     it('should prioritize tech specialty planets when Found Research Outposts is revealed', () => {
       const state = createMockGameState({
         objectives: {
-          stage1: [],
-          stage2: [],
-          revealed: [],
+          revealedCount: 0,
           secretDeck: [],
           publicStageI: [
             { id: 'found_research_outposts', revealed: true, scoredBy: [] },
@@ -353,9 +358,7 @@ describe('Bot AI', () => {
     it('should value systems adjacent to Mecatol for Intimidate Council objective', () => {
       const state = createMockGameState({
         objectives: {
-          stage1: [],
-          stage2: [],
-          revealed: [],
+          revealedCount: 0,
           secretDeck: [],
           publicStageI: [
             { id: 'intimidate_council', revealed: true, scoredBy: [] },
@@ -524,7 +527,16 @@ describe('Bot AI', () => {
           votingOrder: ['player1'],
           currentVoterIndex: 0,
           votes: {},
-          round: 1,
+          agendaNumber: 1,
+          currentStep: 'voting',
+          currentAgendaType: 'directive',
+          votingComplete: [],
+          voteTallies: {},
+          riders: [],
+          vetoed: false,
+          electedOutcome: null,
+          electedPlayer: null,
+          electedPlanet: null,
         },
         players: [
           createMockPlayer({
@@ -550,7 +562,16 @@ describe('Bot AI', () => {
           votingOrder: ['player1'],
           currentVoterIndex: 0,
           votes: {},
-          round: 1,
+          agendaNumber: 1,
+          currentStep: 'voting',
+          currentAgendaType: 'directive',
+          votingComplete: [],
+          voteTallies: {},
+          riders: [],
+          vetoed: false,
+          electedOutcome: null,
+          electedPlayer: null,
+          electedPlanet: null,
         },
         players: [
           createMockPlayer({
@@ -576,7 +597,16 @@ describe('Bot AI', () => {
           votingOrder: ['player1'],
           currentVoterIndex: 0,
           votes: {},
-          round: 1,
+          agendaNumber: 1,
+          currentStep: 'voting',
+          currentAgendaType: 'directive',
+          votingComplete: [],
+          voteTallies: {},
+          riders: [],
+          vetoed: false,
+          electedOutcome: null,
+          electedPlayer: null,
+          electedPlanet: null,
         },
         players: [
           createMockPlayer({
@@ -602,17 +632,26 @@ describe('Bot AI', () => {
           votingOrder: ['player1'],
           currentVoterIndex: 0,
           votes: {},
-          round: 1,
+          agendaNumber: 1,
+          currentStep: 'voting',
+          currentAgendaType: 'directive',
+          votingComplete: [],
+          voteTallies: {},
+          riders: [],
+          vetoed: false,
+          electedOutcome: null,
+          electedPlayer: null,
+          electedPlanet: null,
         },
         players: [
           createMockPlayer({
             id: 'player1',
-            victoryPoints: 3,
+            score: 3,
             planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
           }),
           createMockPlayer({
             id: 'player2',
-            victoryPoints: 7, // Leading player
+            score: 7, // Leading player
           }),
         ],
       });
@@ -631,10 +670,11 @@ describe('Bot AI', () => {
       const state = createMockGameState({
         phase: 'status',
         subPhase: 'gain_redistribute_tokens',
-        round: 1, // Early game
         statusPhase: {
-          step: 'gain_redistribute_tokens',
+          currentStep: 5, // gain_redistribute_tokens
           scoringComplete: ['player1'],
+          scoredThisPhase: [],
+          redistributionComplete: [],
         },
         players: [
           createMockPlayer({
@@ -658,8 +698,10 @@ describe('Bot AI', () => {
         subPhase: 'gain_redistribute_tokens',
         round: 3,
         statusPhase: {
-          step: 'gain_redistribute_tokens',
+          currentStep: 5, // gain_redistribute_tokens
           scoringComplete: ['player1'],
+          scoredThisPhase: [],
+          redistributionComplete: [],
         },
         players: [
           createMockPlayer({
@@ -699,8 +741,10 @@ describe('Bot AI', () => {
         phase: 'status',
         subPhase: 'score_objectives',
         statusPhase: {
-          step: 'score_objectives',
+          currentStep: 1, // score_objectives
           scoringComplete: [],
+          scoredThisPhase: [],
+          redistributionComplete: [],
         },
         players: [
           createMockPlayer({
@@ -709,9 +753,7 @@ describe('Bot AI', () => {
           }),
         ],
         objectives: {
-          stage1: [],
-          stage2: [],
-          revealed: [],
+          revealedCount: 0,
           secretDeck: [],
           // Objective requires 2 techs in same color - player has none
           publicStageI: [
@@ -732,8 +774,10 @@ describe('Bot AI', () => {
         phase: 'status',
         subPhase: 'score_objectives',
         statusPhase: {
-          step: 'score_objectives',
+          currentStep: 1, // score_objectives
           scoringComplete: [],
+          scoredThisPhase: [],
+          redistributionComplete: [],
         },
         players: [
           createMockPlayer({
@@ -756,9 +800,7 @@ describe('Bot AI', () => {
           playerCount: 6,
         },
         objectives: {
-          stage1: [],
-          stage2: [],
-          revealed: [],
+          revealedCount: 0,
           secretDeck: [],
           // diversify_research: 2 tech in 2 different colors
           publicStageI: [
@@ -780,8 +822,10 @@ describe('Bot AI', () => {
         phase: 'status',
         subPhase: 'score_objectives',
         statusPhase: {
-          step: 'score_objectives',
+          currentStep: 1, // score_objectives
           scoringComplete: [],
+          scoredThisPhase: [],
+          redistributionComplete: [],
         },
         players: [
           createMockPlayer({
@@ -800,9 +844,7 @@ describe('Bot AI', () => {
           playerCount: 6,
         },
         objectives: {
-          stage1: [],
-          stage2: [],
-          revealed: [],
+          revealedCount: 0,
           secretDeck: [],
           publicStageI: [
             { id: 'diversify_research', revealed: true, scoredBy: ['player1'] },

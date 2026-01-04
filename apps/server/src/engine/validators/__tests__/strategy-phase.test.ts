@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GameState, PlayerState, StrategyCard } from '@ti4/shared';
+import type { GameState, PlayerState, StrategyCardState } from '@ti4/shared';
 import { validatePickStrategyCard, getAvailableStrategyCards } from '../strategy-phase.js';
 
 function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
@@ -25,43 +25,39 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     name: 'Test Player',
+    seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 2,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
     secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
+    score: 0,
+    neighbors: [],
+    transactedWith: [],
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
+    exhaustedTechnologies: [],
+    exhaustedRelics: [],
     ...overrides,
   };
 }
 
-function createMockStrategyCard(number: number, overrides: Partial<StrategyCard> = {}): StrategyCard {
+function createMockStrategyCard(number: number, overrides: Partial<StrategyCardState> = {}): StrategyCardState {
   const names: Record<number, string> = {
     1: 'Leadership',
     2: 'Diplomacy',
@@ -77,19 +73,18 @@ function createMockStrategyCard(number: number, overrides: Partial<StrategyCard>
     number,
     name: names[number] || `Card ${number}`,
     pickedBy: null,
-    tradeGoods: 0,
     exhausted: false,
     ...overrides,
   };
 }
 
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
-  const player1 = createMockPlayer({ id: 'player1' });
-  const player2 = createMockPlayer({ id: 'player2' });
-  const player3 = createMockPlayer({ id: 'player3' });
-  const player4 = createMockPlayer({ id: 'player4' });
+  const player1 = createMockPlayer({ id: 'player1', seatIndex: 0 });
+  const player2 = createMockPlayer({ id: 'player2', seatIndex: 1 });
+  const player3 = createMockPlayer({ id: 'player3', seatIndex: 2 });
+  const player4 = createMockPlayer({ id: 'player4', seatIndex: 3 });
 
-  const strategyCards: StrategyCard[] = [
+  const strategyCards: StrategyCardState[] = [
     createMockStrategyCard(1),
     createMockStrategyCard(2),
     createMockStrategyCard(3),
@@ -102,28 +97,29 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'strategy',
-    subPhase: 'pick_strategy_cards',
+    subPhase: undefined,
     round: 1,
-    turn: 0,
     players: [player1, player2, player3, player4],
-    map: { tiles: [] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
+    map: { tiles: [], playerCount: 6 },
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
+    initiativeOrder: ['player1', 'player2', 'player3', 'player4'],
     activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2', 'player3', 'player4'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    agendaPhase: undefined,
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaDiscard: [],
+    agendas: { currentAgenda: null, currentAgendaNumber: 1, votes: new Map(), outcome: null, riders: [] },
+    custodiansTaken: false,
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    gameLog: [],
     strategyCards,
     ...overrides,
   };
@@ -141,6 +137,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -155,6 +152,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'nonexistent',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -171,6 +169,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -185,6 +184,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 99, // Invalid
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -201,6 +201,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -217,6 +218,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -230,6 +232,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player2',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -248,6 +251,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player2', // Next in clockwise order
         cardNumber: 2,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -265,6 +269,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player3', // Should be player2's turn
         cardNumber: 3,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -280,6 +285,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player3', // Speaker
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -300,6 +306,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 3,
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -315,6 +322,7 @@ describe('validatePickStrategyCard', () => {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 7, // Technology
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);
@@ -322,14 +330,14 @@ describe('validatePickStrategyCard', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should allow picking card with trade goods on it', () => {
+    it('should allow picking any unpicked card', () => {
       const state = createMockGameState({ speakerId: 'player1' });
-      state.strategyCards[6].tradeGoods = 2; // Technology has 2 TGs from previous round
 
       const action = {
         type: 'pick_strategy_card' as const,
         playerId: 'player1',
         cardNumber: 7, // Technology
+        timestamp: Date.now(),
       };
 
       const result = validatePickStrategyCard(state, action);

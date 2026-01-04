@@ -93,6 +93,10 @@ function createMockPlayer(id: string, faction: string): PlayerState {
     score: 0,
     passed: false,
     strategyCards: [],
+    strategyCard: null,
+    strategyCardUsed: false,
+    neighbors: [],
+    transactedWith: [],
     leaders: {
       agent: { unlocked: true, exhausted: false },
       commander: { unlocked: false },
@@ -117,6 +121,7 @@ function createMockTile(q: number, r: number, systemId: number, planets: PlanetI
 
 function createMockPlanet(planetId: string, controlledBy: string | null, units: UnitInstance[] = []): PlanetInstance {
   return {
+    id: `planet-${planetId}`,
     planetId,
     controlledBy,
     exhausted: false,
@@ -259,7 +264,7 @@ describe('Component Actions', () => {
       const result = handleComponentAction(state, action);
 
       expect(result.success).toBe(true);
-      expect(result.data?.destroyedCount).toBe(3);
+      expect((result.data as any)?.destroyedCount).toBe(3);
       expect(state.map.tiles[1].planets[0].units).toHaveLength(1);
       expect(state.map.tiles[1].planets[0].units[0].type).toBe('mech');
       expect(state.players[0].exhaustedTechnologies).toContain('x89_bacterial_weapon');
@@ -346,7 +351,7 @@ describe('Component Actions', () => {
       const result = handleComponentAction(state, action);
 
       expect(result.success).toBe(true);
-      expect(result.data?.unitType).toBe('cruiser');
+      expect((result.data as any)?.unitType).toBe('cruiser');
       expect(state.map.tiles[1].units.some(u => u.type === 'cruiser')).toBe(true);
       expect(state.players[0].exhaustedTechnologies).toContain('sling_relay');
     });

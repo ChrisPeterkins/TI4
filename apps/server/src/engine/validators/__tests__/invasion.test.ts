@@ -24,7 +24,7 @@ import type {
   UnitInstance,
   MapTile,
   PlanetInstance,
-  InvasionPhaseState,
+  InvasionTracking,
 } from '@ti4/shared';
 import {
   validateSelectInvasionTargets,
@@ -71,38 +71,32 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     name: 'Test Player',
+    seatIndex: 0,
+    score: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 2,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
     secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
+    neighbors: [],
+    transactedWith: [],
     ...overrides,
   };
 }
@@ -119,6 +113,7 @@ function createMockUnit(overrides: Partial<UnitInstance> = {}): UnitInstance {
 
 function createMockPlanet(overrides: Partial<PlanetInstance> = {}): PlanetInstance {
   return {
+    id: 'planet1-instance',
     planetId: 'planet1',
     controlledBy: null,
     units: [],
@@ -133,19 +128,24 @@ function createMockTile(overrides: Partial<MapTile> = {}): MapTile {
     id: 'tile1',
     systemId: 25,
     position: { q: 0, r: 0 },
+    rotation: 0,
     units: [],
     planets: [createMockPlanet()],
+    wormhole: null,
+    anomaly: null,
     commandTokens: [],
     ...overrides,
   };
 }
 
-function createMockInvasionPhase(overrides: Partial<InvasionPhaseState> = {}): InvasionPhaseState {
+function createMockInvasionPhase(overrides: Partial<InvasionTracking> = {}): InvasionTracking {
   return {
     targetPlanets: ['planet1'],
     currentPlanetIndex: 0,
     currentStep: 'select_planets',
+    bombardmentComplete: false,
     groundForcesCommitted: {},
+    spaceCannonComplete: false,
     pendingBombardmentHits: 0,
     pendingSpaceCannonHits: 0,
     ...overrides,
@@ -153,8 +153,8 @@ function createMockInvasionPhase(overrides: Partial<InvasionPhaseState> = {}): I
 }
 
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
-  const player1 = createMockPlayer({ id: 'player1' });
-  const player2 = createMockPlayer({ id: 'player2' });
+  const player1 = createMockPlayer({ id: 'player1', seatIndex: 0 });
+  const player2 = createMockPlayer({ id: 'player2', seatIndex: 1 });
 
   const infantry1 = createMockUnit({ id: 'infantry1', type: 'infantry', ownerId: 'player1' });
   const infantry2 = createMockUnit({ id: 'infantry2', type: 'infantry', ownerId: 'player2' });
@@ -174,28 +174,29 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'action',
     subPhase: 'tactical_invasion',
     round: 1,
-    turn: 0,
     players: [player1, player2],
-    map: { tiles: [tile] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
+    map: { tiles: [tile], playerCount: 2 },
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
+    strategyCards: [],
+    agendas: { currentAgenda: null, currentAgendaNumber: 1, votes: new Map(), outcome: null, riders: [] },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
+    initiativeOrder: ['player1', 'player2'],
     activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaDiscard: [],
+    custodiansTaken: false,
+    gameLog: [],
     activatedSystem: { q: 0, r: 0 },
     invasionPhase: createMockInvasionPhase(),
     ...overrides,
@@ -214,6 +215,7 @@ describe('validateSelectInvasionTargets', () => {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
         targetPlanets: ['planet1'],
+        timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -227,7 +229,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -241,7 +243,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player2',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -251,11 +253,12 @@ describe('validateSelectInvasionTargets', () => {
     });
 
     it('should fail if invasion phase not initialized', () => {
-      const state = createMockGameState({ invasionPhase: null });
+      const state = createMockGameState({ invasionPhase: undefined });
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
         targetPlanets: ['planet1'],
+        timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -265,11 +268,12 @@ describe('validateSelectInvasionTargets', () => {
     });
 
     it('should fail if no system activated', () => {
-      const state = createMockGameState({ activatedSystem: null });
+      const state = createMockGameState({ activatedSystem: undefined });
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
         targetPlanets: ['planet1'],
+        timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -286,6 +290,7 @@ describe('validateSelectInvasionTargets', () => {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
         targetPlanets: ['nonexistent'],
+        timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -303,7 +308,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -320,7 +325,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -335,7 +340,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -351,7 +356,7 @@ describe('validateSelectInvasionTargets', () => {
       const action = {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
-        targetPlanets: ['planet1'],
+        targetPlanets: ['planet1'], timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -366,6 +371,7 @@ describe('validateSelectInvasionTargets', () => {
         type: 'select_invasion_targets' as const,
         playerId: 'player1',
         targetPlanets: [],
+        timestamp: Date.now(),
       };
 
       const result = validateSelectInvasionTargets(state, action);
@@ -389,7 +395,7 @@ describe('validateCommitGroundForces', () => {
       const action = {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
-        assignments: [],
+        assignments: [], timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -403,7 +409,7 @@ describe('validateCommitGroundForces', () => {
       const action = {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
-        assignments: [],
+        assignments: [], timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -417,7 +423,7 @@ describe('validateCommitGroundForces', () => {
       const action = {
         type: 'commit_ground_forces' as const,
         playerId: 'player2',
-        assignments: [],
+        assignments: [], timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -437,6 +443,7 @@ describe('validateCommitGroundForces', () => {
           { unitId: 'infantry1', planetId: 'planet1' },
           { unitId: 'infantry1', planetId: 'planet1' },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -451,6 +458,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'nonexistent', planetId: 'planet1' }],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -473,6 +481,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'enemy_infantry', planetId: 'planet1' }],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -491,6 +500,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'cruiser1', planetId: 'planet1' }],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -507,6 +517,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'infantry1', planetId: 'planet1' }],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -523,6 +534,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [], // No units committed
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -538,6 +550,7 @@ describe('validateCommitGroundForces', () => {
         type: 'commit_ground_forces' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'infantry1', planetId: 'planet1' }],
+        timestamp: Date.now(),
       };
 
       const result = validateCommitGroundForces(state, action);
@@ -557,7 +570,7 @@ describe('validateRollBombardment', () => {
     const action = {
       type: 'roll_bombardment' as const,
       playerId: 'player1',
-      planetId: 'planet1',
+      planetId: 'planet1', timestamp: Date.now(),
     };
 
     const result = validateRollBombardment(state, action);
@@ -571,7 +584,7 @@ describe('validateRollBombardment', () => {
     const action = {
       type: 'roll_bombardment' as const,
       playerId: 'player2',
-      planetId: 'planet1',
+      planetId: 'planet1', timestamp: Date.now(),
     };
 
     const result = validateRollBombardment(state, action);
@@ -589,6 +602,7 @@ describe('validateRollBombardment', () => {
       type: 'roll_bombardment' as const,
       playerId: 'player1',
       planetId: 'planet2', // Wrong planet
+      timestamp: Date.now(),
     };
 
     const result = validateRollBombardment(state, action);
@@ -607,7 +621,7 @@ describe('validateRollBombardment', () => {
     const action = {
       type: 'roll_bombardment' as const,
       playerId: 'player1',
-      planetId: 'planet1',
+      planetId: 'planet1', timestamp: Date.now(),
     };
 
     const result = validateRollBombardment(state, action);
@@ -626,7 +640,7 @@ describe('validateRollBombardment', () => {
     const action = {
       type: 'roll_bombardment' as const,
       playerId: 'player1',
-      planetId: 'planet1',
+      planetId: 'planet1', timestamp: Date.now(),
     };
 
     const result = validateRollBombardment(state, action);
@@ -641,6 +655,7 @@ describe('validateSkipBombardment', () => {
     const action = {
       type: 'skip_bombardment' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipBombardment(state, action);
@@ -654,6 +669,7 @@ describe('validateSkipBombardment', () => {
     const action = {
       type: 'skip_bombardment' as const,
       playerId: 'player2',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipBombardment(state, action);
@@ -667,6 +683,7 @@ describe('validateSkipBombardment', () => {
     const action = {
       type: 'skip_bombardment' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipBombardment(state, action);
@@ -687,7 +704,7 @@ describe('validateAssignBombardmentHits', () => {
     const action = {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player2',
-      assignments: [],
+      assignments: [], timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -704,7 +721,7 @@ describe('validateAssignBombardmentHits', () => {
     const action = {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player1', // Not the defender
-      assignments: [],
+      assignments: [], timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -722,6 +739,7 @@ describe('validateAssignBombardmentHits', () => {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player2',
       assignments: [{ unitId: 'nonexistent', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -747,6 +765,7 @@ describe('validateAssignBombardmentHits', () => {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player2',
       assignments: [{ unitId: 'enemy_inf', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -768,6 +787,7 @@ describe('validateAssignBombardmentHits', () => {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player2',
       assignments: [{ unitId: 'pds1', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -793,6 +813,7 @@ describe('validateAssignBombardmentHits', () => {
       type: 'assign_bombardment_hits' as const,
       playerId: 'player2',
       assignments: [{ unitId: 'def_inf1', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignBombardmentHits(state, action);
@@ -811,7 +832,7 @@ describe('validateAssignSpaceCannonHits', () => {
     const action = {
       type: 'assign_space_cannon_hits' as const,
       playerId: 'player1',
-      assignments: [],
+      assignments: [], timestamp: Date.now(),
     };
 
     const result = validateAssignSpaceCannonHits(state, action);
@@ -827,7 +848,7 @@ describe('validateAssignSpaceCannonHits', () => {
     const action = {
       type: 'assign_space_cannon_hits' as const,
       playerId: 'player1',
-      assignments: [],
+      assignments: [], timestamp: Date.now(),
     };
 
     const result = validateAssignSpaceCannonHits(state, action);
@@ -849,6 +870,7 @@ describe('validateAssignSpaceCannonHits', () => {
       type: 'assign_space_cannon_hits' as const,
       playerId: 'player1',
       assignments: [{ unitId: 'inf1', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignSpaceCannonHits(state, action);
@@ -870,6 +892,7 @@ describe('validateAssignSpaceCannonHits', () => {
       type: 'assign_space_cannon_hits' as const,
       playerId: 'player1',
       assignments: [{ unitId: 'inf1', sustainDamage: false, destroyed: true }],
+      timestamp: Date.now(),
     };
 
     const result = validateAssignSpaceCannonHits(state, action);
@@ -884,6 +907,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -897,6 +921,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -910,6 +935,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player2',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -923,6 +949,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -935,6 +962,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -947,6 +975,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);
@@ -959,6 +988,7 @@ describe('validateSkipInvasion', () => {
     const action = {
       type: 'skip_invasion' as const,
       playerId: 'player1',
+      timestamp: Date.now(),
     };
 
     const result = validateSkipInvasion(state, action);

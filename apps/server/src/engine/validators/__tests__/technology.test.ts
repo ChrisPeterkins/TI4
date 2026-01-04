@@ -159,48 +159,46 @@ vi.mock('@ti4/game-data', () => ({
 function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
   return {
     id: 'player1',
+    name: 'Test Player',
     faction: 'sol',
     color: 'blue',
-    name: 'Test Player',
+    seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
+    tradeGoods: 2,
     commodities: 2,
     maxCommodities: 4,
-    tradeGoods: 2,
     technologies: [],
-    planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
-    secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    secretObjectives: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
-    passed: false,
-    speaker: false,
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
+    planets: [],
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
-    leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
-    },
+    passed: false,
+    score: 0,
+    neighbors: [],
+    transactedWith: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    exhaustedRelics: [],
+    exhaustedTechnologies: [],
+    leaders: {
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
+    },
     ...overrides,
   };
 }
 
 function createMockPlanet(overrides: Partial<PlanetInstance> = {}): PlanetInstance {
+  const planetId = overrides.planetId || 'planet1';
   return {
-    planetId: 'planet1',
+    id: planetId,
+    planetId,
     controlledBy: 'player1',
     units: [],
     exhausted: false,
@@ -214,6 +212,9 @@ function createMockTile(overrides: Partial<MapTile> = {}): MapTile {
     id: 'tile1',
     systemId: 25,
     position: { q: 0, r: 0 },
+    rotation: 0,
+    wormhole: null,
+    anomaly: null,
     units: [],
     planets: [],
     commandTokens: [],
@@ -222,8 +223,8 @@ function createMockTile(overrides: Partial<MapTile> = {}): MapTile {
 }
 
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
-  const player1 = createMockPlayer({ id: 'player1' });
-  const player2 = createMockPlayer({ id: 'player2' });
+  const player1 = createMockPlayer({ id: 'player1', seatIndex: 0 });
+  const player2 = createMockPlayer({ id: 'player2', seatIndex: 1 });
 
   const tile = createMockTile({
     planets: [createMockPlanet({ planetId: 'wellon', controlledBy: 'player1' })],
@@ -231,28 +232,36 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
+    round: 1,
     phase: 'action',
     subPhase: 'strategic_primary',
-    round: 1,
-    turn: 0,
-    players: [player1, player2],
-    map: { tiles: [tile] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
-    laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
-    activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    initiativeOrder: ['player1', 'player2'],
+    players: [player1, player2],
+    map: { tiles: [tile], playerCount: 6 },
+    strategyCards: [],
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
+    agendas: {
+      currentAgenda: null,
+      currentAgendaNumber: 1,
+      votes: new Map(),
+      outcome: null,
+      riders: [],
+    },
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaDiscard: [],
+    laws: [],
+    custodiansTaken: false,
+    activeCombat: null,
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    agendaPhase: undefined,
+    gameLog: [],
     ...overrides,
   };
 }
@@ -269,6 +278,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'nonexistent',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -283,6 +293,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -297,6 +308,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'nonexistent_tech',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -312,6 +324,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -329,6 +342,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -346,6 +360,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'l4_disruptors', // Letnev faction tech
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -362,6 +377,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'spec_ops_ii', // Sol faction tech
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -377,6 +393,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -391,6 +408,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'hyper_metabolism', // Requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -406,6 +424,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'hyper_metabolism', // Requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -439,6 +458,7 @@ describe('validateResearchTechnology', () => {
         playerId: 'player1',
         techId: 'hyper_metabolism', // Requires 2 green, player has 1 + 1 skip from planet
         exhaustedPlanets: ['new_albion'],
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -472,6 +492,7 @@ describe('validateResearchTechnology', () => {
         playerId: 'player1',
         techId: 'hyper_metabolism',
         exhaustedPlanets: ['regular_planet'],
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -504,6 +525,7 @@ describe('validateResearchTechnology', () => {
         playerId: 'player1',
         techId: 'hyper_metabolism',
         exhaustedPlanets: ['new_albion'],
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -536,6 +558,7 @@ describe('validateResearchTechnology', () => {
         playerId: 'player1',
         techId: 'hyper_metabolism',
         exhaustedPlanets: ['new_albion'],
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -555,6 +578,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'fleet_logistics', // Requires 2 blue, player has 1 + 1 Jol-Nar skip
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);
@@ -572,6 +596,7 @@ describe('validateResearchTechnology', () => {
         type: 'research_technology' as const,
         playerId: 'player1',
         techId: 'carrier_ii',
+        timestamp: Date.now(),
       };
 
       const result = validateResearchTechnology(state, action);

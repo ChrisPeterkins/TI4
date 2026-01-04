@@ -114,9 +114,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -212,6 +212,7 @@ describe('Combat Handlers', () => {
         type: 'assign_hits',
         playerId: 'player1',
         assignments: [],
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -230,6 +231,7 @@ describe('Combat Handlers', () => {
         type: 'assign_hits',
         playerId: 'player1',
         assignments: [],
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -248,6 +250,7 @@ describe('Combat Handlers', () => {
         type: 'assign_hits',
         playerId: 'nonexistent',
         assignments: [],
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -273,7 +276,8 @@ describe('Combat Handlers', () => {
       const action: AssignHitsAction = {
         type: 'assign_hits',
         playerId: 'player1',
-        assignments: [{ unitId: 'cruiser-1', destroyed: true }],
+        assignments: [{ unitId: 'cruiser-1', destroyed: true, sustainDamage: false }],
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -299,7 +303,8 @@ describe('Combat Handlers', () => {
       const action: AssignHitsAction = {
         type: 'assign_hits',
         playerId: 'player1',
-        assignments: [{ unitId: 'cruiser-1', destroyed: true }], // Only 1 hit, need 2
+        assignments: [{ unitId: 'cruiser-1', destroyed: true, sustainDamage: false }], // Only 1 hit, need 2
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -324,7 +329,8 @@ describe('Combat Handlers', () => {
       const action: AssignHitsAction = {
         type: 'assign_hits',
         playerId: 'player1',
-        assignments: [{ unitId: 'enemy-cruiser', destroyed: true }],
+        assignments: [{ unitId: 'enemy-cruiser', destroyed: true, sustainDamage: false }],
+        timestamp: Date.now(),
       };
 
       const result = handleAssignHits(state, action);
@@ -341,6 +347,7 @@ describe('Combat Handlers', () => {
         type: 'announce_retreat',
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -359,6 +366,7 @@ describe('Combat Handlers', () => {
         type: 'announce_retreat',
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -379,6 +387,7 @@ describe('Combat Handlers', () => {
         playerId: 'player1',
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -399,6 +408,7 @@ describe('Combat Handlers', () => {
         playerId: 'player2', // Defender
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -419,6 +429,7 @@ describe('Combat Handlers', () => {
         playerId: 'player1',
         retreating: true,
         // No retreatSystem specified
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -437,6 +448,7 @@ describe('Combat Handlers', () => {
         type: 'announce_retreat',
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = handleAnnounceRetreat(state, action);
@@ -538,7 +550,7 @@ describe('Combat Handlers', () => {
       const result = completeCombat(state, 'player1');
 
       expect(result.success).toBe(true);
-      expect(result.data?.winnerId).toBe('player1');
+      expect((result.data as any)?.winnerId).toBe('player1');
       expect(state.activeCombat?.state).toBe('combat_complete');
     });
 
@@ -550,7 +562,7 @@ describe('Combat Handlers', () => {
       const result = completeCombat(state, null);
 
       expect(result.success).toBe(true);
-      expect(result.data?.winnerId).toBeNull();
+      expect((result.data as any)?.winnerId).toBeNull();
     });
   });
 

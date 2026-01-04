@@ -119,9 +119,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -354,6 +354,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player1',
         windowId: 'some-window',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -381,6 +382,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player1',
         windowId: 'wrong-window-id',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -408,6 +410,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player2', // Not in eligiblePlayers
         windowId: 'test-window',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -435,6 +438,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player1',
         windowId: 'test-window',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -466,6 +470,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player1',
         windowId: 'test-window',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -495,6 +500,7 @@ describe('Timing Window Handlers', () => {
         windowId: 'test-window',
         response: 'play_card',
         // Missing cardId
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -524,6 +530,7 @@ describe('Timing Window Handlers', () => {
         windowId: 'test-window',
         response: 'play_card',
         cardId: 'morale_boost',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -554,6 +561,7 @@ describe('Timing Window Handlers', () => {
         windowId: 'test-window',
         response: 'play_card',
         cardId: 'morale_boost',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);
@@ -584,6 +592,7 @@ describe('Timing Window Handlers', () => {
         playerId: 'player1',
         windowId: 'test-window',
         response: 'pass',
+        timestamp: Date.now(),
       };
 
       const result = handleTimingWindowResponse(state, action);

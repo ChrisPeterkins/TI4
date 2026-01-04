@@ -84,38 +84,32 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     name: 'Test Player',
+    seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 2,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
+    score: 0,
     secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
+    neighbors: [],
+    transactedWith: [],
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
     ...overrides,
   };
 }
@@ -132,6 +126,7 @@ function createMockUnit(overrides: Partial<UnitInstance> = {}): UnitInstance {
 
 function createMockPlanet(overrides: Partial<PlanetInstance> = {}): PlanetInstance {
   return {
+    id: 'planet-instance-1',
     planetId: 'planet1',
     controlledBy: 'player1',
     units: [],
@@ -146,9 +141,12 @@ function createMockTile(overrides: Partial<MapTile> = {}): MapTile {
     id: 'tile1',
     systemId: 25,
     position: { q: 0, r: 0 },
+    rotation: 0,
     units: [],
     planets: [createMockPlanet()],
     commandTokens: [],
+    wormhole: null,
+    anomaly: null,
     ...overrides,
   };
 }
@@ -161,41 +159,47 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'action',
     subPhase: 'strategic_primary',
     round: 1,
-    turn: 0,
     players: [player1, player2],
-    map: { tiles: [tile] },
+    map: { tiles: [tile], playerCount: 6 },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
-      secret: [],
       publicStageI: [],
       publicStageII: [],
+      revealedCount: 0,
       secretDeck: ['secret1', 'secret2'],
     },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
-    activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    initiativeOrder: ['player1', 'player2'],
+    strategyCards: [],
+    agendas: {
+      currentAgenda: null,
+      currentAgendaNumber: 1,
+      votes: new Map(),
+      outcome: null,
+      riders: [],
+    },
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaDiscard: [],
+    activeCombat: null,
+    custodiansTaken: false,
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    gameLog: [],
+    agendaPhase: undefined,
     strategicActionState: {
       cardNumber: 1,
-      primaryPlayerId: 'player1',
       secondaryOrder: ['player2'],
       currentSecondaryIndex: 0,
+      primaryResolved: false,
+      secondaryResponses: {},
     },
     ...overrides,
   };
@@ -214,6 +218,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'nonexistent',
         cardNumber: 1,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -229,6 +234,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 1,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -244,6 +250,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player2',
         cardNumber: 1,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -260,6 +267,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 2, // Mismatch
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -276,6 +284,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 99,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -297,6 +306,7 @@ describe('validateStrategicPrimary', () => {
           influenceSpent: 0,
           tokenDistribution: { tactics: 1, fleet: 1, strategy: 1 }, // 3 tokens
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -315,6 +325,7 @@ describe('validateStrategicPrimary', () => {
           influenceSpent: 0,
           tokenDistribution: { tactics: 1, fleet: 1, strategy: 0 }, // Only 2, need 3
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -334,6 +345,7 @@ describe('validateStrategicPrimary', () => {
           influenceSpent: 0,
           tokenDistribution: { tactics: -1, fleet: 2, strategy: 2 },
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -352,6 +364,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 2,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -368,6 +381,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 2,
         choices: { targetSystemPosition: { q: 99, r: 99 } },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -387,6 +401,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 2,
         choices: { targetSystemPosition: { q: 1, r: 1 } },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -406,6 +421,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 2,
         choices: { targetSystemPosition: { q: 0, r: 0 } },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -426,6 +442,7 @@ describe('validateStrategicPrimary', () => {
           targetSystemPosition: { q: 0, r: 0 },
           planetsToReady: ['p1', 'p2', 'p3'], // 3 planets, max is 2
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -446,6 +463,7 @@ describe('validateStrategicPrimary', () => {
           targetSystemPosition: { q: 0, r: 0 },
           planetsToReady: ['p1', 'p2'],
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -463,6 +481,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 3,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -479,6 +498,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 3,
         choices: { newSpeakerId: 'player1' },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -495,6 +515,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 3,
         choices: { newSpeakerId: 'nonexistent' },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -511,6 +532,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 3,
         choices: { newSpeakerId: 'player2' },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -523,14 +545,18 @@ describe('validateStrategicPrimary', () => {
     it('should fail if second structure is not PDS', () => {
       const state = createMockGameState();
       state.strategicActionState!.cardNumber = 4;
+      // Test that validator rejects space_dock as second structure
+      // We need to cast to any to bypass TypeScript's static type checking
+      // since the type system correctly prevents this invalid combination
       const action = {
         type: 'strategic_primary' as const,
         playerId: 'player1',
         cardNumber: 4,
         choices: {
-          firstStructure: { type: 'pds', planetId: 'planet1' },
-          secondStructure: { type: 'space_dock', planetId: 'planet1' }, // Must be PDS
+          firstStructure: { type: 'pds' as const, planetId: 'planet1' },
+          secondStructure: { type: 'space_dock' as 'pds', planetId: 'planet1' }, // Must be PDS - intentionally wrong for test
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -547,8 +573,9 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 4,
         choices: {
-          firstStructure: { type: 'space_dock', planetId: 'planet1' },
+          firstStructure: { type: 'space_dock' as const, planetId: 'planet1' },
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -566,6 +593,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 5,
         choices: { freeSecondaryPlayers: ['player1'] },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -582,6 +610,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 5,
         choices: { freeSecondaryPlayers: ['nonexistent'] },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -598,6 +627,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 5,
         choices: { freeSecondaryPlayers: ['player2'] },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -621,6 +651,7 @@ describe('validateStrategicPrimary', () => {
           firstTechId: 'neural_motivator',
           secondTechId: 'neural_motivator', // Same tech
         },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -637,6 +668,7 @@ describe('validateStrategicPrimary', () => {
         playerId: 'player1',
         cardNumber: 7,
         choices: { firstTechId: 'neural_motivator' },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicPrimary(state, action);
@@ -659,6 +691,7 @@ describe('validateStrategicSecondary', () => {
         playerId: 'nonexistent',
         cardNumber: 1,
         declined: false,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -674,6 +707,7 @@ describe('validateStrategicSecondary', () => {
         playerId: 'player2',
         cardNumber: 1,
         declined: false,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -691,6 +725,7 @@ describe('validateStrategicSecondary', () => {
         playerId: 'player1', // Not player2's turn
         cardNumber: 1,
         declined: false,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -706,6 +741,7 @@ describe('validateStrategicSecondary', () => {
         playerId: 'player2',
         cardNumber: 1,
         declined: true,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -728,6 +764,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 2,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -748,6 +785,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 1,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -767,6 +805,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 5,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -786,6 +825,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 2,
         declined: false,
         choices: { readiedPlanets: ['p1', 'p2', 'p3'] },
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -806,6 +846,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 7,
         declined: false,
         choices: {}, // No techId
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -827,6 +868,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 8,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -846,6 +888,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 8,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);
@@ -866,6 +909,7 @@ describe('validateStrategicSecondary', () => {
         cardNumber: 8,
         declined: false,
         choices: {},
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicSecondary(state, action);

@@ -77,9 +77,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -105,6 +105,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'nonexistent',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -119,6 +120,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'fake_tech',
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -139,6 +141,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -160,6 +163,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'e_res_siphons', // Hacan faction tech
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -180,6 +184,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'hyper_metabolism', // Requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -200,6 +205,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'neural_motivator', // Tier 1 green, no prerequisites
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -221,6 +227,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'hyper_metabolism', // Tier 2 green, requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -242,6 +249,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'spec_ops_ii', // Sol faction tech, requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);
@@ -259,6 +267,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const initialVersion = state.version;
@@ -280,6 +289,7 @@ describe('Technology Handlers', () => {
         type: 'research_technology',
         playerId: 'player1',
         techId: 'hyper_metabolism', // Requires 2 green
+        timestamp: Date.now(),
       };
 
       const result = handleResearchTechnology(state, action);

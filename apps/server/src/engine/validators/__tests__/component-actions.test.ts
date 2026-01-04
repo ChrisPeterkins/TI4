@@ -93,7 +93,10 @@ function createMockPlayer(id: string, faction: string): PlayerState {
     planets: [],
     score: 0,
     passed: false,
-    strategyCards: [],
+    strategyCard: null,
+    strategyCardUsed: false,
+    neighbors: [],
+    transactedWith: [],
     leaders: {
       agent: { unlocked: true, exhausted: false },
       commander: { unlocked: false },
@@ -118,6 +121,7 @@ function createMockTile(q: number, r: number, systemId: number, planets: PlanetI
 
 function createMockPlanet(planetId: string, controlledBy: string | null, units: UnitInstance[] = []): PlanetInstance {
   return {
+    id: planetId,
     planetId,
     controlledBy,
     exhausted: false,

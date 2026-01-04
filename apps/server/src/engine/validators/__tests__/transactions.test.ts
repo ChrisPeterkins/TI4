@@ -42,40 +42,30 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     name: 'Test Player',
+    seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 3,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
+    score: 0,
     secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
     promissoryNotesInHand: ['support_for_the_throne_player1'],
     promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
     neighbors: ['player2'],
     transactedWith: [],
     ...overrides,
@@ -92,6 +82,22 @@ function createMockOffer(overrides: Partial<TransactionOffer> = {}): Transaction
   };
 }
 
+function createProposeAction(
+  playerId: string,
+  targetPlayerId: string,
+  offering: TransactionOffer,
+  requesting: TransactionOffer
+) {
+  return {
+    type: 'propose_transaction' as const,
+    playerId,
+    targetPlayerId,
+    offering,
+    requesting,
+    timestamp: Date.now(),
+  };
+}
+
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
   const player1 = createMockPlayer({
     id: 'player1',
@@ -101,6 +107,7 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
   });
   const player2 = createMockPlayer({
     id: 'player2',
+    seatIndex: 1,
     neighbors: ['player1'],
     tradeGoods: 2,
     commodities: 3,
@@ -108,29 +115,29 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'action',
-    subPhase: 'active',
+    subPhase: 'awaiting_action',
     round: 1,
-    turn: 0,
     players: [player1, player2],
-    map: { tiles: [] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
+    map: { tiles: [], playerCount: 2 },
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
+    strategyCards: [],
+    agendas: { currentAgenda: null, currentAgendaNumber: 1, votes: new Map(), outcome: null, riders: [] },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
+    initiativeOrder: ['player1', 'player2'],
     activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
-    pendingTransaction: null,
+    agendaDiscard: [],
+    custodiansTaken: false,
+    gameLog: [],
     ...overrides,
   };
 }
@@ -149,6 +156,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 1 }),
         requesting: createMockOffer({ commodities: 1 }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -165,6 +173,7 @@ describe('validateProposeTransaction', () => {
         targetId: 'player2',
         initiatorOffer: createMockOffer(),
         requestedOffer: createMockOffer(),
+        createdAt: Date.now(),
       };
 
       const action = {
@@ -173,6 +182,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -189,6 +199,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -205,6 +216,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'nonexistent',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -221,6 +233,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player1',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -242,6 +255,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -259,6 +273,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 1 }),
         requesting: createMockOffer({ commodities: 1 }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -271,7 +286,7 @@ describe('validateProposeTransaction', () => {
       state.players[0].neighbors = []; // Not neighbors
       state.players[1].neighbors = [];
       // Player1 has Trade Convoys in play
-      state.players[0].promissoryNotesInPlay = [{ noteId: 'trade_convoys_player1', targetId: null }];
+      state.players[0].promissoryNotesInPlay = [{ noteId: 'trade_convoys_player1', originalOwnerId: 'player1', placedRound: 1 }];
 
       const action = {
         type: 'propose_transaction' as const,
@@ -279,6 +294,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 1 }),
         requesting: createMockOffer({ commodities: 1 }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -298,6 +314,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer(),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -317,6 +334,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 10 }), // Only has 3
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -334,6 +352,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: -1 }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -351,6 +370,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ commodities: 10 }), // Only has 2
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -368,6 +388,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ commodities: -1 }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -386,6 +407,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ promissoryNotes: ['note1', 'note2'] }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -403,6 +425,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ promissoryNotes: ['note_not_in_hand'] }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -414,7 +437,7 @@ describe('validateProposeTransaction', () => {
     it('should fail if promissory note is in play area', () => {
       const state = createMockGameState();
       state.players[0].promissoryNotesInHand = ['note1'];
-      state.players[0].promissoryNotesInPlay = [{ noteId: 'note1', targetId: 'player2' }];
+      state.players[0].promissoryNotesInPlay = [{ noteId: 'note1', originalOwnerId: 'player1', placedRound: 1 }];
 
       const action = {
         type: 'propose_transaction' as const,
@@ -422,6 +445,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ promissoryNotes: ['note1'] }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -440,6 +464,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ actionCards: ['card_not_in_hand'] }),
         requesting: createMockOffer(),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -458,7 +483,8 @@ describe('validateProposeTransaction', () => {
         playerId: 'player1',
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 1 }),
-        requesting: createMockOffer({ tradeGoods: 10 }), // Player2 only has 2
+        requesting: createMockOffer({ tradeGoods: 10 }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -478,6 +504,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 2 }),
         requesting: createMockOffer({ commodities: 3 }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -495,6 +522,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ promissoryNotes: ['support_for_the_throne_player1'] }),
         requesting: createMockOffer({ promissoryNotes: ['their_note'] }),
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -511,6 +539,7 @@ describe('validateProposeTransaction', () => {
         targetPlayerId: 'player2',
         offering: createMockOffer({ tradeGoods: 2, commodities: 1 }),
         requesting: createMockOffer(), // Nothing requested
+        timestamp: Date.now(),
       };
 
       const result = validateProposeTransaction(state, action);
@@ -526,11 +555,12 @@ describe('validateAcceptTransaction', () => {
   });
 
   it('should fail if no pending transaction', () => {
-    const state = createMockGameState({ pendingTransaction: null });
+    const state = createMockGameState({ pendingTransaction: undefined });
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -547,12 +577,14 @@ describe('validateAcceptTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player2',
       transactionId: 'wrong_id',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -569,12 +601,14 @@ describe('validateAcceptTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player1', // Initiator, not target
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -591,12 +625,14 @@ describe('validateAcceptTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer({ tradeGoods: 5 }), // More than player1 has
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -613,12 +649,14 @@ describe('validateAcceptTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer({ tradeGoods: 1 }),
       requestedOffer: createMockOffer({ commodities: 10 }), // More than player2 has
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -635,12 +673,14 @@ describe('validateAcceptTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer({ tradeGoods: 1 }),
       requestedOffer: createMockOffer({ commodities: 1 }),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'accept_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateAcceptTransaction(state, action);
@@ -655,11 +695,12 @@ describe('validateDeclineTransaction', () => {
   });
 
   it('should fail if no pending transaction', () => {
-    const state = createMockGameState({ pendingTransaction: null });
+    const state = createMockGameState({ pendingTransaction: undefined });
     const action = {
       type: 'decline_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateDeclineTransaction(state, action);
@@ -676,12 +717,14 @@ describe('validateDeclineTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'decline_transaction' as const,
       playerId: 'player2',
       transactionId: 'wrong_id',
+      timestamp: Date.now(),
     };
 
     const result = validateDeclineTransaction(state, action);
@@ -699,12 +742,14 @@ describe('validateDeclineTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'decline_transaction' as const,
       playerId: 'player3', // Not involved
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateDeclineTransaction(state, action);
@@ -721,12 +766,14 @@ describe('validateDeclineTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'decline_transaction' as const,
       playerId: 'player2',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateDeclineTransaction(state, action);
@@ -742,12 +789,14 @@ describe('validateDeclineTransaction', () => {
       targetId: 'player2',
       initiatorOffer: createMockOffer(),
       requestedOffer: createMockOffer(),
+      createdAt: Date.now(),
     };
 
     const action = {
       type: 'decline_transaction' as const,
       playerId: 'player1',
       transactionId: 'tx1',
+      timestamp: Date.now(),
     };
 
     const result = validateDeclineTransaction(state, action);

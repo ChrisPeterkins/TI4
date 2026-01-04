@@ -10,6 +10,32 @@ import type {
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { getLeaderAbility, FACTION_LEADERS } from '@ti4/shared';
+import { systems } from '@ti4/game-data';
+
+// Build a lookup map for planet static data
+const planetDataLookup: Map<string, { resources: number; influence: number }> = new Map();
+for (const system of Object.values(systems)) {
+  for (const planet of system.planets || []) {
+    planetDataLookup.set(planet.id, {
+      resources: planet.resources,
+      influence: planet.influence,
+    });
+  }
+}
+
+/**
+ * Get planet resources from static data
+ */
+function getPlanetResources(planetId: string): number {
+  return planetDataLookup.get(planetId)?.resources || 0;
+}
+
+/**
+ * Get planet influence from static data
+ */
+function getPlanetInfluence(planetId: string): number {
+  return planetDataLookup.get(planetId)?.influence || 0;
+}
 
 /**
  * Validate using an agent ability
@@ -223,7 +249,7 @@ export function canUnlockCommander(
       for (const tile of state.map.tiles) {
         for (const planet of tile.planets) {
           if (planet.controlledBy === playerId) {
-            totalResources += planet.resources || 0;
+            totalResources += getPlanetResources(planet.planetId);
           }
         }
       }
@@ -239,7 +265,7 @@ export function canUnlockCommander(
       for (const tile of state.map.tiles) {
         for (const planet of tile.planets) {
           if (planet.controlledBy === playerId) {
-            totalInfluence += planet.influence || 0;
+            totalInfluence += getPlanetInfluence(planet.planetId);
           }
         }
       }
@@ -380,12 +406,14 @@ export function canUnlockCommander(
     }
 
     case 'have_scored_secrets': {
-      // Count scored secret objectives
-      const secretCount = player.scoredSecretObjectives?.length || 0;
-      if (secretCount >= condition.count) {
+      // Count scored secret objectives (secrets that appear in both secretObjectives and scoredObjectives)
+      const scoredSecrets = player.secretObjectives?.filter(
+        obj => player.scoredObjectives?.includes(obj)
+      ).length || 0;
+      if (scoredSecrets >= condition.count) {
         return { canUnlock: true };
       }
-      return { canUnlock: false, reason: `Need ${condition.count} scored secret objectives, have ${secretCount}` };
+      return { canUnlock: false, reason: `Need ${condition.count} scored secret objectives, have ${scoredSecrets}` };
     }
 
     case 'have_mechs_in_systems': {

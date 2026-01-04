@@ -1503,7 +1503,7 @@ function generateTechnologyPrimaryChoices(gameState: GameState, player: PlayerSt
   const bestTech = scoredTechs[0];
   if (bestTech && bestTech.score > 0) {
     return {
-      techId: bestTech.tech.id,
+      firstTechId: bestTech.tech.id,
     };
   }
 
@@ -1830,6 +1830,11 @@ function evaluateAgendaOutcome(
   const agendaId = agenda.currentAgendaId;
   const electionType = agenda.currentElectionType;
 
+  // If no agenda, default to abstain
+  if (!agendaId) {
+    return { outcome: 'for', shouldAbstain: true };
+  }
+
   // For/Against agendas - evaluate if the effect helps or hurts us
   if (electionType === 'for_against') {
     const preference = evaluateForAgainstAgenda(gameState, player, agendaId);
@@ -1901,7 +1906,7 @@ function evaluateForAgainstAgenda(
   // Specific evaluations based on player state
   if (agendaId === 'ixthian_artifact') {
     // Risky - vote against unless we're winning
-    const isWinning = player.victoryPoints >= 8;
+    const isWinning = player.score >= 8;
     return isWinning ? 'for' : 'against';
   }
 
@@ -2026,8 +2031,8 @@ function findLeadingPlayer(gameState: GameState, excludePlayerId: string): Playe
 
   for (const p of gameState.players) {
     if (p.id === excludePlayerId) continue;
-    if (p.victoryPoints > maxVP) {
-      maxVP = p.victoryPoints;
+    if (p.score > maxVP) {
+      maxVP = p.score;
       leader = p;
     }
   }
@@ -2212,10 +2217,24 @@ function getPlanetInfluence(planetId: string): number {
   return 0;
 }
 
-function findPlanetData(planetId: string): { resources: number; influence: number } | null {
+function findPlanetData(planetId: string): {
+  resources: number;
+  influence: number;
+  techSpecialty?: string;
+  trait?: string;
+  legendary?: boolean;
+} | null {
   for (const system of Object.values(systems)) {
     const planet = system.planets.find(p => p.id === planetId);
-    if (planet) return { resources: planet.resources, influence: planet.influence };
+    if (planet) {
+      return {
+        resources: planet.resources,
+        influence: planet.influence,
+        techSpecialty: planet.techSpecialty,
+        trait: planet.trait,
+        legendary: planet.legendary,
+      };
+    }
   }
   return null;
 }

@@ -90,9 +90,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: ['secret1', 'secret2', 'secret3'],
     },
     laws: [],
@@ -121,6 +121,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -134,6 +135,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'nonexistent',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -149,6 +151,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -172,6 +175,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -195,6 +199,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -216,6 +221,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -238,6 +244,7 @@ describe('Leader Handlers', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -266,6 +273,7 @@ describe('Leader Handlers', () => {
         type: 'use_agent',
         playerId: 'player1',
         targetPlayerId: 'player2',
+        timestamp: Date.now(),
       };
 
       const result = handleUseAgent(state, action);
@@ -277,6 +285,7 @@ describe('Leader Handlers', () => {
   describe('handleUnlockCommander', () => {
     it('should unlock commander when conditions met', () => {
       // Sol commander: Control planets with 12+ combined resources
+      // Using real planets: jord (4 res), moll_primus (4 res), arc_prime (4 res) = 12 total
       const state = createMockGameState({
         players: [
           createMockPlayer({
@@ -287,9 +296,9 @@ describe('Leader Handlers', () => {
           tiles: [
             createMockTile({ q: 0, r: 0 }, {
               planets: [
-                { planetId: 'p1', controlledBy: 'player1', resources: 4, influence: 2, units: [], exhausted: false } as any,
-                { planetId: 'p2', controlledBy: 'player1', resources: 5, influence: 3, units: [], exhausted: false } as any,
-                { planetId: 'p3', controlledBy: 'player1', resources: 4, influence: 2, units: [], exhausted: false } as any,
+                { planetId: 'jord', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'moll_primus', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'arc_prime', controlledBy: 'player1', units: [], exhausted: false } as any,
               ],
             }),
           ],
@@ -299,6 +308,7 @@ describe('Leader Handlers', () => {
       const action: UnlockCommanderAction = {
         type: 'unlock_commander',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUnlockCommander(state, action);
@@ -313,6 +323,7 @@ describe('Leader Handlers', () => {
       const action: UnlockCommanderAction = {
         type: 'unlock_commander',
         playerId: 'nonexistent',
+        timestamp: Date.now(),
       };
 
       const result = handleUnlockCommander(state, action);
@@ -328,6 +339,7 @@ describe('Leader Handlers', () => {
       const action: UnlockCommanderAction = {
         type: 'unlock_commander',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUnlockCommander(state, action);
@@ -351,6 +363,7 @@ describe('Leader Handlers', () => {
       const action: UnlockCommanderAction = {
         type: 'unlock_commander',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUnlockCommander(state, action);
@@ -382,6 +395,7 @@ describe('Leader Handlers', () => {
       const action: UnlockCommanderAction = {
         type: 'unlock_commander',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handleUnlockCommander(state, action);
@@ -408,6 +422,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -432,6 +447,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -455,6 +471,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -491,6 +508,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -530,6 +548,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -568,6 +587,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -626,6 +646,7 @@ describe('Leader Handlers', () => {
         type: 'purge_hero',
         playerId: 'player1',
         targets: { systemId: '42' },
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -659,6 +680,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -699,6 +721,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -763,6 +786,8 @@ describe('Leader Handlers', () => {
 
   describe('checkAllCommanderUnlocks', () => {
     it('should unlock commanders for eligible players', () => {
+      // Sol needs 12+ resources
+      // Using real planets: jord (4 res), moll_primus (4 res), arc_prime (4 res), axis (5 res) = 17 total
       const state = createMockGameState({
         players: [
           createMockPlayer({
@@ -779,9 +804,10 @@ describe('Leader Handlers', () => {
           tiles: [
             createMockTile({ q: 0, r: 0 }, {
               planets: [
-                { planetId: 'p1', controlledBy: 'player1', resources: 6, influence: 2, units: [], exhausted: false } as any,
-                { planetId: 'p2', controlledBy: 'player1', resources: 7, influence: 3, units: [], exhausted: false } as any,
-              ], // 13 resources = Sol unlocks
+                { planetId: 'jord', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'moll_primus', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'arc_prime', controlledBy: 'player1', units: [], exhausted: false } as any,
+              ],
             }),
           ],
           playerCount: 6,
@@ -938,6 +964,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -994,6 +1021,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -1026,6 +1054,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);
@@ -1056,6 +1085,7 @@ describe('Leader Handlers', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = handlePurgeHero(state, action);

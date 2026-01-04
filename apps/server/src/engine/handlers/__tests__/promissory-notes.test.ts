@@ -129,9 +129,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -158,6 +158,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'nonexistent',
           noteId: 'support_for_the_throne_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -178,6 +179,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'unknown_note',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -203,6 +205,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'support_for_the_throne_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -224,6 +227,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -253,6 +257,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -281,6 +286,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -310,6 +316,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -334,6 +341,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'support_for_the_throne_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -362,6 +370,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'military_support_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -388,6 +397,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'war_funding_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -413,6 +423,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'political_secret_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -437,6 +448,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'political_secret_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -466,6 +478,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'cybernetic_enhancements_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -498,6 +511,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -528,6 +542,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -560,6 +575,7 @@ describe('Promissory Note Handlers', () => {
           playerId: 'player1',
           noteId: 'spy_net_green',
           targetCardId: 'sabotage',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -590,6 +606,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'spy_net_green',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -620,6 +637,7 @@ describe('Promissory Note Handlers', () => {
           playerId: 'player1',
           noteId: 'spy_net_green',
           targetCardId: 'sabotage',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -652,6 +670,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'war_funding_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -683,6 +702,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'war_funding_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -711,6 +731,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'political_favor_yellow',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -738,6 +759,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'political_favor_yellow',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -770,12 +792,13 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'stymie_purple',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.staysInPlay).toBe(true);
+        expect((result.data as any)?.staysInPlay).toBe(true);
         expect(state.players[0].promissoryNotesInPlay).toHaveLength(1);
         expect(state.players[0].promissoryNotesInPlay[0].noteId).toBe('stymie_purple');
         expect(state.players[0].promissoryNotesInPlay[0].originalOwnerId).toBe('player2');
@@ -804,12 +827,13 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'fires_of_the_gashlai_red',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.staysInPlay).toBe(false);
+        expect((result.data as any)?.staysInPlay).toBe(false);
         // Note returned to original owner
         expect(state.players[1].promissoryNotesInHand).toContain('fires_of_the_gashlai_red');
         // Removed from player's hand
@@ -837,6 +861,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'stymie_purple',
+          timestamp: Date.now(),
         };
 
         handlePlayPromissoryNote(state, action);
@@ -861,6 +886,7 @@ describe('Promissory Note Handlers', () => {
           type: 'play_promissory_note',
           playerId: 'player1',
           noteId: 'political_secret_blue',
+          timestamp: Date.now(),
         };
 
         const result = handlePlayPromissoryNote(state, action);
@@ -985,7 +1011,7 @@ describe('Promissory Note Handlers', () => {
 
       expect(result.success).toBe(true);
       expect(result.triggeredEvents).toContain('promissory_note_returned');
-      expect(result.data?.reason).toBe('resolved');
+      expect((result.data as any)?.reason).toBe('resolved');
     });
 
     it('should increment game version', () => {

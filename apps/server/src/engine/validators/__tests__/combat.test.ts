@@ -58,38 +58,32 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     name: 'Test Player',
+    seatIndex: 0,
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 2,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
     secretObjectives: [],
     actionCards: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
+    score: 0,
+    neighbors: [],
+    transactedWith: [],
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
     ...overrides,
   };
 }
@@ -109,8 +103,11 @@ function createMockTile(overrides: Partial<MapTile> = {}): MapTile {
     id: 'tile1',
     systemId: 25,
     position: { q: 0, r: 0 },
+    rotation: 0,
     units: [],
     planets: [],
+    wormhole: null,
+    anomaly: null,
     commandTokens: [],
     ...overrides,
   };
@@ -128,6 +125,7 @@ function createMockCombat(overrides: Partial<CombatInstance> = {}): CombatInstan
     state: 'combat_round_assign',
     roundNumber: 1,
     pendingHits: { attacker: 0, defender: 1 },
+    retreatAnnounced: { attacker: false, defender: false },
     temporaryModifiers: {},
     ...overrides,
   };
@@ -135,7 +133,7 @@ function createMockCombat(overrides: Partial<CombatInstance> = {}): CombatInstan
 
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
   const player1 = createMockPlayer({ id: 'player1', faction: 'sol' });
-  const player2 = createMockPlayer({ id: 'player2', faction: 'letnev' });
+  const player2 = createMockPlayer({ id: 'player2', faction: 'letnev', seatIndex: 1 });
 
   const attackerUnit = createMockUnit({ id: 'unit1', ownerId: 'player1', type: 'cruiser' });
   const defenderUnit = createMockUnit({ id: 'unit2', ownerId: 'player2', type: 'cruiser' });
@@ -148,28 +146,36 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'action',
-    subPhase: 'tactical_combat',
+    subPhase: 'tactical_space_combat',
     round: 1,
-    turn: 0,
     players: [player1, player2],
-    map: { tiles: [tile] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
+    map: { tiles: [tile], playerCount: 6 },
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
-    activeCombat: createMockCombat(),
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
+    initiativeOrder: ['player1', 'player2'],
+    strategyCards: [],
+    agendas: {
+      currentAgenda: null,
+      currentAgendaNumber: 1,
+      votes: new Map(),
+      outcome: null,
+      riders: [],
+    },
+    actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaDiscard: [],
+    custodiansTaken: false,
+    activeCombat: createMockCombat(),
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    agendaPhase: undefined,
+    gameLog: [],
     ...overrides,
   };
 }
@@ -182,7 +188,7 @@ describe('validateAssignHits', () => {
   describe('basic validation', () => {
     it('should fail if no active combat', () => {
       const state = createMockGameState({ activeCombat: null });
-      const action = { type: 'assign_hits' as const, playerId: 'player1', assignments: [] };
+      const action = { type: 'assign_hits' as const, playerId: 'player1', assignments: [], timestamp: Date.now() };
 
       const result = validateAssignHits(state, action);
 
@@ -193,7 +199,7 @@ describe('validateAssignHits', () => {
     it('should fail if not in hit assignment phase', () => {
       const state = createMockGameState();
       state.activeCombat!.state = 'announce_retreat';
-      const action = { type: 'assign_hits' as const, playerId: 'player1', assignments: [] };
+      const action = { type: 'assign_hits' as const, playerId: 'player1', assignments: [], timestamp: Date.now() };
 
       const result = validateAssignHits(state, action);
 
@@ -203,7 +209,7 @@ describe('validateAssignHits', () => {
 
     it('should fail if player not found', () => {
       const state = createMockGameState();
-      const action = { type: 'assign_hits' as const, playerId: 'nonexistent', assignments: [] };
+      const action = { type: 'assign_hits' as const, playerId: 'nonexistent', assignments: [], timestamp: Date.now() };
 
       const result = validateAssignHits(state, action);
 
@@ -214,7 +220,7 @@ describe('validateAssignHits', () => {
     it('should fail if player is not part of combat', () => {
       const state = createMockGameState();
       state.players.push(createMockPlayer({ id: 'player3' }));
-      const action = { type: 'assign_hits' as const, playerId: 'player3', assignments: [] };
+      const action = { type: 'assign_hits' as const, playerId: 'player3', assignments: [], timestamp: Date.now() };
 
       const result = validateAssignHits(state, action);
 
@@ -240,6 +246,7 @@ describe('validateAssignHits', () => {
           { unitId: 'unit1', sustainDamage: false, destroyed: true },
           { unitId: 'unit1', sustainDamage: false, destroyed: true }, // Same unit again
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -255,6 +262,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'nonexistent', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -270,6 +278,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit2', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -290,6 +299,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit3', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -305,6 +315,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: true, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -324,6 +335,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: true, destroyed: false }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -349,6 +361,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: true, destroyed: false }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -374,6 +387,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: true, destroyed: false }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -397,6 +411,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -413,6 +428,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -428,6 +444,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -452,6 +469,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player1',
         assignments: [{ unitId: 'unit1', sustainDamage: true, destroyed: false }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -469,6 +487,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player2',
         assignments: [{ unitId: 'unit2', sustainDamage: false, destroyed: true }],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -486,6 +505,7 @@ describe('validateAssignHits', () => {
         type: 'assign_hits' as const,
         playerId: 'player2',
         assignments: [],
+        timestamp: Date.now(),
       };
 
       const result = validateAssignHits(state, action);
@@ -508,6 +528,7 @@ describe('validateAnnounceRetreat', () => {
         type: 'announce_retreat' as const,
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -523,6 +544,7 @@ describe('validateAnnounceRetreat', () => {
         type: 'announce_retreat' as const,
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -539,6 +561,7 @@ describe('validateAnnounceRetreat', () => {
         type: 'announce_retreat' as const,
         playerId: 'player3',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -558,6 +581,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player2', // defender
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -574,6 +598,7 @@ describe('validateAnnounceRetreat', () => {
         type: 'announce_retreat' as const,
         playerId: 'player2', // defender
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -599,6 +624,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player2', // defender
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -625,6 +651,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player1', // attacker
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -639,6 +666,7 @@ describe('validateAnnounceRetreat', () => {
         type: 'announce_retreat' as const,
         playerId: 'player1',
         retreating: false,
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -656,6 +684,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player1',
         retreating: true,
         // No retreatSystem specified
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -676,6 +705,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player1',
         retreating: true,
         retreatSystem: { q: 5, r: 5 }, // Invalid destination
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -701,6 +731,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player1',
         retreating: true,
         retreatSystem: { q: -1, r: 1 },
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -719,6 +750,7 @@ describe('validateAnnounceRetreat', () => {
         playerId: 'player1',
         retreating: true,
         retreatSystem: { q: 1, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateAnnounceRetreat(state, action);
@@ -736,7 +768,7 @@ describe('validateAdvanceCombat', () => {
 
   it('should fail if no active combat', () => {
     const state = createMockGameState({ activeCombat: null });
-    const action = { playerId: 'player1' };
+    const action = { playerId: 'player1', timestamp: Date.now() };
 
     const result = validateAdvanceCombat(state, action);
 
@@ -747,7 +779,7 @@ describe('validateAdvanceCombat', () => {
   it('should fail if player is not a combat participant', () => {
     const state = createMockGameState();
     state.players.push(createMockPlayer({ id: 'player3' }));
-    const action = { playerId: 'player3' };
+    const action = { playerId: 'player3', timestamp: Date.now() };
 
     const result = validateAdvanceCombat(state, action);
 
@@ -757,7 +789,7 @@ describe('validateAdvanceCombat', () => {
 
   it('should allow attacker to advance combat', () => {
     const state = createMockGameState();
-    const action = { playerId: 'player1' };
+    const action = { playerId: 'player1', timestamp: Date.now() };
 
     const result = validateAdvanceCombat(state, action);
 
@@ -766,7 +798,7 @@ describe('validateAdvanceCombat', () => {
 
   it('should allow defender to advance combat', () => {
     const state = createMockGameState();
-    const action = { playerId: 'player2' };
+    const action = { playerId: 'player2', timestamp: Date.now() };
 
     const result = validateAdvanceCombat(state, action);
 

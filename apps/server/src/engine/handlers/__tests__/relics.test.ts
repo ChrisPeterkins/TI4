@@ -130,9 +130,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -161,6 +161,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'nonexistent',
           relicId: 'dominus_orb',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -177,6 +178,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'dominus_orb',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -198,6 +200,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'dominus_orb',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -214,6 +217,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'fake_relic',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -237,6 +241,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'dominus_orb',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -254,7 +259,7 @@ describe('Relic Handlers', () => {
           players: [
             createMockPlayer({
               relics: ['maw_of_worlds'],
-              planets: [{ planetId: 'jord', exhausted: false }],
+              planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
             }),
           ],
         });
@@ -262,6 +267,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'maw_of_worlds',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -277,9 +283,9 @@ describe('Relic Handlers', () => {
               relics: ['maw_of_worlds'],
               technologies: [],
               planets: [
-                { planetId: 'jord', exhausted: false },
-                { planetId: 'abyz', exhausted: false },
-                { planetId: 'fria', exhausted: true }, // Already exhausted
+                { planetId: 'jord', exhausted: false, attachments: [] },
+                { planetId: 'abyz', exhausted: false, attachments: [] },
+                { planetId: 'fria', exhausted: true, attachments: [] }, // Already exhausted
               ],
             }),
           ],
@@ -289,6 +295,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'maw_of_worlds',
           targets: { techId: 'war_sun' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -306,7 +313,7 @@ describe('Relic Handlers', () => {
             createMockPlayer({
               relics: ['maw_of_worlds'],
               technologies: ['war_sun'],
-              planets: [{ planetId: 'jord', exhausted: false }],
+              planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
             }),
           ],
         });
@@ -315,6 +322,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'maw_of_worlds',
           targets: { techId: 'war_sun' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -334,6 +342,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'stellar_converter',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -351,6 +360,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'stellar_converter',
           targets: { planetId: 'nonexistent_planet' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -384,6 +394,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'stellar_converter',
           targets: { planetId: 'target_planet' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -411,6 +422,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_codex',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -429,6 +441,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'the_codex',
           targets: { actionCardIds: ['card1', 'card2', 'card3', 'card4'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -447,6 +460,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'the_codex',
           targets: { actionCardIds: ['direct_hit'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -471,6 +485,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'the_codex',
           targets: { actionCardIds: ['sabotage', 'direct_hit', 'flank_speed'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -496,6 +511,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_crown_of_emphidia',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -509,7 +525,7 @@ describe('Relic Handlers', () => {
           players: [
             createMockPlayer({
               relics: ['the_crown_of_emphidia'],
-              planets: [{ planetId: 'jord', exhausted: false }],
+              planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
             }),
           ],
         });
@@ -518,6 +534,7 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'the_crown_of_emphidia',
           targets: { planetId: 'uncontrolled_planet' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -531,7 +548,7 @@ describe('Relic Handlers', () => {
           players: [
             createMockPlayer({
               relics: ['the_crown_of_emphidia'],
-              planets: [{ planetId: 'jord', exhausted: false }],
+              planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
             }),
           ],
         });
@@ -540,13 +557,14 @@ describe('Relic Handlers', () => {
           playerId: 'player1',
           relicId: 'the_crown_of_emphidia',
           targets: { planetId: 'jord' },
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
 
         expect(result.success).toBe(true);
         expect(state.players[0].exhaustedRelics).toContain('the_crown_of_emphidia');
-        expect(result.data?.effect.planetToExplore).toBe('jord');
+        expect((result.data as any)?.effect.planetToExplore).toBe('jord');
       });
     });
 
@@ -560,9 +578,9 @@ describe('Relic Handlers', () => {
             }),
           ],
           objectives: {
-            stage1: [],
-            stage2: [],
-            revealed: [],
+            publicStageI: [],
+            publicStageII: [],
+            revealedCount: 0,
             secretDeck: ['new_secret_1', 'new_secret_2'],
           },
         });
@@ -570,6 +588,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_obsidian',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -587,9 +606,9 @@ describe('Relic Handlers', () => {
             }),
           ],
           objectives: {
-            stage1: [],
-            stage2: [],
-            revealed: [],
+            publicStageI: [],
+            publicStageII: [],
+            revealedCount: 0,
             secretDeck: [],
           },
         });
@@ -597,12 +616,13 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_obsidian',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.effect).toBe('extra_secret_objective_capacity');
+        expect((result.data as any)?.effect.effect).toBe('extra_secret_objective_capacity');
       });
     });
 
@@ -615,6 +635,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'scepter_of_emelpar',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -631,12 +652,13 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_crown_of_thalnos',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.effect).toBe('combat_reroll_passive');
+        expect((result.data as any)?.effect.effect).toBe('combat_reroll_passive');
       });
 
       it('should return success for The Prophet\'s Tears (passive effect)', () => {
@@ -647,6 +669,7 @@ describe('Relic Handlers', () => {
           type: 'use_relic',
           playerId: 'player1',
           relicId: 'the_prophets_tears',
+          timestamp: Date.now(),
         };
 
         const result = handleUseRelic(state, action);
@@ -664,6 +687,7 @@ describe('Relic Handlers', () => {
         type: 'ready_relic',
         playerId: 'nonexistent',
         relicId: 'dominus_orb',
+        timestamp: Date.now(),
       };
 
       const result = handleReadyRelic(state, action);
@@ -680,6 +704,7 @@ describe('Relic Handlers', () => {
         type: 'ready_relic',
         playerId: 'player1',
         relicId: 'dominus_orb',
+        timestamp: Date.now(),
       };
 
       const result = handleReadyRelic(state, action);
@@ -701,6 +726,7 @@ describe('Relic Handlers', () => {
         type: 'ready_relic',
         playerId: 'player1',
         relicId: 'dominus_orb',
+        timestamp: Date.now(),
       };
 
       const result = handleReadyRelic(state, action);
@@ -722,6 +748,7 @@ describe('Relic Handlers', () => {
         type: 'ready_relic',
         playerId: 'player1',
         relicId: 'dominus_orb',
+        timestamp: Date.now(),
       };
 
       const result = handleReadyRelic(state, action);

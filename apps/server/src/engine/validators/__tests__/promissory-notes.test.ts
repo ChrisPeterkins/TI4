@@ -72,40 +72,31 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     color: 'blue',
     name: 'Test Player',
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    resources: 5,
-    influence: 5,
     commodities: 2,
     maxCommodities: 4,
     tradeGoods: 3,
     technologies: [],
     planets: [],
-    controlledSystems: [],
-    victoryPoints: 0,
     secretObjectives: [],
     actionCards: ['sabotage', 'skilled_retreat'],
-    promissoryNotes: [],
     promissoryNotesInHand: [],
     promissoryNotesOwned: [],
     promissoryNotesInPlay: [],
     scoredObjectives: [],
-    scoredSecretObjectives: [],
-    custodiansTaken: false,
     passed: false,
-    speaker: false,
     strategyCard: null,
     strategyCardUsed: false,
-    activatedSystems: [],
-    unitUpgrades: {},
+    score: 0,
+    seatIndex: 0,
+    neighbors: [],
+    transactedWith: [],
     leaders: {
-      agent: { id: 'sol_agent', unlocked: true, exhausted: false },
-      commander: { id: 'sol_commander', unlocked: false, exhausted: false },
-      hero: { id: 'sol_hero', unlocked: false, purged: false },
+      agent: { unlocked: true, exhausted: false },
+      commander: { unlocked: false },
+      hero: { unlocked: false, purged: false },
     },
     relics: [],
-    fragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
-    exhaustedPlanets: [],
-    exhaustedTechs: [],
-    exhaustedAgents: [],
+    relicFragments: { cultural: 0, industrial: 0, hazardous: 0, unknown: 0 },
     ...overrides,
   };
 }
@@ -119,9 +110,10 @@ function createMockCombat(overrides: Partial<CombatInstance> = {}): CombatInstan
     defenderId: 'player2',
     attackerUnits: [],
     defenderUnits: [],
-    state: 'combat_round',
+    state: 'space_cannon_offense',
     roundNumber: 1,
     pendingHits: { attacker: 0, defender: 0 },
+    retreatAnnounced: { attacker: false, defender: false },
     temporaryModifiers: {},
     ...overrides,
   };
@@ -147,30 +139,21 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
 
   return {
     id: 'game1',
-    name: 'Test Game',
+    version: 1,
     phase: 'action',
     subPhase: 'awaiting_action',
     round: 1,
-    turn: 0,
     players: [player1, player2],
-    map: { tiles: [] },
-    objectives: { stage1: [], stage2: [], revealed: [], secret: [] },
+    map: { tiles: [], playerCount: 6 },
+    objectives: { publicStageI: [], publicStageII: [], revealedCount: 0, secretDeck: [] },
     laws: [],
     activePlayerId: 'player1',
     speakerId: 'player1',
+    initiativeOrder: ['player1', 'player2'],
     activeCombat: null,
-    agendaPhase: null,
-    turnOrder: ['player1', 'player2'],
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-    miltyDraft: null,
-    actionDeck: [],
-    actionDiscardPile: [],
-    agendaDeck: [],
-    agendaDiscardPile: [],
-    stageTwoRevealed: false,
+    agendaPhase: undefined,
     ...overrides,
-  };
+  } as GameState;
 }
 
 describe('validatePlayPromissoryNote', () => {
@@ -185,6 +168,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'nonexistent',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -201,6 +185,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'nonexistent_note',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -217,6 +202,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -233,6 +219,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'test_action_note', // Has no owner
+        timestamp: Date.now(),
       };
 
       // Mock this note to be in hand
@@ -255,6 +242,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -272,6 +260,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -289,6 +278,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -306,6 +296,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'support_for_throne_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -323,6 +314,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'war_funding_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -340,6 +332,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'war_funding_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -358,6 +351,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'test_ground_combat_note',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -377,6 +371,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'test_ground_combat_note',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -394,6 +389,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'raghs_call_player1',
         targetPlanetId: 'planet1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -411,6 +407,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'political_favor_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -428,6 +425,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'test_strategy_note',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -445,6 +443,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'ceasefire_player2',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -465,6 +464,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'war_funding_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -483,6 +483,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'war_funding_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -506,6 +507,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'fires_of_the_gashlai_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -530,6 +532,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'political_favor_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -548,6 +551,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player2',
         noteId: 'military_support_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -566,6 +570,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'research_agreement_player1',
         // No targetTechId specified
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -591,6 +596,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'spy_net_player1',
         // No targetCardId specified
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -616,6 +622,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'spy_net_player1',
         targetCardId: 'sabotage', // Not in Yssaril's hand
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -634,6 +641,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'raghs_call_player1',
         // No targetPlanetId specified
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -653,6 +661,7 @@ describe('validatePlayPromissoryNote', () => {
         type: 'play_promissory_note' as const,
         playerId: 'player1',
         noteId: 'trade_agreement_player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -670,6 +679,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'research_agreement_player1',
         targetTechId: 'neural_motivator',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);
@@ -687,6 +697,7 @@ describe('validatePlayPromissoryNote', () => {
         playerId: 'player1',
         noteId: 'raghs_call_player1',
         targetPlanetId: 'planet1',
+        timestamp: Date.now(),
       };
 
       const result = validatePlayPromissoryNote(state, action);

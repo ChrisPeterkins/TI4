@@ -79,9 +79,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -156,6 +156,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'nonexistent',
           planetId: 'primor',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -172,6 +173,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -192,6 +194,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'mecatol_rex',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -213,6 +216,7 @@ describe('Legendary Planet Handlers', () => {
           playerId: 'player1',
           planetId: 'primor',
           targets: { attachmentIds: ['demilitarized_zone'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -235,6 +239,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -258,6 +263,7 @@ describe('Legendary Planet Handlers', () => {
           playerId: 'player1',
           planetId: 'primor',
           targets: { attachmentIds: ['a1', 'a2', 'a3'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -279,10 +285,10 @@ describe('Legendary Planet Handlers', () => {
           map: {
             tiles: [
               createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'primor', attachments: [] }],
+                planets: [{ planetId: 'primor', attachments: [] } as any],
               }),
               createMockTile({ q: 1, r: 0 }, {
-                planets: [{ planetId: 'abyz', attachments: ['research_station'] }],
+                planets: [{ planetId: 'abyz', attachments: ['research_station'] } as any],
               }),
             ],
             playerCount: 6,
@@ -293,6 +299,7 @@ describe('Legendary Planet Handlers', () => {
           playerId: 'player1',
           planetId: 'primor',
           targets: { attachmentIds: ['nonexistent_attachment'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -328,13 +335,14 @@ describe('Legendary Planet Handlers', () => {
           playerId: 'player1',
           planetId: 'primor',
           targets: { attachmentIds: ['research_station'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
         expect(result.triggeredEvents).toContain('legendary_ability_used');
-        expect(result.data?.effect.purgedAttachments).toContain('research_station');
+        expect((result.data as any)?.effect.purgedAttachments).toContain('research_station');
         // Verify attachment was removed from map
         expect(state.map.tiles[1].planets[0].attachments).not.toContain('research_station');
         // Verify planet was exhausted
@@ -368,12 +376,13 @@ describe('Legendary Planet Handlers', () => {
           playerId: 'player1',
           planetId: 'primor',
           targets: { attachmentIds: ['research_station', 'demilitarized_zone'] },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.purgedAttachments).toHaveLength(2);
+        expect((result.data as any)?.effect.purgedAttachments).toHaveLength(2);
         expect(state.map.tiles[1].planets[0].attachments).toHaveLength(0);
       });
     });
@@ -393,12 +402,13 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'hopes_end',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.awaitingCardSelection).toBe(true);
+        expect((result.data as any)?.effect.awaitingCardSelection).toBe(true);
         expect(state.players[0].actionCards).toHaveLength(3);
         expect(state.actionCardDeck).toHaveLength(2);
       });
@@ -420,13 +430,14 @@ describe('Legendary Planet Handlers', () => {
           targets: {
             actionCardIds: ['existing_card', 'card1', 'card2'],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.drawnCards).toBe(3);
-        expect(result.data?.effect.returnedCards).toBe(3);
+        expect((result.data as any)?.effect.drawnCards).toBe(3);
+        expect((result.data as any)?.effect.returnedCards).toBe(3);
         // Started with 1, drew 3, returned 3 = 1 card in hand
         expect(state.players[0].actionCards).toHaveLength(1);
         expect(state.players[0].actionCards[0]).toBe('card3'); // The one not returned
@@ -453,6 +464,7 @@ describe('Legendary Planet Handlers', () => {
           targets: {
             actionCardIds: ['card1', 'card_i_dont_have', 'another_missing'],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -475,12 +487,13 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'hopes_end',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.data?.effect.drawnCards).toBe(0);
+        expect((result.data as any)?.effect.drawnCards).toBe(0);
         expect(state.players[0].actionCards).toHaveLength(0);
       });
     });
@@ -506,6 +519,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'mallice',
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -537,6 +551,7 @@ describe('Legendary Planet Handlers', () => {
           targets: {
             unitProduction: [{ type: 'infantry', count: 3 }],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -569,6 +584,7 @@ describe('Legendary Planet Handlers', () => {
           targets: {
             unitProduction: [{ type: 'infantry', count: 2 }],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -609,6 +625,7 @@ describe('Legendary Planet Handlers', () => {
               { type: 'mech', count: 1 },
             ],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
@@ -644,6 +661,7 @@ describe('Legendary Planet Handlers', () => {
           targets: {
             unitProduction: [{ type: 'fighter', count: 2 }],
           },
+          timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);

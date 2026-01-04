@@ -12,6 +12,7 @@ import type {
   RevealAgendaAction,
   CastVoteAction,
   SpeakerTiebreakAction,
+  AgendaPhaseTracking,
 } from '@ti4/shared';
 
 // Mock the agenda utility functions
@@ -28,8 +29,10 @@ vi.mock('../../utils/agenda.js', () => ({
   }),
   tallyVotes: vi.fn((votes) => {
     const tallies: Record<string, number> = {};
-    for (const [outcome, count] of Object.entries(votes)) {
-      tallies[outcome] = count as number;
+    for (const vote of Object.values(votes) as Array<{ outcome: string; votes: number; extraVotes: number; abstained: boolean }>) {
+      if (vote.abstained) continue;
+      const totalVotes = vote.votes + vote.extraVotes;
+      tallies[vote.outcome] = (tallies[vote.outcome] || 0) + totalVotes;
     }
     return tallies;
   }),
@@ -54,25 +57,24 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     faction: 'sol',
     color: 'blue',
     isBot: false,
-    seatPosition: 0,
-    victoryPoints: 0,
-    resources: 10,
-    influence: 5,
+    seatIndex: 0,
+    score: 0,
     tradeGoods: 0,
     commodities: 0,
     maxCommodities: 4,
     planets: [
-      { planetId: 'jord', exhausted: false, attachments: [], resources: 4, influence: 2 },
-      { planetId: 'mars', exhausted: false, attachments: [], resources: 2, influence: 3 },
+      { planetId: 'jord', exhausted: false, attachments: [] },
+      { planetId: 'mars', exhausted: false, attachments: [] },
     ],
     technologies: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     actionCards: [],
     scoredObjectives: [],
     secretObjectives: [],
     relics: [],
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    exhaustedPlanets: [],
     leaders: {
       agent: { unlocked: true, exhausted: false },
       commander: { unlocked: false },
@@ -81,7 +83,8 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     strategyCard: 1,
     strategyCardUsed: false,
     passed: false,
-    speaker: true,
+    neighbors: [],
+    transactedWith: [],
     ...overrides,
   } as PlayerState;
 }
@@ -101,7 +104,34 @@ function createMockTile(position: HexCoord, overrides: Partial<MapTile> = {}): M
   };
 }
 
-function createMockGameState(overrides: Partial<GameState> = {}): GameState {
+function createMockGameState(overrides: Omit<Partial<GameState>, 'agendaPhase'> & { agendaPhase?: Partial<AgendaPhaseTracking> | null } = {}): GameState {
+  const { agendaPhase: agendaPhaseOverrides, ...restOverrides } = overrides;
+
+  const defaultAgendaPhase: AgendaPhaseTracking = {
+    currentStep: 'reveal_agenda',
+    agendaNumber: 1,
+    currentAgendaId: null,
+    currentAgendaType: null,
+    currentElectionType: 'for_against',
+    votingOrder: ['player2', 'player1'], // Left of speaker, then speaker
+    currentVoterIndex: 0,
+    votes: {},
+    voteTallies: {},
+    votingComplete: [],
+    riders: [],
+    vetoed: false,
+    electedOutcome: null,
+    electedPlayer: null,
+    electedPlanet: null,
+  };
+
+  // Check if agendaPhase key was explicitly passed (even if undefined/null)
+  const hasAgendaPhaseKey = 'agendaPhase' in overrides;
+  // If explicitly passed as null/undefined, clear it; if not passed, use default; otherwise merge
+  const agendaPhase = hasAgendaPhaseKey && (agendaPhaseOverrides === null || agendaPhaseOverrides === undefined)
+    ? undefined
+    : { ...defaultAgendaPhase, ...agendaPhaseOverrides };
+
   return {
     id: 'test-game',
     phase: 'agenda',
@@ -112,17 +142,17 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
     speakerId: 'player1',
     version: 1,
     players: [
-      createMockPlayer({ id: 'player1', speaker: true }),
-      createMockPlayer({ id: 'player2', speaker: false }),
+      createMockPlayer({ id: 'player1' }),
+      createMockPlayer({ id: 'player2' }),
     ],
     map: {
       tiles: [createMockTile({ q: 0, r: 0 })],
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -138,16 +168,8 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       gameDuration: 'full',
       mapType: 'standard',
     },
-    agendaPhase: {
-      agendasResolved: 0,
-      currentAgenda: null,
-      currentElectionType: 'for_against',
-      votingOrder: ['player2', 'player1'], // Left of speaker, then speaker
-      currentVoterIndex: 0,
-      votes: {},
-      votingComplete: [],
-    },
-    ...overrides,
+    agendaPhase,
+    ...restOverrides,
   } as GameState;
 }
 
@@ -158,6 +180,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -171,6 +194,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -184,6 +208,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player2', // Not the speaker
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -200,6 +225,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -216,6 +242,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -232,6 +259,7 @@ describe('Agenda Phase Validators', () => {
       const action: RevealAgendaAction = {
         type: 'reveal_agenda',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateRevealAgenda(state, action);
@@ -247,9 +275,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: ['jord'],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -264,9 +292,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: ['jord'],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -284,9 +312,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: [],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -301,9 +329,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'nonexistent',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: [],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -316,8 +344,8 @@ describe('Agenda Phase Validators', () => {
       const state = createMockGameState({
         subPhase: 'voting',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0, // player2's turn
@@ -329,9 +357,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player1', // Not player2
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: [],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -344,12 +372,13 @@ describe('Agenda Phase Validators', () => {
       const state = createMockGameState({
         subPhase: 'voting',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
-          votes: { for: 3 },
+          votes: {},
+          voteTallies: { for: 3 },
           votingComplete: ['player2'], // Already voted
         },
       });
@@ -357,9 +386,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: [],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -372,8 +401,8 @@ describe('Agenda Phase Validators', () => {
       const state = createMockGameState({
         subPhase: 'voting',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -385,9 +414,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'player1', // Invalid for for_against
-        votes: 3,
         exhaustedPlanets: [],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -404,8 +433,8 @@ describe('Agenda Phase Validators', () => {
           createMockPlayer({ id: 'player2', planets: [] }), // No planets
         ],
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -417,9 +446,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: ['jord'], // Does not control
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -439,8 +468,8 @@ describe('Agenda Phase Validators', () => {
           }),
         ],
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -452,9 +481,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: ['jord'],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -474,8 +503,8 @@ describe('Agenda Phase Validators', () => {
           }),
         ],
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -487,9 +516,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'for',
-        votes: 3,
         exhaustedPlanets: ['jord'],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -501,8 +530,8 @@ describe('Agenda Phase Validators', () => {
       const state = createMockGameState({
         subPhase: 'voting',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -514,9 +543,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: '',
-        votes: 0,
         exhaustedPlanets: [],
         abstain: true,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -535,8 +564,8 @@ describe('Agenda Phase Validators', () => {
           }),
         ],
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'player',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 0,
@@ -548,9 +577,9 @@ describe('Agenda Phase Validators', () => {
         type: 'cast_vote',
         playerId: 'player2',
         outcome: 'player1', // Voting for player1
-        votes: 2,
         exhaustedPlanets: ['jord'],
         abstain: false,
+        timestamp: Date.now(),
       };
 
       const result = validateCastVote(state, action);
@@ -566,6 +595,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -580,6 +610,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -597,6 +628,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -610,12 +642,13 @@ describe('Agenda Phase Validators', () => {
         subPhase: 'speaker_tiebreak',
         speakerId: 'player1',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 2,
-          votes: { for: 3, against: 3 }, // Tied
+          votes: {},
+          voteTallies: { for: 3, against: 3 }, // Tied
           votingComplete: ['player1', 'player2'],
         },
       });
@@ -623,6 +656,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player2', // Not speaker
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -636,12 +670,13 @@ describe('Agenda Phase Validators', () => {
         subPhase: 'speaker_tiebreak',
         speakerId: 'player1',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 2,
-          votes: { for: 5, against: 2 }, // Not tied
+          votes: {},
+          voteTallies: { for: 5, against: 2 }, // Not tied
           votingComplete: ['player1', 'player2'],
         },
       });
@@ -649,6 +684,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -662,19 +698,25 @@ describe('Agenda Phase Validators', () => {
         subPhase: 'speaker_tiebreak',
         speakerId: 'player1',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'player',
-          votingOrder: ['player2', 'player1'],
-          currentVoterIndex: 2,
-          votes: { player1: 3, player2: 3, player3: 1 }, // player1 and player2 tied
-          votingComplete: ['player1', 'player2'],
+          votingOrder: ['player2', 'player1', 'player3'],
+          currentVoterIndex: 3,
+          votes: {
+            player1: { outcome: 'player1', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+            player2: { outcome: 'player2', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+            player3: { outcome: 'player3', votes: 1, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+          },
+          voteTallies: { player1: 3, player2: 3, player3: 1 }, // player1 and player2 tied
+          votingComplete: ['player1', 'player2', 'player3'],
         },
       });
       const action: SpeakerTiebreakAction = {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'player3', // Not one of the tied outcomes
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -688,12 +730,16 @@ describe('Agenda Phase Validators', () => {
         subPhase: 'speaker_tiebreak',
         speakerId: 'player1',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 2,
-          votes: { for: 3, against: 3 }, // Tied
+          votes: {
+            player1: { outcome: 'for', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+            player2: { outcome: 'against', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+          },
+          voteTallies: { for: 3, against: 3 }, // Tied
           votingComplete: ['player1', 'player2'],
         },
       });
@@ -701,6 +747,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'for',
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);
@@ -713,12 +760,16 @@ describe('Agenda Phase Validators', () => {
         subPhase: 'speaker_tiebreak',
         speakerId: 'player1',
         agendaPhase: {
-          agendasResolved: 0,
-          currentAgenda: 'test_agenda',
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
           currentElectionType: 'for_against',
           votingOrder: ['player2', 'player1'],
           currentVoterIndex: 2,
-          votes: { for: 3, against: 3 }, // Tied
+          votes: {
+            player1: { outcome: 'for', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+            player2: { outcome: 'against', votes: 3, extraVotes: 0, abstained: false, exhaustedPlanets: [] },
+          },
+          voteTallies: { for: 3, against: 3 }, // Tied
           votingComplete: ['player1', 'player2'],
         },
       });
@@ -726,6 +777,7 @@ describe('Agenda Phase Validators', () => {
         type: 'speaker_tiebreak',
         playerId: 'player1',
         chosenOutcome: 'against', // Other tied option
+        timestamp: Date.now(),
       };
 
       const result = validateSpeakerTiebreak(state, action);

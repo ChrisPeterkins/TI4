@@ -82,9 +82,9 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
     laws: [],
@@ -109,6 +109,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -121,6 +122,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'nonexistent',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -136,6 +138,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -159,6 +162,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -182,6 +186,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -194,12 +199,13 @@ describe('Leader Validators', () => {
       // Hacan agent is an ACTION: ability
       const state = createMockGameState({
         phase: 'strategy',
-        subPhase: null,
+        subPhase: undefined,
         players: [createMockPlayer({ faction: 'hacan' })],
       });
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -218,6 +224,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -237,6 +244,7 @@ describe('Leader Validators', () => {
       const action: UseAgentAction = {
         type: 'use_agent',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -256,6 +264,7 @@ describe('Leader Validators', () => {
         type: 'use_agent',
         playerId: 'player1',
         targetPlayerId: 'player2',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -271,6 +280,7 @@ describe('Leader Validators', () => {
         type: 'use_agent',
         playerId: 'player1',
         targetPlayerId: 'nonexistent',
+        timestamp: Date.now(),
       };
 
       const result = validateUseAgent(state, action);
@@ -296,6 +306,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -308,6 +319,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'nonexistent',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -323,6 +335,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -336,6 +349,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -359,6 +373,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -383,6 +398,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -407,6 +423,7 @@ describe('Leader Validators', () => {
       const action: PurgeHeroAction = {
         type: 'purge_hero',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validatePurgeHero(state, action);
@@ -452,7 +469,8 @@ describe('Leader Validators', () => {
         players: [
           createMockPlayer({
             faction: 'nomad',
-            scoredSecretObjectives: ['secret1'],
+            secretObjectives: ['secret1'],
+            scoredObjectives: ['secret1'], // Must be in both arrays to count as scored
           }),
         ],
       });
@@ -467,7 +485,7 @@ describe('Leader Validators', () => {
         players: [
           createMockPlayer({
             faction: 'nomad',
-            scoredSecretObjectives: [],
+            secretObjectives: [],
           }),
         ],
       });
@@ -606,15 +624,16 @@ describe('Leader Validators', () => {
 
     // Control resources condition
     it('should check control_resources condition (Sol - 12 resources)', () => {
+      // Using real planets: jord (4 res), moll_primus (4 res), arc_prime (4 res) = 12 total
       const state = createMockGameState({
         players: [createMockPlayer({ faction: 'sol' })],
         map: {
           tiles: [
             createMockTile({ q: 0, r: 0 }, {
               planets: [
-                { planetId: 'p1', controlledBy: 'player1', resources: 5, influence: 2, units: [], exhausted: false } as any,
-                { planetId: 'p2', controlledBy: 'player1', resources: 4, influence: 3, units: [], exhausted: false } as any,
-                { planetId: 'p3', controlledBy: 'player1', resources: 4, influence: 2, units: [], exhausted: false } as any,
+                { planetId: 'jord', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'moll_primus', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'arc_prime', controlledBy: 'player1', units: [], exhausted: false } as any,
               ],
             }),
           ],
@@ -681,15 +700,16 @@ describe('Leader Validators', () => {
 
     // Control influence condition
     it('should check control_influence condition (Xxcha - 12 influence)', () => {
+      // Using real planets: mecatol_rex (6 inf), ixth (5 inf), winnu (4 inf) = 15 total (>12)
       const state = createMockGameState({
         players: [createMockPlayer({ faction: 'xxcha' })],
         map: {
           tiles: [
             createMockTile({ q: 0, r: 0 }, {
               planets: [
-                { planetId: 'p1', controlledBy: 'player1', resources: 2, influence: 5, units: [], exhausted: false } as any,
-                { planetId: 'p2', controlledBy: 'player1', resources: 3, influence: 4, units: [], exhausted: false } as any,
-                { planetId: 'p3', controlledBy: 'player1', resources: 1, influence: 4, units: [], exhausted: false } as any,
+                { planetId: 'mecatol_rex', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'ixth', controlledBy: 'player1', units: [], exhausted: false } as any,
+                { planetId: 'winnu', controlledBy: 'player1', units: [], exhausted: false } as any,
               ],
             }),
           ],

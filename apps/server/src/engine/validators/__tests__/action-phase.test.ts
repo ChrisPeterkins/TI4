@@ -20,7 +20,7 @@ import type {
   SkipMovementAction,
   ProduceUnitsAction,
   SkipProductionAction,
-  Unit,
+  UnitInstance,
 } from '@ti4/shared';
 
 function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
@@ -29,25 +29,23 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     name: 'Test Player',
     faction: 'sol',
     color: 'blue',
-    isBot: false,
-    seatPosition: 0,
-    victoryPoints: 0,
-    resources: 10,
-    influence: 5,
+    seatIndex: 0,
+    score: 0,
     tradeGoods: 0,
     commodities: 0,
     maxCommodities: 4,
     planets: [
-      { planetId: 'jord', exhausted: false, attachments: [], resources: 4, influence: 2 },
+      { planetId: 'jord', exhausted: false },
     ],
     technologies: [],
-    promissoryNotes: [],
+    promissoryNotesOwned: [],
+    promissoryNotesInHand: [],
+    promissoryNotesInPlay: [],
     actionCards: [],
     scoredObjectives: [],
     secretObjectives: [],
     relics: [],
     commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
-    exhaustedPlanets: [],
     leaders: {
       agent: { unlocked: true, exhausted: false },
       commander: { unlocked: false },
@@ -56,7 +54,8 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     strategyCard: 1,
     strategyCardUsed: false,
     passed: false,
-    speaker: false,
+    neighbors: [],
+    transactedWith: [],
     ...overrides,
   } as PlayerState;
 }
@@ -76,25 +75,26 @@ function createMockTile(position: HexCoord, overrides: Partial<MapTile> = {}): M
   };
 }
 
-function createMockUnit(overrides: Partial<Unit> = {}): Unit {
+function createMockUnit(overrides: Partial<UnitInstance> = {}): UnitInstance {
   return {
     id: 'unit-1',
     type: 'carrier',
     ownerId: 'player1',
     damaged: false,
     ...overrides,
-  } as Unit;
+  };
 }
 
 function createMockGameState(overrides: Partial<GameState> = {}): GameState {
   return {
     id: 'test-game',
+    version: 1,
     phase: 'action',
     subPhase: 'awaiting_action',
     round: 1,
-    turn: 1,
     activePlayerId: 'player1',
-    version: 1,
+    speakerId: 'player1',
+    initiativeOrder: ['player1'],
     players: [createMockPlayer()],
     map: {
       tiles: [
@@ -105,27 +105,24 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
       playerCount: 6,
     },
     objectives: {
-      stage1: [],
-      stage2: [],
-      revealed: [],
+      publicStageI: [],
+      publicStageII: [],
+      revealedCount: 0,
       secretDeck: [],
     },
+    strategyCards: [],
+    agendas: { currentAgenda: null, currentAgendaNumber: 1, votes: new Map(), outcome: null, riders: [] },
     laws: [],
     actionCardDeck: [],
     actionCardDiscard: [],
     agendaDeck: [],
-    relicDeck: [],
-    strategyCards: [
-      { number: 1, exhausted: false },
-      { number: 2, exhausted: false },
-    ],
-    strategyCardState: {},
-    log: [],
-    settings: {
-      victoryPointLimit: 10,
-      gameDuration: 'full',
-      mapType: 'standard',
-    },
+    agendaDiscard: [],
+    custodiansTaken: false,
+    activeCombat: null,
+    timingWindowStack: [],
+    activeTimingWindow: null,
+    winner: null,
+    gameLog: [],
     ...overrides,
   } as GameState;
 }
@@ -134,7 +131,7 @@ describe('Action Phase Validators', () => {
   describe('validatePass', () => {
     it('should fail if not in action phase', () => {
       const state = createMockGameState({ phase: 'strategy' });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -144,7 +141,7 @@ describe('Action Phase Validators', () => {
 
     it('should fail if not in awaiting_action subphase', () => {
       const state = createMockGameState({ subPhase: 'tactical_movement' });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -154,7 +151,7 @@ describe('Action Phase Validators', () => {
 
     it('should fail if player not found', () => {
       const state = createMockGameState();
-      const action: PassAction = { type: 'pass', playerId: 'nonexistent' };
+      const action: PassAction = { type: 'pass', playerId: 'nonexistent', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -166,7 +163,7 @@ describe('Action Phase Validators', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCard: 1, strategyCardUsed: false })],
       });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -178,7 +175,7 @@ describe('Action Phase Validators', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCardUsed: true, passed: true })],
       });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -190,7 +187,7 @@ describe('Action Phase Validators', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCardUsed: true, passed: false })],
       });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -201,7 +198,7 @@ describe('Action Phase Validators', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCard: null, passed: false })],
       });
-      const action: PassAction = { type: 'pass', playerId: 'player1' };
+      const action: PassAction = { type: 'pass', playerId: 'player1', timestamp: Date.now() };
 
       const result = validatePass(state, action);
 
@@ -216,6 +213,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -230,6 +228,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -244,6 +243,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'nonexistent',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -260,6 +260,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -274,6 +275,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 99, r: 99 }, // Non-existent
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -295,6 +297,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -309,6 +312,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -330,6 +334,7 @@ describe('Action Phase Validators', () => {
         type: 'tactical_action',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
       };
 
       const result = validateTacticalAction(state, action);
@@ -345,6 +350,7 @@ describe('Action Phase Validators', () => {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -359,6 +365,7 @@ describe('Action Phase Validators', () => {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -373,6 +380,7 @@ describe('Action Phase Validators', () => {
         type: 'strategic_action',
         playerId: 'nonexistent',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -389,6 +397,7 @@ describe('Action Phase Validators', () => {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -405,6 +414,7 @@ describe('Action Phase Validators', () => {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -416,12 +426,13 @@ describe('Action Phase Validators', () => {
     it('should fail if strategy card is exhausted', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCard: 1, strategyCardUsed: false })],
-        strategyCards: [{ number: 1, exhausted: true }],
+        strategyCards: [{ number: 1, name: 'Leadership', pickedBy: 'player1', exhausted: true }],
       });
       const action: StrategicAction = {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -433,12 +444,13 @@ describe('Action Phase Validators', () => {
     it('should allow using valid strategy card', () => {
       const state = createMockGameState({
         players: [createMockPlayer({ strategyCard: 1, strategyCardUsed: false })],
-        strategyCards: [{ number: 1, exhausted: false }],
+        strategyCards: [{ number: 1, name: 'Leadership', pickedBy: 'player1', exhausted: false }],
       });
       const action: StrategicAction = {
         type: 'strategic_action',
         playerId: 'player1',
         cardNumber: 1,
+        timestamp: Date.now(),
       };
 
       const result = validateStrategicAction(state, action);
@@ -454,6 +466,7 @@ describe('Action Phase Validators', () => {
         type: 'move_units',
         playerId: 'player1',
         moves: [],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -471,6 +484,7 @@ describe('Action Phase Validators', () => {
         type: 'move_units',
         playerId: 'player1',
         moves: [],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -488,6 +502,7 @@ describe('Action Phase Validators', () => {
         type: 'move_units',
         playerId: 'player1',
         moves: [],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -506,6 +521,7 @@ describe('Action Phase Validators', () => {
         type: 'move_units',
         playerId: 'nonexistent', // Not the active player
         moves: [],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -539,6 +555,7 @@ describe('Action Phase Validators', () => {
             to: { systemPosition: { q: 2, r: 0 } }, // Not the activated system
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -572,6 +589,7 @@ describe('Action Phase Validators', () => {
             to: { systemPosition: { q: 0, r: 0 } },
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -602,6 +620,7 @@ describe('Action Phase Validators', () => {
             to: { systemPosition: { q: 0, r: 0 } },
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -634,6 +653,7 @@ describe('Action Phase Validators', () => {
             to: { systemPosition: { q: 0, r: 0 } },
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -666,6 +686,7 @@ describe('Action Phase Validators', () => {
             to: { systemPosition: { q: 0, r: 0 } },
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -699,6 +720,7 @@ describe('Action Phase Validators', () => {
             // No carrier specified
           },
         ],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -716,6 +738,7 @@ describe('Action Phase Validators', () => {
         type: 'move_units',
         playerId: 'player1',
         moves: [],
+        timestamp: Date.now(),
       };
 
       const result = validateMoveUnits(state, action);
@@ -730,6 +753,7 @@ describe('Action Phase Validators', () => {
       const action: SkipMovementAction = {
         type: 'skip_movement',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipMovement(state, action);
@@ -746,6 +770,7 @@ describe('Action Phase Validators', () => {
       const action: SkipMovementAction = {
         type: 'skip_movement',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipMovement(state, action);
@@ -762,6 +787,7 @@ describe('Action Phase Validators', () => {
       const action: SkipMovementAction = {
         type: 'skip_movement',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipMovement(state, action);
@@ -777,6 +803,7 @@ describe('Action Phase Validators', () => {
         type: 'produce_units',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
         units: [],
       };
 
@@ -796,6 +823,7 @@ describe('Action Phase Validators', () => {
         type: 'produce_units',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
         units: [],
       };
 
@@ -814,6 +842,7 @@ describe('Action Phase Validators', () => {
         type: 'produce_units',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
         units: [],
       };
 
@@ -833,6 +862,7 @@ describe('Action Phase Validators', () => {
         playerId: 'player1',
         systemPosition: { q: 1, r: 0 }, // Different from activated
         units: [],
+        timestamp: Date.now(),
       };
 
       const result = validateProduceUnits(state, action);
@@ -856,6 +886,7 @@ describe('Action Phase Validators', () => {
         type: 'produce_units',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
         units: [{ type: 'infantry', count: 1 }],
       };
 
@@ -885,13 +916,14 @@ describe('Action Phase Validators', () => {
           playerCount: 6,
         },
         players: [createMockPlayer({
-          planets: [{ planetId: 'testplanet', exhausted: false, attachments: [], resources: 3, influence: 2 }],
+          planets: [{ planetId: 'testplanet', exhausted: false, attachments: [] }],
         })],
       });
       const action: ProduceUnitsAction = {
         type: 'produce_units',
         playerId: 'player1',
         systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
         units: [], // Empty - effectively skip production
       };
 
@@ -908,6 +940,7 @@ describe('Action Phase Validators', () => {
       const action: SkipProductionAction = {
         type: 'skip_production',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipProduction(state, action);
@@ -924,6 +957,7 @@ describe('Action Phase Validators', () => {
       const action: SkipProductionAction = {
         type: 'skip_production',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipProduction(state, action);
@@ -940,6 +974,7 @@ describe('Action Phase Validators', () => {
       const action: SkipProductionAction = {
         type: 'skip_production',
         playerId: 'player1',
+        timestamp: Date.now(),
       };
 
       const result = validateSkipProduction(state, action);
