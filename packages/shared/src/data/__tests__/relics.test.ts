@@ -451,3 +451,86 @@ describe('Relic-Exploration Interactions', () => {
     });
   });
 });
+
+describe('Thunder\'s Edge Relics', () => {
+  it('should have exactly 7 Thunder\'s Edge relics', () => {
+    const teRelics = RELIC_CARDS.filter(r => r.expansion === 'thunders_edge');
+    expect(teRelics.length).toBe(7);
+  });
+
+  it('should have Metali Void Armaments - anti-fighter barrage ability', () => {
+    const relic = getRelic('metali_void_armaments');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('combat');
+    expect(relic?.usage).toBe('passive');
+    expect(relic?.description.toLowerCase()).toMatch(/anti-fighter barrage/i);
+  });
+
+  it('should have The Quantumcore - grants breakthrough and tech synergy', () => {
+    const relic = getRelic('the_quantumcore');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('passive');
+    expect(relic?.description.toLowerCase()).toMatch(/breakthrough/i);
+    expect(relic?.description.toLowerCase()).toMatch(/synergy/i);
+  });
+
+  it('should have The Silver Flame - risky VP gamble', () => {
+    const relic = getRelic('the_silver_flame');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('action');
+    expect(relic?.usage).toBe('purge');
+    expect(relic?.description.toLowerCase()).toMatch(/victory point/i);
+    expect(relic?.description.toLowerCase()).toMatch(/roll.*10/i);
+  });
+
+  it('should have Lightrail Ordnance - space dock space cannon', () => {
+    const relic = getRelic('lightrail_ordnance');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('passive');
+    expect(relic?.description.toLowerCase()).toMatch(/space dock/i);
+    expect(relic?.description.toLowerCase()).toMatch(/space cannon/i);
+  });
+
+  it('should have Metali Void Shielding - sustain damage for non-fighters', () => {
+    const relic = getRelic('metali_void_shielding');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('combat');
+    expect(relic?.usage).toBe('passive');
+    expect(relic?.description.toLowerCase()).toMatch(/sustain damage/i);
+    expect(relic?.description.toLowerCase()).toMatch(/non-fighter/i);
+  });
+
+  it('should have The Triad - planet card based on relic fragments', () => {
+    const relic = getRelic('the_triad');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('passive');
+    expect(relic?.usage).toBe('passive');
+    expect(relic?.description.toLowerCase()).toMatch(/planet card/i);
+    expect(relic?.description.toLowerCase()).toMatch(/relic fragment/i);
+  });
+
+  it('should have Heart of Ixth - modify die rolls', () => {
+    const relic = getRelic('heart_of_ixth');
+    expect(relic).toBeDefined();
+    expect(relic?.expansion).toBe('thunders_edge');
+    expect(relic?.timing).toBe('action');
+    expect(relic?.usage).toBe('exhaust');
+    expect(relic?.description.toLowerCase()).toMatch(/die.*roll/i);
+    expect(relic?.description.toLowerCase()).toMatch(/add or subtract/i);
+  });
+
+  it('should include Thunder\'s Edge relics in deck when expansion enabled', () => {
+    const deck = getInitialRelicDeck(['pok', 'thunders_edge']);
+    const teRelics = RELIC_CARDS.filter(r => r.expansion === 'thunders_edge');
+
+    for (const relic of teRelics) {
+      expect(deck).toContain(relic.id);
+    }
+  });
+});

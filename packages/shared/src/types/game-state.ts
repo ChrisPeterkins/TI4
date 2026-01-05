@@ -262,10 +262,23 @@ export interface GameState {
   };
   /** Ion Storm token - creates a wormhole that flips when ships pass through */
   ionStormToken?: IonStormToken | null;
+  /** Creuss wormhole token - delta wormhole placed via Creuss IFF promissory note */
+  creussWormholeToken?: CreussWormholeToken | null;
   /** Pending card discards required by abilities (e.g., Yssaril Scheming) */
   pendingDiscards?: PendingDiscard[];
   /** Pending emergency agenda phase triggered by Emergency Meeting action card */
   pendingEmergencyAgenda?: UUID;
+  // =============================================================================
+  // THUNDER'S EDGE
+  // =============================================================================
+  /** Active galactic events for this game (selected during setup) */
+  activeGalacticEvents?: string[];
+  /** The Fracture dimension state */
+  fractureState?: FractureState;
+  /** Breach tokens placed by Crimson Rebellion */
+  breachTokens?: BreachTokenState[];
+  /** Coexistence state for Deepwrought Scholarate mechanic */
+  coexistenceState?: CoexistenceState[];
 }
 
 /** Pending discard requirement (e.g., from Yssaril Scheming) */
@@ -284,6 +297,48 @@ export interface IonStormToken {
   systemId: string;
   /** Which wormhole type the token currently shows */
   side: 'alpha' | 'beta';
+}
+
+/** Creuss wormhole token - delta wormhole placed via Creuss IFF promissory note */
+export interface CreussWormholeToken {
+  /** The system where the token is placed */
+  systemId: string;
+}
+
+// =============================================================================
+// THUNDER'S EDGE STATE INTERFACES
+// =============================================================================
+
+/** The Fracture dimension state (Thunder's Edge) */
+export interface FractureState {
+  /** Whether The Fracture has been activated */
+  isActive: boolean;
+  /** Ingress tokens allowing access to The Fracture */
+  ingressTokens: IngressToken[];
+}
+
+/** Ingress token placed in a system to access The Fracture */
+export interface IngressToken {
+  /** The system where the token is placed */
+  systemId: number;
+  /** Player who placed the token */
+  playerId: UUID;
+}
+
+/** Breach token state (Crimson Rebellion) */
+export interface BreachTokenState {
+  /** The system containing the breach token */
+  systemId: number;
+  /** Player who placed the breach token */
+  placedBy: UUID;
+}
+
+/** Coexistence state for a planet (Deepwrought Scholarate) */
+export interface CoexistenceState {
+  /** The planet where coexistence is occurring */
+  planetId: string;
+  /** Player IDs who have units in coexistence on this planet */
+  coexistingPlayers: UUID[];
 }
 
 /** Temporary tactical modifiers from action cards and relics */
@@ -307,6 +362,8 @@ export interface TacticalModifiers {
   solarFlareSystem?: HexCoord;
   /** Units with Reveal Prototype (gain sustain damage) */
   revealPrototypeUnits?: string[];
+  /** Ignore anomaly effects during movement (Nav Suite) */
+  ignoreAnomalies?: boolean;
   /** Can perform strategic action without token (Master Plan) */
   freeStrategicAction?: boolean;
   /** Dominus Orb - Can move from systems with command tokens */
@@ -350,6 +407,8 @@ export interface PlayerState {
   id: UUID;
   name: string;
   faction: string;
+  /** The home system ID for this player's faction */
+  homeSystemId?: number;
   color: PlayerColor;
   seatIndex: number;
   commandTokens: {
@@ -503,6 +562,8 @@ export interface StrategyCardState {
   name: string;
   pickedBy: UUID | null;
   exhausted: boolean;
+  /** Trade goods placed on this card (Manipulate Investments) */
+  tradeGoods?: number;
 }
 
 // Objectives
@@ -603,6 +664,8 @@ export interface CombatModifiers {
   blockedFromCombat?: boolean;
   /** Cannot retreat this combat (Waylay) */
   cannotRetreat?: boolean;
+  /** Must announce retreat this combat (Rout) */
+  mustRetreat?: boolean;
   /** Unit ID targeted for boarding party cargo steal */
   boardingPartyTarget?: string;
 }

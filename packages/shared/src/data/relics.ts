@@ -1,5 +1,5 @@
 /**
- * TI4 Prophecy of Kings - Relic Card Data
+ * TI4 Relic Card Data
  *
  * Relics are powerful artifacts acquired by purging 3 relic fragments.
  * Each relic has unique abilities that can be used once or passively.
@@ -9,6 +9,7 @@
  * - 'codex1' - Codex I: Ordinian additions (1)
  * - 'codex2' - Codex II: Affinity additions (2)
  * - 'codex3' - Codex III: Vigil additions (0)
+ * - 'thunders_edge' - Thunder's Edge expansion (7)
  */
 
 import type { Expansion } from '../types/common.js';
@@ -188,6 +189,83 @@ const CODEX2_RELICS: RelicDef[] = [
 ];
 
 // ============================================================================
+// Thunder's Edge Relics (7)
+// ============================================================================
+
+const THUNDERS_EDGE_RELICS: RelicDef[] = [
+  {
+    id: 'metali_void_armaments',
+    name: 'Metali Void Armaments',
+    description:
+      'During the "Anti-Fighter Barrage" step of space combat, you may resolve ANTI-FIGHTER BARRAGE 6 (x3) against your opponent\'s units.',
+    timing: 'combat',
+    usage: 'passive',
+    imageId: 'metali_void_armaments',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'the_quantumcore',
+    name: 'The Quantumcore',
+    description:
+      'When you gain this card, gain your breakthrough. You have the required synergy for each technology type.',
+    timing: 'passive',
+    usage: 'passive',
+    imageId: 'the_quantumcore',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'the_silver_flame',
+    name: 'The Silver Flame',
+    description:
+      'This card may be exchanged as part of a transaction. ACTION: Purge this card and roll 1 die. If the result is 10, gain 1 victory point. Otherwise, purge your home system planet card; you cannot score public objectives.',
+    timing: 'action',
+    usage: 'purge',
+    imageId: 'the_silver_flame',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'lightrail_ordnance',
+    name: 'Lightrail Ordnance',
+    description:
+      'Your space docks gain SPACE CANNON 5 (x2). You may use the SPACE CANNON abilities of your space docks against ships in adjacent systems.',
+    timing: 'passive',
+    usage: 'passive',
+    imageId: 'lightrail_ordnance',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'metali_void_shielding',
+    name: 'Metali Void Shielding',
+    description:
+      'When hits are produced against your units, 1 of your non-fighter ships in the active system may use SUSTAIN DAMAGE to cancel 1 of those hits.',
+    timing: 'combat',
+    usage: 'passive',
+    imageId: 'metali_void_shielding',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'the_triad',
+    name: 'The Triad',
+    description:
+      'This card is a planet card. Its resource value and influence value are each equal to the number of different relic fragment types you have (including unknown). This planet does not have a trait and cannot be explored.',
+    timing: 'passive',
+    usage: 'passive',
+    imageId: 'the_triad',
+    expansion: 'thunders_edge',
+  },
+  {
+    id: 'heart_of_ixth',
+    name: 'Heart of Ixth',
+    description:
+      'After a die is rolled, you may exhaust this card to add or subtract 1 from the result of that roll.',
+    timing: 'action',
+    usage: 'exhaust',
+    imageId: 'heart_of_ixth',
+    expansion: 'thunders_edge',
+  },
+];
+
+// ============================================================================
 // All Relic Cards
 // ============================================================================
 
@@ -195,6 +273,7 @@ export const RELIC_CARDS: RelicDef[] = [
   ...POK_RELICS,
   ...CODEX1_RELICS,
   ...CODEX2_RELICS,
+  ...THUNDERS_EDGE_RELICS,
 ];
 
 // ============================================================================

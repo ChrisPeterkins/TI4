@@ -148,6 +148,10 @@ export function rollDiceForPlayer(
 
   const rolls: DiceRoll[] = [];
 
+  // Get the combat system tile for anomaly checks
+  const combatTile = state.map.tiles.find(t => t.id === combat.systemId);
+  const isDefender = playerId === combat.defenderId;
+
   for (const unitId of unitIds) {
     const unit = findUnitById(state, unitId);
     if (!unit) continue;
@@ -158,6 +162,13 @@ export function rollDiceForPlayer(
 
     // Calculate base modifiers (faction abilities, techs, flagships)
     const modifiers = calculateCombatModifiers(state, unit, player, combat);
+
+    // NEBULA DEFENDER BONUS: In a nebula, defender applies +1 to each combat roll
+    // Note: This does NOT apply to AFB, bombardment, or space cannon (only space combat rolls)
+    if (combat.type === 'space' && isDefender && combatTile?.anomaly === 'nebula') {
+      modifiers.total += 1;
+      modifiers.descriptions.push('Nebula Defender: +1');
+    }
 
     // Apply action card modifiers from combat state
     if (tempMods?.combatBonus) {
@@ -593,6 +604,11 @@ export function countHits(rolls: DiceRoll[]): number {
  * Get valid retreat systems for a player
  * Must be adjacent system with no enemy ships that player has activated
  * or contains their own ships
+ *
+ * Anomaly restrictions:
+ * - Cannot retreat into a nebula (it would not be the active system)
+ * - Cannot retreat into an asteroid field (unless has Antimass Deflectors)
+ * - Cannot retreat into a supernova (ships cannot be in supernovas)
  */
 export function getValidRetreatSystems(
   state: GameState,
@@ -600,6 +616,10 @@ export function getValidRetreatSystems(
   combatSystemPosition: HexCoord
 ): MapTile[] {
   const validTiles: MapTile[] = [];
+  const player = state.players.find(p => p.id === playerId);
+
+  // Check if player has Antimass Deflectors (allows movement into asteroid fields)
+  const hasAntimassDeflectors = player?.technologies.includes('antimass_deflectors') ?? false;
 
   for (const tile of state.map.tiles) {
     // Skip the combat system itself
@@ -612,6 +632,25 @@ export function getValidRetreatSystems(
     if (!isAdjacent(combatSystemPosition, tile.position)) {
       continue;
     }
+
+    // ANOMALY RESTRICTIONS:
+    // Cannot retreat into a nebula (it's not the active system, so ships can't enter)
+    if (tile.anomaly === 'nebula') {
+      continue;
+    }
+
+    // Cannot retreat into a supernova (ships cannot enter supernovas)
+    if (tile.anomaly === 'supernova') {
+      continue;
+    }
+
+    // Cannot retreat into an asteroid field UNLESS player has Antimass Deflectors
+    if (tile.anomaly === 'asteroid' && !hasAntimassDeflectors) {
+      continue;
+    }
+
+    // Note: Gravity rifts are dangerous but retreating into them IS allowed
+    // (the ship just has to roll for the rift when leaving later)
 
     // Cannot have enemy ships
     const hasEnemies = tile.units.some(u =>

@@ -96,7 +96,7 @@ export function createGame(options: GameSetupOptions): GameState {
     strategyCards: strategyCardStates,
     objectives,
     agendas: createAgendaState(),
-    actionCardDeck: shuffleArray(createActionCardDeck('base')), // TODO: Pass expansions when action cards support it
+    actionCardDeck: shuffleArray(createActionCardDeck(expansions)),
     actionCardDiscard: [],
     agendaDeck: shuffleArray(createAgendaDeck('base')), // TODO: Pass expansions when agendas support it
     agendaDiscard: [],

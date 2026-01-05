@@ -69,6 +69,15 @@ function checkTechnologicalSingularity(
   const opponent = state.players.find(p => p.id === destroyedUnitOwnerId);
   if (!opponent || opponent.technologies.length === 0) return;
 
+  // ANTIVIRUS CHECK: If opponent has Antivirus in play against Nekro, block ability
+  // Antivirus (Nekro promissory note) prevents Technological Singularity against holder
+  const hasAntivirus = opponent.promissoryNotesInPlay.some(
+    note => note.noteId === 'antivirus' && note.originalOwnerId === nekroPlayer.id
+  );
+  if (hasAntivirus) {
+    return; // Antivirus blocks Technological Singularity
+  }
+
   // Set up pending tech gain - Nekro gets to choose
   combat.pendingTechGain = {
     nekroPlayerId: nekroPlayer.id,

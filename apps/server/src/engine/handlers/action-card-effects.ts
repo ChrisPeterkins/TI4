@@ -25,6 +25,7 @@ import { systems, units } from '@ti4/game-data';
 import type { HandlerResult } from '../game-machine.js';
 import { v4 as uuidv4 } from 'uuid';
 import { handleDrawActionCards } from './action-cards.js';
+import { isShipType } from '../utils/units.js';
 
 export type EffectHandler = (
   state: GameState,
@@ -176,6 +177,21 @@ const EFFECT_HANDLERS: Record<string, EffectHandler> = {
   coup_detat: applyCoupDetat,
   sanction_rider: applyRider,
   keleres_rider: applyRider,
+
+  // =========================================================================
+  // NEW POK ACTION CARDS (Added January 2026)
+  // =========================================================================
+
+  archaeological_expedition: applyArchaeologicalExpedition,
+  exploration_probe: applyExplorationProbe,
+  confounding_legal_text: applyConfoundingLegalText,
+  diplomatic_pressure: applyDiplomaticPressure,
+  divert_funding: applyDivertFunding,
+  reverse_engineer: applyReverseEngineer,
+  nav_suite: applyNavSuite,
+  rout: applyRout,
+  refit_troops: applyRefitTroops,
+  manipulate_investments: applyManipulateInvestments,
 };
 
 // =============================================================================
@@ -2737,6 +2753,458 @@ function applyCoupDetat(
     success: true,
     triggeredEvents: ['speaker_changed'],
     data: { playerId, previousSpeaker, newSpeaker: targets.targetPlayerId },
+  };
+}
+
+// =============================================================================
+// NEW POK ACTION CARDS (Added January 2026)
+// =============================================================================
+
+/**
+ * Archaeological Expedition: Reveal top 3 cards of matching exploration deck,
+ * gain relic fragments, discard rest
+ */
+function applyArchaeologicalExpedition(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const player = findPlayer(state, playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Player must select a planet trait (cultural, industrial, hazardous)
+  if (!targets?.planetTrait) {
+    return { success: false, error: 'Must select a planet trait to explore' };
+  }
+
+  const trait = targets.planetTrait as 'cultural' | 'industrial' | 'hazardous';
+
+  // Verify player controls a planet of this trait
+  const controlledPlanets = getPlayerControlledPlanets(state, playerId);
+  const hasMatchingPlanet = controlledPlanets.some(({ planet }) => {
+    const planetData = getPlanetData(planet.planetId);
+    return planetData?.trait === trait;
+  });
+
+  if (!hasMatchingPlanet) {
+    return { success: false, error: `You do not control a ${trait} planet` };
+  }
+
+  // Get the exploration deck for this trait
+  const deckKey = `${trait}ExplorationDeck` as keyof typeof state;
+  const deck = state[deckKey] as string[] | undefined;
+
+  if (!deck || deck.length === 0) {
+    return { success: false, error: `${trait} exploration deck is empty` };
+  }
+
+  // Reveal top 3 cards (or fewer if deck is smaller)
+  const revealCount = Math.min(3, deck.length);
+  const revealedCards = deck.splice(0, revealCount);
+
+  // Count relic fragments gained
+  let fragmentsGained = 0;
+  const discardedCards: string[] = [];
+
+  for (const cardId of revealedCards) {
+    // Check if card is a relic fragment
+    if (cardId.includes('relic_fragment') || cardId.includes('fragment')) {
+      fragmentsGained++;
+      // Add to player's relic fragments based on trait
+      if (player.relicFragments) {
+        player.relicFragments[trait]++;
+      }
+    } else {
+      discardedCards.push(cardId);
+    }
+  }
+
+  // Discard non-fragment cards (add to discard pile if exists)
+  // For now, they're just removed from the game
+
+  return {
+    success: true,
+    triggeredEvents: ['archaeological_expedition_resolved'],
+    data: {
+      playerId,
+      trait,
+      cardsRevealed: revealCount,
+      fragmentsGained,
+      discardedCards,
+    },
+  };
+}
+
+/**
+ * Exploration Probe: Explore a frontier token in or adjacent to a system with your ships
+ */
+function applyExplorationProbe(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.systemId) {
+    return { success: false, error: 'Must select a system with a frontier token' };
+  }
+
+  const targetTile = state.map.tiles.find(t => t.id === targets.systemId);
+  if (!targetTile) {
+    return { success: false, error: 'System not found' };
+  }
+
+  // Check if tile has a frontier token
+  if (!targetTile.frontier) {
+    return { success: false, error: 'Selected system does not have a frontier token' };
+  }
+
+  // Check if player has ships in this system or an adjacent system
+  const hasShipsInSystem = targetTile.units.some(
+    u => u.ownerId === playerId && isShipType(u.type)
+  );
+
+  let hasShipsAdjacent = false;
+  if (!hasShipsInSystem) {
+    for (const tile of state.map.tiles) {
+      if (tile.id === targets.systemId) continue;
+      // Check adjacency (simplified - real implementation would use hex math)
+      const dq = Math.abs(tile.position.q - targetTile.position.q);
+      const dr = Math.abs(tile.position.r - targetTile.position.r);
+      const ds = Math.abs((-tile.position.q - tile.position.r) - (-targetTile.position.q - targetTile.position.r));
+      const isAdjacent = (dq + dr + ds) === 2;
+
+      if (isAdjacent && tile.units.some(u => u.ownerId === playerId && isShipType(u.type))) {
+        hasShipsAdjacent = true;
+        break;
+      }
+    }
+  }
+
+  if (!hasShipsInSystem && !hasShipsAdjacent) {
+    return { success: false, error: 'You must have ships in or adjacent to the target system' };
+  }
+
+  // Remove frontier token and explore
+  targetTile.frontier = false;
+
+  // Draw from frontier exploration deck
+  const frontierDeck = state.explorationDecks?.frontier;
+  if (frontierDeck && frontierDeck.length > 0) {
+    const exploredCard = frontierDeck.shift();
+    // Handle exploration result (simplified - actual exploration handling is complex)
+    return {
+      success: true,
+      triggeredEvents: ['frontier_explored'],
+      data: { playerId, systemId: targets.systemId, exploredCard },
+    };
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['frontier_explored'],
+    data: { playerId, systemId: targets.systemId },
+  };
+}
+
+/**
+ * Confounding Legal Text: You become the elected player instead
+ */
+function applyConfoundingLegalText(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  if (!state.agendaPhase) {
+    return { success: false, error: 'No active agenda phase' };
+  }
+
+  // This card is played after another player is elected
+  // Change the elected player to the card player
+  const previousElected = state.agendaPhase.electedPlayer;
+  state.agendaPhase.electedPlayer = playerId;
+
+  return {
+    success: true,
+    triggeredEvents: ['confounding_legal_text_applied'],
+    data: { playerId, previousElected, newElected: playerId },
+  };
+}
+
+/**
+ * Diplomatic Pressure: Force target player to give you a promissory note
+ */
+function applyDiplomaticPressure(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.targetPlayerId) {
+    return { success: false, error: 'Must select a target player' };
+  }
+
+  const targetPlayer = findPlayer(state, targets.targetPlayerId);
+  const player = findPlayer(state, playerId);
+
+  if (!targetPlayer || !player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Check if target has promissory notes in hand
+  if (!targetPlayer.promissoryNotesInHand || targetPlayer.promissoryNotesInHand.length === 0) {
+    return { success: false, error: 'Target player has no promissory notes in hand' };
+  }
+
+  // Target player chooses which note to give (for now, we take the first one)
+  // In a real implementation, this would prompt the target player
+  const noteToGive = targetPlayer.promissoryNotesInHand[0];
+
+  // Transfer the note
+  targetPlayer.promissoryNotesInHand = targetPlayer.promissoryNotesInHand.filter(n => n !== noteToGive);
+  player.promissoryNotesInHand = player.promissoryNotesInHand || [];
+  player.promissoryNotesInHand.push(noteToGive);
+
+  return {
+    success: true,
+    triggeredEvents: ['diplomatic_pressure_applied'],
+    data: { playerId, targetPlayerId: targets.targetPlayerId, noteTransferred: noteToGive },
+  };
+}
+
+/**
+ * Divert Funding: Return a technology, research another
+ */
+function applyDivertFunding(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const player = findPlayer(state, playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  if (!targets?.techId) {
+    return { success: false, error: 'Must select a technology to return' };
+  }
+
+  if (!targets?.newTechId) {
+    return { success: false, error: 'Must select a technology to research' };
+  }
+
+  const techToReturn = targets.techId;
+  const techToResearch = targets.newTechId;
+
+  // Verify player has the tech to return
+  if (!player.technologies.includes(techToReturn)) {
+    return { success: false, error: 'You do not own the technology to return' };
+  }
+
+  // Verify tech is not a unit upgrade or faction tech
+  // (Simplified check - real implementation would check tech data)
+  if (techToReturn.includes('_ii') || techToReturn.includes('_upgrade')) {
+    return { success: false, error: 'Cannot return unit upgrade technologies' };
+  }
+
+  // Remove old tech, add new tech
+  player.technologies = player.technologies.filter(t => t !== techToReturn);
+  player.technologies.push(techToResearch);
+
+  return {
+    success: true,
+    triggeredEvents: ['divert_funding_applied', 'tech_researched'],
+    data: { playerId, techReturned: techToReturn, techResearched: techToResearch },
+  };
+}
+
+/**
+ * Reverse Engineer: Take a discarded action card
+ */
+function applyReverseEngineer(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const player = findPlayer(state, playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  if (!targets?.cardId) {
+    return { success: false, error: 'Must select an action card from the discard pile' };
+  }
+
+  // Check action card discard pile
+  const discardPile = state.actionCardDiscard || [];
+  const cardIndex = discardPile.indexOf(targets.cardId);
+
+  if (cardIndex === -1) {
+    return { success: false, error: 'Card not found in discard pile' };
+  }
+
+  // Remove from discard pile, add to player's hand
+  discardPile.splice(cardIndex, 1);
+  player.actionCards.push(targets.cardId);
+
+  return {
+    success: true,
+    triggeredEvents: ['reverse_engineer_applied'],
+    data: { playerId, cardTaken: targets.cardId },
+  };
+}
+
+/**
+ * Nav Suite: Ignore anomaly effects during movement this tactical action
+ */
+function applyNavSuite(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  // Set a flag on the current tactical action to ignore anomalies
+  if (!state.activatedSystem) {
+    return { success: false, error: 'No active tactical action' };
+  }
+
+  if (!state.tacticalModifiers) {
+    state.tacticalModifiers = {};
+  }
+  if (!state.tacticalModifiers[playerId]) {
+    state.tacticalModifiers[playerId] = {};
+  }
+  state.tacticalModifiers[playerId].ignoreAnomalies = true;
+
+  return {
+    success: true,
+    triggeredEvents: ['nav_suite_applied'],
+    data: { playerId },
+  };
+}
+
+/**
+ * Rout: Force opponent to announce retreat if able
+ */
+function applyRout(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: false, error: 'No active combat' };
+  }
+
+  // Determine opponent
+  const opponentId = combat.attackerId === playerId ? combat.defenderId : combat.attackerId;
+
+  // Set flag to force retreat announcement
+  if (!combat.temporaryModifiers) {
+    combat.temporaryModifiers = {};
+  }
+  if (!combat.temporaryModifiers[opponentId]) {
+    combat.temporaryModifiers[opponentId] = {};
+  }
+  combat.temporaryModifiers[opponentId].mustRetreat = true;
+
+  return {
+    success: true,
+    triggeredEvents: ['rout_applied'],
+    data: { playerId, targetPlayerId: opponentId },
+  };
+}
+
+/**
+ * Refit Troops: Replace infantry with mechs
+ */
+function applyRefitTroops(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const player = findPlayer(state, playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  if (!targets?.unitIds || targets.unitIds.length === 0) {
+    return { success: false, error: 'Must select infantry to replace' };
+  }
+
+  if (targets.unitIds.length > 2) {
+    return { success: false, error: 'Can only replace up to 2 infantry' };
+  }
+
+  let replacedCount = 0;
+
+  for (const unitId of targets.unitIds) {
+    // Find the infantry unit
+    for (const tile of state.map.tiles) {
+      for (const planet of tile.planets) {
+        const unitIndex = planet.units.findIndex(
+          u => u.id === unitId && u.ownerId === playerId && u.type === 'infantry'
+        );
+        if (unitIndex !== -1) {
+          // Replace infantry with mech
+          planet.units[unitIndex] = {
+            ...planet.units[unitIndex],
+            id: `mech-${Date.now()}-${replacedCount}`,
+            type: 'mech',
+            damaged: false,
+          };
+          replacedCount++;
+          break;
+        }
+      }
+    }
+  }
+
+  if (replacedCount === 0) {
+    return { success: false, error: 'No valid infantry found to replace' };
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['refit_troops_applied'],
+    data: { playerId, infantryReplaced: replacedCount },
+  };
+}
+
+/**
+ * Manipulate Investments: Place trade goods on strategy cards
+ */
+function applyManipulateInvestments(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (state.phase !== 'strategy') {
+    return { success: false, error: 'Can only be played at the start of strategy phase' };
+  }
+
+  if (!targets?.strategyCardDistribution) {
+    return { success: false, error: 'Must specify how to distribute trade goods on strategy cards' };
+  }
+
+  // targets.strategyCardDistribution should be a map of cardNumber (as string) -> tradeGoods
+  const distribution = targets.strategyCardDistribution as Record<string, number>;
+  let totalPlaced = 0;
+
+  for (const [cardNumberStr, amount] of Object.entries(distribution)) {
+    if (amount > 0) {
+      const cardNumber = parseInt(cardNumberStr, 10);
+      const strategyCard = state.strategyCards.find(sc => sc.number === cardNumber);
+      if (strategyCard) {
+        strategyCard.tradeGoods = (strategyCard.tradeGoods || 0) + amount;
+        totalPlaced += amount;
+      }
+    }
+  }
+
+  if (totalPlaced > 5) {
+    return { success: false, error: 'Can only place up to 5 trade goods total' };
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['manipulate_investments_applied'],
+    data: { playerId, distribution, totalPlaced },
   };
 }
 

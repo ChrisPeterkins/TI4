@@ -80,6 +80,8 @@ export interface ActionCardTargets {
   prediction?: string;
   /** For technology research (Focused Research) */
   techId?: string;
+  /** For Divert Funding - the new technology to research */
+  newTechId?: string;
   /** For Skilled Retreat - the destination system */
   destinationSystem?: HexCoord;
   /** For Shields Holding, Bribery - count of hits to cancel / TG to spend */
@@ -90,6 +92,12 @@ export interface ActionCardTargets {
   cardId?: string;
   /** For Hack Election - reordered agenda IDs */
   agendaOrder?: string[];
+  /** For Archaeological Expedition - planet trait to explore */
+  planetTrait?: 'cultural' | 'industrial' | 'hazardous';
+  /** For Exploration Probe - system ID to explore */
+  systemId?: string;
+  /** For Overrule - strategy card redistribution */
+  strategyCardDistribution?: Record<string, number>;
 }
 
 export interface ComponentAction extends BaseAction {
@@ -418,6 +426,8 @@ export interface PlayPromissoryNoteAction extends BaseAction {
   targetPlanetId?: string;
   targetTechId?: string;
   targetCardId?: string;
+  /** Target system ID (for Creuss IFF wormhole placement) */
+  targetSystemId?: string;
 }
 
 // Timing Window Responses

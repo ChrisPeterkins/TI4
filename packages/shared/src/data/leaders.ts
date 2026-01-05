@@ -189,6 +189,41 @@ export const FACTION_LEADERS: Record<string, FactionLeaderIds> = {
     commander: 'odlynn_myrr',
     hero: 'odlynn_myrr_hero',
   },
+
+  // ============================================
+  // THUNDER'S EDGE FACTIONS (6)
+  // ============================================
+
+  last_bastion: {
+    agent: 'dame_briar',
+    commander: 'nip_and_tuck',
+    hero: 'lyra_keen',
+  },
+  deepwrought: {
+    agent: 'dr_carrina',
+    commander: 'aello',
+    hero: 'ta_zern_hero', // Different from Jol-Nar ta_zern
+  },
+  ral_nel: {
+    agent: 'kan_kip_rel',
+    commander: 'watchful_ojz',
+    hero: 'director_nel',
+  },
+  crimson_rebellion: {
+    agent: 'ahk_ravin',
+    commander: 'ahk_siever',
+    hero: 'homesick_phantom',
+  },
+  firmament: {
+    agent: 'myru_vos',
+    commander: 'captain_aroz',
+    hero: 'sharsiss',
+  },
+  obsidian: {
+    agent: 'vos_hollow',
+    commander: 'aroz_hollow',
+    hero: 'sharsiss_hollow',
+  },
 };
 
 /**
@@ -373,6 +408,48 @@ export const LEADER_NAMES: Record<string, string> = {
   kuuasi_aun_jalatai: 'Kuuasi Aun Jalatai',
   harka_leeds: 'Harka Leeds',
   odlynn_myrr_hero: 'Odlynn Myrr',
+
+  // ============================================
+  // LAST BASTION
+  // ============================================
+  dame_briar: 'Dame Briar',
+  nip_and_tuck: 'Nip and Tuck',
+  lyra_keen: 'Lyra Keen',
+
+  // ============================================
+  // DEEPWROUGHT SCHOLARATE
+  // ============================================
+  dr_carrina: 'Dr. Carrina',
+  aello: 'Aello',
+  ta_zern_hero: 'Ta Zern', // Deepwrought hero (different from Jol-Nar commander)
+
+  // ============================================
+  // RAL NEL CONSORTIUM
+  // ============================================
+  kan_kip_rel: 'Kan Kip Rel',
+  watchful_ojz: 'Watchful Ojz',
+  director_nel: 'Director Nel',
+
+  // ============================================
+  // CRIMSON REBELLION
+  // ============================================
+  ahk_ravin: 'Ahk Ravin',
+  ahk_siever: 'Ahk Siever',
+  homesick_phantom: 'Homesick Phantom',
+
+  // ============================================
+  // THE FIRMAMENT
+  // ============================================
+  myru_vos: 'Myru Vos',
+  captain_aroz: 'Captain Aroz',
+  sharsiss: 'Sharsiss',
+
+  // ============================================
+  // THE OBSIDIAN
+  // ============================================
+  vos_hollow: 'Vos Hollow',
+  aroz_hollow: 'Aroz Hollow',
+  sharsiss_hollow: 'Sharsiss Hollow',
 };
 
 /**

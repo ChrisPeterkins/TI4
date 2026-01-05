@@ -1606,4 +1606,121 @@ export const systems: Record<number, SystemData> = {
       [2, 5],
     ],
   },
+
+  // =====================================================================
+  // THUNDER'S EDGE - HOME SYSTEMS
+  // =====================================================================
+
+  // Tile 92: Last Bastion - Ordinian (legendary) + Revelation in Nebula
+  92: {
+    id: 92,
+    tileNumber: '92',
+    type: 'home',
+    factionId: 'last_bastion',
+    anomaly: 'nebula',
+    planets: [
+      {
+        id: 'ordinian',
+        name: 'Ordinian',
+        resources: 0,
+        influence: 0,
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to gain 1 galvanize token and place it on any of your units.',
+      },
+      {
+        id: 'revelation',
+        name: 'Revelation',
+        resources: 1,
+        influence: 2,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 93: Deepwrought Scholarate - Ikatena
+  93: {
+    id: 93,
+    tileNumber: '93',
+    type: 'home',
+    factionId: 'deepwrought',
+    planets: [
+      {
+        id: 'ikatena',
+        name: 'Ikatena',
+        resources: 4,
+        influence: 4,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 94: Ral Nel Consortium - 3 planets
+  94: {
+    id: 94,
+    tileNumber: '94',
+    type: 'home',
+    factionId: 'ral_nel',
+    planets: [
+      {
+        id: 'mez',
+        name: 'Mez',
+        resources: 1,
+        influence: 1,
+      },
+      {
+        id: 'lo_orz',
+        name: 'Lo Orz',
+        resources: 0,
+        influence: 2,
+      },
+      {
+        id: 'pei_zsha',
+        name: 'Pei Zsha',
+        resources: 2,
+        influence: 0,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 95: Crimson Rebellion - The Sorrow (with epsilon wormhole and breach)
+  95: {
+    id: 95,
+    tileNumber: '95',
+    type: 'home',
+    factionId: 'crimson_rebellion',
+    wormhole: 'epsilon',
+    planets: [
+      {
+        id: 'ahk_creuxx',
+        name: 'Ahk Creuxx',
+        resources: 4,
+        influence: 2,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 96: The Firmament / The Obsidian - Cronos + Tallin
+  96: {
+    id: 96,
+    tileNumber: '96',
+    type: 'home',
+    factionId: 'firmament',
+    planets: [
+      {
+        id: 'cronos',
+        name: 'Cronos',
+        resources: 2,
+        influence: 1,
+      },
+      {
+        id: 'tallin',
+        name: 'Tallin',
+        resources: 1,
+        influence: 2,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
 };

@@ -676,4 +676,112 @@ describe('Combat Handlers', () => {
       expect(Array.isArray(result.defenderRolls)).toBe(true);
     });
   });
+
+  describe('Nebula Combat Effects', () => {
+    it('should give defender +1 combat bonus in a nebula', () => {
+      const units = [
+        createMockUnit({ id: 'c1', type: 'cruiser', ownerId: 'player1' }),
+        createMockUnit({ id: 'c2', type: 'cruiser', ownerId: 'player2' }),
+      ];
+      const state = createMockGameState({
+        map: {
+          tiles: [createMockTile({ q: 0, r: 0 }, {
+            units,
+            anomaly: 'nebula',
+          })],
+          playerCount: 6,
+        },
+        activeCombat: createMockCombat({
+          state: 'combat_round_roll',
+          systemId: 'tile-0-0',
+          attackerUnits: ['c1'],
+          defenderUnits: ['c2'],
+        }),
+      });
+
+      // Roll dice and check that defender has the nebula bonus in modifiers
+      const result = rollCombatDice(state);
+
+      // Defender rolls should have the nebula modifier
+      expect(result.defenderRolls.some(r =>
+        r.modifiers?.includes('Nebula Defender: +1')
+      )).toBe(true);
+
+      // Attacker should NOT have the nebula modifier
+      expect(result.attackerRolls.some(r =>
+        r.modifiers?.includes('Nebula Defender: +1')
+      )).toBe(false);
+    });
+
+    it('should NOT give nebula bonus in non-nebula systems', () => {
+      const units = [
+        createMockUnit({ id: 'c1', type: 'cruiser', ownerId: 'player1' }),
+        createMockUnit({ id: 'c2', type: 'cruiser', ownerId: 'player2' }),
+      ];
+      const state = createMockGameState({
+        map: {
+          tiles: [createMockTile({ q: 0, r: 0 }, {
+            units,
+            anomaly: null, // No anomaly
+          })],
+          playerCount: 6,
+        },
+        activeCombat: createMockCombat({
+          state: 'combat_round_roll',
+          systemId: 'tile-0-0',
+          attackerUnits: ['c1'],
+          defenderUnits: ['c2'],
+        }),
+      });
+
+      const result = rollCombatDice(state);
+
+      // Neither player should have nebula modifier
+      expect(result.defenderRolls.some(r =>
+        r.modifiers?.includes('Nebula Defender: +1')
+      )).toBe(false);
+      expect(result.attackerRolls.some(r =>
+        r.modifiers?.includes('Nebula Defender: +1')
+      )).toBe(false);
+    });
+
+    it('should NOT give nebula bonus in ground combat', () => {
+      const units = [
+        createMockUnit({ id: 'i1', type: 'infantry', ownerId: 'player1' }),
+        createMockUnit({ id: 'i2', type: 'infantry', ownerId: 'player2' }),
+      ];
+      const state = createMockGameState({
+        map: {
+          tiles: [createMockTile({ q: 0, r: 0 }, {
+            units,
+            anomaly: 'nebula',
+            planets: [{
+              id: 'test-planet-instance',
+              planetId: 'test-planet',
+              controlledBy: 'player2',
+              exhausted: false,
+              units,
+              attachments: [],
+            }],
+          })],
+          playerCount: 6,
+        },
+        activeCombat: createMockCombat({
+          type: 'ground',
+          state: 'combat_round_roll',
+          systemId: 'tile-0-0',
+          planetId: 'test-planet',
+          attackerUnits: ['i1'],
+          defenderUnits: ['i2'],
+        }),
+      });
+
+      const result = rollCombatDice(state);
+
+      // Nebula bonus should NOT apply to ground combat
+      expect(result.defenderRolls.some(r =>
+        r.modifiers?.includes('Nebula Defender: +1')
+      )).toBe(false);
+    });
+  });
 });

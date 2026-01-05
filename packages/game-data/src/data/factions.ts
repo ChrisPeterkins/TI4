@@ -1572,4 +1572,423 @@ export const factions: Record<string, FactionData> = {
       abilities: ['When your infantry on this planet are destroyed, place them on your faction sheet; those units are captured.', 'SUSTAIN DAMAGE'],
     },
   },
+
+  // ============================================================================
+  // Thunder's Edge Factions
+  // ============================================================================
+
+  last_bastion: {
+    id: 'last_bastion',
+    name: 'Last Bastion',
+    shortName: 'Bastion',
+    expansion: 'thunders_edge',
+    homeSystemId: 92,
+    startingTech: [], // Choose 1 blue or yellow with no prerequisites
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'cruiser', count: 1 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 3, planet: 'ordinian' },
+      { type: 'space_dock', count: 1, planet: 'ordinian' },
+    ],
+    commodities: 1,
+    abilities: [
+      {
+        id: 'liberate',
+        name: 'Liberate',
+        description: 'When you gain control of a planet, if the number of your infantry on that planet is equal to or greater than the planet\'s resource value, ready that planet; otherwise, place 1 infantry from your reinforcements on that planet.',
+        implementation: {
+          timing: { type: 'after', trigger: 'planet_control_gained' },
+          effectType: 'planet_ready',
+          handlerId: 'last_bastion_liberate',
+          isOptional: false,
+        },
+      },
+      {
+        id: 'galvanize',
+        name: 'Galvanize',
+        description: 'You may place a galvanize token beneath any of your units that does not have one. Galvanized units roll 1 additional die during combat.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'combat_modifier',
+          handlerId: 'last_bastion_galvanize',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'phoenix_standard',
+        name: 'Phoenix Standard',
+        description: 'After combat, you may galvanize 1 of your participating units.',
+        implementation: {
+          timing: { type: 'after', trigger: 'combat' },
+          effectType: 'token_placement',
+          handlerId: 'last_bastion_phoenix_standard',
+          isOptional: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'raise_the_standard',
+      name: 'Raise the Standard',
+      owner: 'last_bastion',
+      description: 'At the end of combat: Galvanize 1 participating unit. Then, return this card to the Last Bastion player.',
+    },
+    flagship: {
+      id: 'the_egeiro',
+      name: 'The Egeiro',
+      cost: 8,
+      combat: 9,
+      move: 1,
+      capacity: 3,
+      abilities: ['Apply +1 to the result of each of your unit\'s combat rolls for each non-home system that contains a planet you control.', 'PRODUCTION 1', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'a3_valiance',
+      name: 'A3 Valiance',
+      cost: 2,
+      combat: 6,
+      abilities: ['When this unit is destroyed while galvanized, galvanize up to 3 of your infantry in this system.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  deepwrought: {
+    id: 'deepwrought',
+    name: 'The Deepwrought Scholarate',
+    shortName: 'Deepwrought',
+    expansion: 'thunders_edge',
+    homeSystemId: 93,
+    startingTech: [], // Research technology twice during setup
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'fighter', count: 4 },
+      { type: 'infantry', count: 3, planet: 'ikatena' },
+      { type: 'space_dock', count: 1, planet: 'ikatena' },
+    ],
+    commodities: 3,
+    abilities: [
+      {
+        id: 'research_team',
+        name: 'Research Team',
+        description: 'When you commit ground forces to a planet, those units may coexist with another player\'s units on that planet if no units are already coexisting there.',
+        implementation: {
+          timing: { type: 'when', trigger: 'commit_ground_forces' },
+          effectType: 'coexistence',
+          handlerId: 'deepwrought_research_team',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'oceanbound',
+        name: 'Oceanbound',
+        description: 'When units begin coexisting on a planet, gain and ready an ocean card. Discard excess ocean cards if they outnumber planets with coexisting units.',
+        implementation: {
+          timing: { type: 'when', trigger: 'coexistence_start' },
+          effectType: 'card_gain',
+          handlerId: 'deepwrought_oceanbound',
+          isOptional: false,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'share_knowledge',
+      name: 'Share Knowledge',
+      owner: 'deepwrought',
+      description: 'Place this card face-up in your play area. Gain 1 non-faction, non-unit upgrade technology that the Deepwrought player has. At the end of the status phase, return that technology card and this card to the Deepwrought player.',
+    },
+    flagship: {
+      id: 'dws_luminous',
+      name: 'D.W.S. Luminous',
+      cost: 8,
+      combat: 7,
+      combatRolls: 2,
+      move: 1,
+      capacity: 6,
+      abilities: ['This ship may move through systems containing your units. Apply +1 to the move value of this ship for each system it moves through that contains your units.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'eanautic',
+      name: 'Eanautic',
+      cost: 2,
+      combat: 6,
+      abilities: ['When another player activates this system, you may move this unit and any number of your infantry on this planet to a planet in your home system.', 'PRODUCTION 1', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  ral_nel: {
+    id: 'ral_nel',
+    name: 'The Ral Nel Consortium',
+    shortName: 'Ral Nel',
+    expansion: 'thunders_edge',
+    homeSystemId: 94,
+    startingTech: [], // Choose 1 red or green with no prerequisites
+    startingUnits: [
+      { type: 'dreadnought', count: 1 },
+      { type: 'carrier', count: 1 },
+      { type: 'destroyer', count: 1 },
+      { type: 'fighter', count: 2 },
+      { type: 'infantry', count: 4, planet: 'mez' },
+      { type: 'pds', count: 2, planet: 'lo_orz' },
+      { type: 'space_dock', count: 1, planet: 'pei_zsha' },
+    ],
+    commodities: 4,
+    abilities: [
+      {
+        id: 'survival_instinct',
+        name: 'Survival Instinct',
+        description: 'After another player activates a system containing your ships, you may relocate up to 2 of your ships into that system from adjacent systems that do not contain your command tokens.',
+        implementation: {
+          timing: { type: 'after', trigger: 'system_activated_by_other' },
+          effectType: 'ship_movement',
+          handlerId: 'ral_nel_survival_instinct',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'miniaturization',
+        name: 'Miniaturization',
+        description: 'Your structures can be transported by any ships without requiring or counting against capacity. While in space areas, structures cannot use their abilities. At the end of your tactical action, you may place structures from space onto planets you control in their systems.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'transport_modifier',
+          handlerId: 'ral_nel_miniaturization',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'nano_link_permit',
+      name: 'Nano-Link Permit',
+      owner: 'ral_nel',
+      description: 'After you activate a system: You may move your structures from adjacent systems that do not contain your command tokens onto planets you control in the active system. Then, return this card to the Ral Nel player.',
+    },
+    flagship: {
+      id: 'last_dispatch',
+      name: 'Last Dispatch',
+      cost: 8,
+      combat: 8,
+      combatRolls: 2,
+      move: 2,
+      capacity: 4,
+      abilities: ['When you declare a retreat, you may destroy 1 of your opponent\'s ships in the active system that does not have SUSTAIN DAMAGE.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'alarum',
+      name: 'Alarum',
+      cost: 2,
+      combat: 6,
+      abilities: ['At the end of a round of ground combat on this planet, you may move up to 2 ground forces to this planet from adjacent systems.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  crimson_rebellion: {
+    id: 'crimson_rebellion',
+    name: 'The Crimson Rebellion',
+    shortName: 'Crimson',
+    expansion: 'thunders_edge',
+    homeSystemId: 95,
+    startingTech: [], // Choose 1 red or blue with no prerequisites; starts with breakthrough
+    startingUnits: [
+      { type: 'carrier', count: 1 },
+      { type: 'destroyer', count: 2 },
+      { type: 'fighter', count: 3 },
+      { type: 'infantry', count: 4, planet: 'ahk_creuxx' },
+      { type: 'pds', count: 1, planet: 'ahk_creuxx' },
+      { type: 'space_dock', count: 1, planet: 'ahk_creuxx' },
+    ],
+    commodities: 2,
+    abilities: [
+      {
+        id: 'sundered',
+        name: 'Sundered',
+        description: 'You cannot use non-epsilon wormholes. Other players\' units that move into your home system are destroyed.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'movement_restriction',
+          handlerId: 'crimson_rebellion_sundered',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'incursion',
+        name: 'Incursion',
+        description: 'When you activate a system that contains a breach token, flip it to its active side. Systems with active breach tokens are adjacent to each other. At the end of the status phase, remove all breach tokens.',
+        implementation: {
+          timing: { type: 'when', trigger: 'system_activated' },
+          effectType: 'adjacency_modifier',
+          handlerId: 'crimson_rebellion_incursion',
+          isOptional: false,
+        },
+      },
+      {
+        id: 'the_sorrow',
+        name: 'The Sorrow',
+        description: 'During setup, your home system is replaced with The Sorrow tile (tile 95) which contains an inactive breach token and an epsilon wormhole.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'setup_modifier',
+          handlerId: 'crimson_rebellion_sorrow',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'sever',
+      name: 'Sever',
+      owner: 'crimson_rebellion',
+      description: 'Place this card face-up in your play area. Place the sever token in a system that contains your units; wormholes in that system cannot be used. At the end of the status phase, remove the sever token and return this card to the Crimson Rebellion player.',
+    },
+    flagship: {
+      id: 'quietus',
+      name: 'Quietus',
+      cost: 8,
+      combat: 5,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['While this ship is in a system with an active breach token, other players\' units in systems with breach tokens lose all abilities.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'revenant',
+      name: 'Revenant',
+      cost: 2,
+      combat: 6,
+      abilities: ['DEPLOY: When you commit ground forces during an invasion in a system with an active breach token, you may place this unit on a planet in that system even if you do not have units in the space area.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  firmament: {
+    id: 'firmament',
+    name: 'The Firmament',
+    shortName: 'Firmament',
+    expansion: 'thunders_edge',
+    homeSystemId: 96,
+    startingTech: [], // Choose 1 green or yellow with no prerequisites
+    startingUnits: [
+      { type: 'carrier', count: 1 },
+      { type: 'cruiser', count: 1 },
+      { type: 'destroyer', count: 1 },
+      { type: 'fighter', count: 3 },
+      { type: 'infantry', count: 3, planet: 'cronos' },
+      { type: 'space_dock', count: 1, planet: 'cronos' },
+    ],
+    commodities: 3,
+    abilities: [
+      {
+        id: 'plots_within_plots',
+        name: 'Plots Within Plots',
+        description: 'You may score secret objectives that have already been scored by other players. When you do, do not gain the victory point; instead, place a plot card face-down with that opponent\'s control token on it.',
+        implementation: {
+          timing: { type: 'when', trigger: 'secret_objective_scored' },
+          effectType: 'special',
+          handlerId: 'firmament_plots_within_plots',
+          isOptional: true,
+        },
+      },
+      {
+        id: 'puppets_of_the_blade',
+        name: 'Puppets of the Blade',
+        description: 'If you have at least 1 plot card in play, you may purge your faction components to transform into The Obsidian.',
+        implementation: {
+          timing: { type: 'action' },
+          effectType: 'faction_transform',
+          handlerId: 'firmament_puppets',
+          isOptional: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'black_ops',
+      name: 'Black Ops',
+      owner: 'firmament',
+      description: 'Place a face-down plot card with your control token on it. Gain 2 command tokens and 2 trade goods. Then, return this card to the Firmament player.',
+    },
+    flagship: {
+      id: 'heavens_eye',
+      name: 'Heaven\'s Eye',
+      cost: 8,
+      combat: 5,
+      combatRolls: 2,
+      move: 1,
+      capacity: 3,
+      abilities: ['This ship gains +1 move value and repairs at the end of each combat round if in a system containing units belonging to a puppeted player.', 'SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'viper_ex_23',
+      name: 'Viper EX-23',
+      cost: 2,
+      combat: 6,
+      abilities: ['When you commit ground forces to a planet, those units may coexist with another player\'s units on that planet.', 'SUSTAIN DAMAGE'],
+    },
+  },
+
+  obsidian: {
+    id: 'obsidian',
+    name: 'The Obsidian',
+    shortName: 'Obsidian',
+    expansion: 'thunders_edge',
+    homeSystemId: 96, // Same tile, different planet values when transformed
+    startingTech: [], // Inherited from Firmament transformation
+    startingUnits: [], // Inherited from Firmament transformation
+    commodities: 3,
+    abilities: [
+      {
+        id: 'nocturne',
+        name: 'Nocturne',
+        description: 'You cannot be chosen during faction setup. You only appear through transformation from The Firmament.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'setup_restriction',
+          handlerId: 'obsidian_nocturne',
+          isPassive: true,
+        },
+      },
+      {
+        id: 'blades_orchestra',
+        name: 'The Blade\'s Orchestra',
+        description: 'When you transform, flip all your faction components and plot cards. Ready your home system planets.',
+        implementation: {
+          timing: { type: 'when', trigger: 'faction_transform' },
+          effectType: 'special',
+          handlerId: 'obsidian_blades_orchestra',
+          isOptional: false,
+        },
+      },
+      {
+        id: 'marionettes',
+        name: 'Marionettes',
+        description: 'Players with control tokens on your plot cards are puppeted players.',
+        implementation: {
+          timing: { type: 'passive' },
+          effectType: 'special',
+          handlerId: 'obsidian_marionettes',
+          isPassive: true,
+        },
+      },
+    ],
+    promissoryNote: {
+      id: 'malevolency',
+      name: 'Malevolency',
+      owner: 'obsidian',
+      description: 'You may spend influence to pass this card to one of your neighbors. At the end of the status phase, if you are not The Obsidian player, lose 1 command token from your fleet pool.',
+    },
+    flagship: {
+      id: 'heavens_hollow',
+      name: 'Heaven\'s Hollow',
+      cost: 8,
+      combat: 5,
+      combatRolls: 3,
+      move: 1,
+      capacity: 3,
+      abilities: ['SUSTAIN DAMAGE'],
+    },
+    mech: {
+      id: 'viper_hollow',
+      name: 'Viper Hollow',
+      cost: 2,
+      combat: 6,
+      abilities: ['If this unit was coexisting when you transformed, you gain control of the planet and your opponent\'s units now coexist with yours.', 'SUSTAIN DAMAGE'],
+    },
+  },
 };

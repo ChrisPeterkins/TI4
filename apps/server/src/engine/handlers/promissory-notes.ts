@@ -298,9 +298,11 @@ function executeNoteEffect(
       return { success: true };
 
     case 'creuss_iff':
-      // Creuss - Place/move Creuss wormhole token
-      // Would need wormhole token tracking
-      return { success: true };
+      // Creuss IFF - Place or move a Creuss wormhole token
+      // "At the start of your turn during the action phase: Place or move a Creuss wormhole token
+      // into either a system that contains a planet you control or a non-home system that does
+      // not contain another player's ships."
+      return executeCreussIff(state, player, action);
 
     case 'trade_convoys':
       // Hacan - Player can transact with non-neighbors
@@ -319,11 +321,11 @@ function executeNoteEffect(
 
     case 'cybernetic_enhancements':
       // L1Z1X - Replace infantry with fighters at start of ground combat
+      // "Replace each of your infantry on that planet with the same number of fighters from your reinforcements"
       if (!state.activeCombat || state.activeCombat.type !== 'ground') {
         return { success: false, error: 'Can only play at start of ground combat' };
       }
-      // The actual replacement would be handled by the combat system
-      return { success: true };
+      return executeCyberneticEnhancements(state, player, state.activeCombat);
 
     case 'war_funding':
       // Letnev - Letnev loses 2 TG, player can reroll dice this combat round
@@ -386,9 +388,41 @@ function executeNoteEffect(
       return { success: true };
 
     case 'acquiescence':
-      // Winnu - Exchange strategy card with Winnu
-      // Would need target strategy card selection
-      return { success: true };
+      // Winnu - Exchange strategy card with Winnu at end of strategy phase
+      // "Exchange 1 of your strategy cards with a strategy card that was chosen by the Winnu player"
+      if (state.phase !== 'strategy') {
+        return { success: false, error: 'Can only play Acquiescence at end of strategy phase' };
+      }
+
+      // Player must have a strategy card
+      if (player.strategyCard === null) {
+        return { success: false, error: 'You do not have a strategy card to exchange' };
+      }
+
+      // Winnu player must have a strategy card
+      if (originalOwner.strategyCard === null) {
+        return { success: false, error: 'Winnu player does not have a strategy card' };
+      }
+
+      // Exchange strategy cards
+      const playerCard = player.strategyCard;
+      const winnuCard = originalOwner.strategyCard;
+
+      player.strategyCard = winnuCard;
+      originalOwner.strategyCard = playerCard;
+
+      // Reset used flags since we're exchanging
+      player.strategyCardUsed = false;
+      originalOwner.strategyCardUsed = false;
+
+      return {
+        success: true,
+        triggeredEvents: ['strategy_cards_exchanged'],
+        data: {
+          playerReceivedCard: winnuCard,
+          winnuReceivedCard: playerCard,
+        },
+      };
 
     case 'political_favor':
       // Xxcha - Remove Xxcha strategy token, discard agenda and reveal new one
@@ -573,4 +607,148 @@ export function hasCommanderAccess(
 
   // Default: check own commander
   return player.leaders?.commander?.unlocked ?? false;
+}
+
+// =============================================================================
+// PROMISSORY NOTE EFFECT IMPLEMENTATIONS
+// =============================================================================
+
+/**
+ * Cybernetic Enhancements (L1Z1X Promissory Note)
+ * "At the start of a ground combat on a planet that contains 1 or more of your units:
+ * Replace each of your infantry on that planet with the same number of fighters
+ * from your reinforcements."
+ *
+ * The fighters replace infantry for ground combat - they fight as ground forces
+ * but return to being fighters after combat ends (handled by combat resolution).
+ */
+function executeCyberneticEnhancements(
+  state: GameState,
+  player: PlayerState,
+  combat: { systemId: string; planetId?: string }
+): HandlerResult {
+  if (!combat.planetId) {
+    return { success: false, error: 'No planet specified for ground combat' };
+  }
+
+  // Find the planet
+  const tile = state.map.tiles.find(t => t.id === combat.systemId);
+  if (!tile) {
+    return { success: false, error: 'Combat system not found' };
+  }
+
+  const planet = tile.planets.find(p => p.planetId === combat.planetId);
+  if (!planet) {
+    return { success: false, error: 'Combat planet not found' };
+  }
+
+  // Count player's infantry on the planet
+  const infantryOnPlanet = planet.units.filter(
+    u => u.ownerId === player.id && u.type === 'infantry'
+  );
+
+  if (infantryOnPlanet.length === 0) {
+    return { success: false, error: 'No infantry on planet to replace' };
+  }
+
+  // Remove infantry and add fighters in their place
+  // The fighters will participate in ground combat as if they were ground forces
+  const infantryCount = infantryOnPlanet.length;
+
+  // Remove all infantry
+  planet.units = planet.units.filter(
+    u => !(u.ownerId === player.id && u.type === 'infantry')
+  );
+
+  // Add fighters (these are "cybernetic enhanced" fighters fighting as ground forces)
+  // They stay on the planet during ground combat
+  for (let i = 0; i < infantryCount; i++) {
+    planet.units.push({
+      id: `fighter-ce-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'fighter',
+      ownerId: player.id,
+      damaged: false,
+      // Mark these as cybernetically enhanced so they're handled properly
+      // after combat (they stay as fighters, not converted back)
+    });
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['cybernetic_enhancements_activated'],
+    data: {
+      infantryReplaced: infantryCount,
+      planetId: combat.planetId,
+    },
+  };
+}
+
+/**
+ * Creuss IFF (Ghosts of Creuss Promissory Note)
+ * "At the start of your turn during the action phase: Place or move a Creuss wormhole token
+ * into either a system that contains a planet you control or a non-home system that does
+ * not contain another player's ships."
+ *
+ * The Creuss wormhole token creates a delta wormhole that connects to other delta wormholes.
+ */
+function executeCreussIff(
+  state: GameState,
+  player: PlayerState,
+  action: PlayPromissoryNoteAction
+): HandlerResult {
+  if (!action.targetSystemId) {
+    return { success: false, error: 'Must specify a target system for Creuss wormhole token' };
+  }
+
+  // Find the target system
+  const targetTile = state.map.tiles.find(t => t.id === action.targetSystemId);
+  if (!targetTile) {
+    return { success: false, error: 'Target system not found' };
+  }
+
+  // Validate placement rules:
+  // 1. System contains a planet player controls, OR
+  // 2. Non-home system that doesn't contain another player's ships
+
+  const playerControlsPlanet = targetTile.planets.some(
+    p => p.controlledBy === player.id
+  );
+
+  // Check if it's a home system
+  const isHomeSystem = state.players.some(
+    p => p.homeSystemId === targetTile.systemId
+  );
+
+  // Check if another player has ships in the system
+  const hasOtherPlayerShips = targetTile.units.some(
+    u => u.ownerId !== player.id
+  );
+
+  if (!playerControlsPlanet) {
+    // Must be non-home system without other players' ships
+    if (isHomeSystem) {
+      return { success: false, error: 'Cannot place Creuss wormhole token in a home system without controlling a planet there' };
+    }
+    if (hasOtherPlayerShips) {
+      return { success: false, error: 'Cannot place Creuss wormhole token in a system with another player\'s ships' };
+    }
+  }
+
+  // Check if there's already a wormhole in the system (not allowed per rules)
+  if (targetTile.wormhole) {
+    return { success: false, error: 'Cannot place Creuss wormhole token in a system that already has a wormhole' };
+  }
+
+  // Place/move the Creuss wormhole token
+  state.creussWormholeToken = {
+    systemId: action.targetSystemId,
+  };
+
+  return {
+    success: true,
+    triggeredEvents: ['creuss_wormhole_token_placed'],
+    data: {
+      systemId: action.targetSystemId,
+    },
+  };
 }

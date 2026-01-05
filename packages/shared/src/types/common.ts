@@ -18,7 +18,7 @@ export type Expansion = 'base' | 'pok' | 'codex1' | 'codex2' | 'codex3' | 'codex
 
 export type PlanetTrait = 'cultural' | 'hazardous' | 'industrial';
 
-export type WormholeType = 'alpha' | 'beta' | 'gamma' | 'delta';
+export type WormholeType = 'alpha' | 'beta' | 'gamma' | 'delta' | 'epsilon';
 
 export type AnomalyType = 'asteroid' | 'nebula' | 'supernova' | 'gravity_rift';
 

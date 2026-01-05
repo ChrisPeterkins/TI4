@@ -1084,6 +1084,233 @@ export const LEADER_ABILITIES: Record<string, LeaderAbility> = {
     effect: { type: 'custom', handlerId: 'keleres_hero_xxcha' },
     isComponentAction: true,
   },
+
+  // ============================================
+  // LAST BASTION (Thunder's Edge)
+  // Agent: Dame Briar
+  // Commander: Nip and Tuck
+  // Hero: Lyra Keen
+  // ============================================
+  dame_briar: {
+    id: 'dame_briar',
+    name: 'Dame Briar',
+    factionId: 'last_bastion',
+    type: 'agent',
+    timing: 'after_combat',
+    description: 'When a player\'s unit is destroyed: You may exhaust this card to galvanize another of that player\'s units in the destroyed unit\'s system.',
+    effect: { type: 'custom', handlerId: 'last_bastion_agent' },
+    canTargetOthers: true,
+  },
+  nip_and_tuck: {
+    id: 'nip_and_tuck',
+    name: 'Nip and Tuck',
+    factionId: 'last_bastion',
+    type: 'commander',
+    timing: 'passive',
+    description: 'Your action cards cannot be canceled by Sabotage action cards. The Nekro Virus cannot place assimilator tokens on your components.',
+    effect: { type: 'custom', handlerId: 'last_bastion_commander' },
+    // UNLOCK: Have 3 or more galvanized units
+    unlockCondition: { type: 'custom', checkerId: 'last_bastion_galvanized_units' },
+  },
+  lyra_keen: {
+    id: 'lyra_keen',
+    name: 'Lyra Keen',
+    factionId: 'last_bastion',
+    type: 'hero',
+    timing: 'after_combat',
+    description: 'When one of your galvanized units is destroyed: You may purge this card to roll 1 die for each opponent unit in its system; if the result is equal to or greater than the galvanized unit\'s combat value, destroy that unit.',
+    effect: { type: 'custom', handlerId: 'last_bastion_hero' },
+  },
+
+  // ============================================
+  // DEEPWROUGHT SCHOLARATE (Thunder's Edge)
+  // Agent: Dr. Carrina
+  // Commander: Aello
+  // Hero: Ta Zern
+  // ============================================
+  dr_carrina: {
+    id: 'dr_carrina',
+    name: 'Dr. Carrina',
+    factionId: 'deepwrought',
+    type: 'agent',
+    timing: 'when_researching',
+    description: 'When another player researches a technology: You may exhaust this card to allow them to ignore 1 prerequisite. If they do, place 1 infantry into coexistence on a non-home planet they control.',
+    effect: { type: 'custom', handlerId: 'deepwrought_agent' },
+    canTargetOthers: true,
+  },
+  aello: {
+    id: 'aello',
+    name: 'Aello',
+    factionId: 'deepwrought',
+    type: 'commander',
+    timing: 'when_researching',
+    description: 'When another player spends resources to research a technology: That player may reduce the cost by 1. If they do, gain 1 commodity or convert 1 of your commodities to a trade good.',
+    effect: { type: 'custom', handlerId: 'deepwrought_commander' },
+    // UNLOCK: Have an ocean card in play
+    unlockCondition: { type: 'custom', checkerId: 'deepwrought_ocean_card' },
+  },
+  ta_zern_hero: {
+    id: 'ta_zern_hero',
+    name: 'Ta Zern',
+    factionId: 'deepwrought',
+    type: 'hero',
+    timing: 'action',
+    description: 'ACTION: Purge this card and a non-unit upgrade technology you own. Each other player that owns a copy of that technology purges it. Then, each player that purged a technology researches 1 technology.',
+    effect: { type: 'custom', handlerId: 'deepwrought_hero' },
+    isComponentAction: true,
+  },
+
+  // ============================================
+  // RAL NEL CONSORTIUM (Thunder's Edge)
+  // Agent: Kan Kip Rel
+  // Commander: Watchful Ojz
+  // Hero: Director Nel
+  // ============================================
+  kan_kip_rel: {
+    id: 'kan_kip_rel',
+    name: 'Kan Kip Rel',
+    factionId: 'ral_nel',
+    type: 'agent',
+    timing: 'action',
+    description: 'ACTION: Exhaust this card to draw 2 action cards. Give 1 of those cards to another player.',
+    effect: { type: 'draw_action_cards', count: 2 },
+    canTargetOthers: true,
+    isComponentAction: true,
+  },
+  watchful_ojz: {
+    id: 'watchful_ojz',
+    name: 'Watchful Ojz',
+    factionId: 'ral_nel',
+    type: 'commander',
+    timing: 'passive',
+    description: 'When you declare a retreat: Immediately retreat up to 2 of your ships from the active system to an adjacent system that does not contain another player\'s ships. Place a command token from your reinforcements into that system.',
+    effect: { type: 'custom', handlerId: 'ral_nel_commander' },
+    // UNLOCK: Be last to pass during the Action Phase
+    unlockCondition: { type: 'custom', checkerId: 'ral_nel_last_to_pass' },
+  },
+  director_nel: {
+    id: 'director_nel',
+    name: 'Director Nel',
+    factionId: 'ral_nel',
+    type: 'hero',
+    timing: 'action',
+    description: 'After the last player passes: You may choose to no longer be passed. If you do, gain 2 command tokens, draw 1 action card, and purge this card.',
+    effect: { type: 'custom', handlerId: 'ral_nel_hero' },
+  },
+
+  // ============================================
+  // CRIMSON REBELLION (Thunder's Edge)
+  // Agent: Ahk Ravin
+  // Commander: Ahk Siever
+  // Hero: Homesick Phantom
+  // ============================================
+  ahk_ravin: {
+    id: 'ahk_ravin',
+    name: 'Ahk Ravin',
+    factionId: 'crimson_rebellion',
+    type: 'agent',
+    timing: 'action',
+    description: 'ACTION: Exhaust this card to choose 1 player. That player may swap the position of 2 of their ships in any systems.',
+    effect: { type: 'custom', handlerId: 'crimson_rebellion_agent' },
+    canTargetOthers: true,
+    isComponentAction: true,
+  },
+  ahk_siever: {
+    id: 'ahk_siever',
+    name: 'Ahk Siever',
+    factionId: 'crimson_rebellion',
+    type: 'commander',
+    timing: 'after_combat',
+    description: 'After any combat: Gain 1 commodity or convert 1 of your commodities to a trade good.',
+    effect: { type: 'gain_commodities', amount: 1 },
+    // UNLOCK: Place a breach token in a system that contains another player's unit
+    unlockCondition: { type: 'custom', checkerId: 'crimson_rebellion_breach_placed' },
+  },
+  homesick_phantom: {
+    id: 'homesick_phantom',
+    name: 'Homesick Phantom',
+    factionId: 'crimson_rebellion',
+    type: 'hero',
+    timing: 'when_producing',
+    description: 'When you produce ships: You may place any of those ships on this card instead of in a system. At the start of space combat, you may purge this card to place all ships from this card into the active system.',
+    effect: { type: 'custom', handlerId: 'crimson_rebellion_hero' },
+  },
+
+  // ============================================
+  // THE FIRMAMENT (Thunder's Edge)
+  // Agent: Myru Vos
+  // Commander: Captain Aroz
+  // Hero: Sharsiss
+  // ============================================
+  myru_vos: {
+    id: 'myru_vos',
+    name: 'Myru Vos',
+    factionId: 'firmament',
+    type: 'agent',
+    timing: 'when_moving',
+    description: 'When another player moves ships: You may exhaust this card to prevent SPACE CANNON use against those ships and allow them to move through systems containing your ships.',
+    effect: { type: 'custom', handlerId: 'firmament_agent' },
+    canTargetOthers: true,
+  },
+  captain_aroz: {
+    id: 'captain_aroz',
+    name: 'Captain Aroz',
+    factionId: 'firmament',
+    type: 'commander',
+    timing: 'passive',
+    description: 'Treat planets in systems that contain your ships as planets you control for the purposes of scoring secret objectives.',
+    effect: { type: 'custom', handlerId: 'firmament_commander' },
+    // UNLOCK: Have at least 1 plot card in play
+    unlockCondition: { type: 'custom', checkerId: 'firmament_plot_card' },
+  },
+  sharsiss: {
+    id: 'sharsiss',
+    name: 'Sharsiss',
+    factionId: 'firmament',
+    type: 'hero',
+    timing: 'action',
+    description: 'ACTION: Place your plot cards with any opponent\'s control token on them. You may rearrange control tokens between your plot cards. Then, purge this card.',
+    effect: { type: 'custom', handlerId: 'firmament_hero' },
+    isComponentAction: true,
+  },
+
+  // ============================================
+  // THE OBSIDIAN (Thunder's Edge - transformed Firmament)
+  // Agent: Vos Hollow
+  // Commander: Aroz Hollow
+  // Hero: Sharsiss Hollow
+  // ============================================
+  vos_hollow: {
+    id: 'vos_hollow',
+    name: 'Vos Hollow',
+    factionId: 'obsidian',
+    type: 'agent',
+    timing: 'after_combat',
+    description: 'When an opponent\'s ship is destroyed: You may exhaust this card to force that opponent to destroy 1 ship of the same type in the active system.',
+    effect: { type: 'custom', handlerId: 'obsidian_agent' },
+    canTargetOthers: false,
+  },
+  aroz_hollow: {
+    id: 'aroz_hollow',
+    name: 'Aroz Hollow',
+    factionId: 'obsidian',
+    type: 'commander',
+    timing: 'passive',
+    description: 'Apply +1 to the result of each of your combat rolls in The Fracture.',
+    effect: { type: 'combat_bonus', value: 1 },
+    // UNLOCK: Have units in The Fracture
+    unlockCondition: { type: 'custom', checkerId: 'obsidian_units_in_fracture' },
+  },
+  sharsiss_hollow: {
+    id: 'sharsiss_hollow',
+    name: 'Sharsiss Hollow',
+    factionId: 'obsidian',
+    type: 'hero',
+    timing: 'action',
+    description: 'ACTION: Ready all planets you control. Then, purge this card.',
+    effect: { type: 'custom', handlerId: 'obsidian_hero' },
+    isComponentAction: true,
+  },
 };
 
 /**

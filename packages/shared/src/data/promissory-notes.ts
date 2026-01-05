@@ -368,6 +368,94 @@ export const FACTION_PROMISSORY_NOTES: PromissoryNoteDefinition[] = [
     returnCondition: 'resolve',
     expansion: 'base',
   },
+
+  // =============================================================================
+  // THUNDER'S EDGE FACTION PROMISSORY NOTES (6 factions)
+  // =============================================================================
+
+  // Last Bastion - Raise the Standard
+  {
+    id: 'raise_the_standard',
+    name: 'Raise the Standard',
+    owner: 'last_bastion',
+    description:
+      'At the end of combat: Galvanize 1 participating unit. Then, return this card to the Last Bastion player.',
+    playTiming: 'start_of_combat',
+    staysInPlay: false,
+    immediatePlay: false,
+    returnCondition: 'resolve',
+    expansion: 'thunders_edge',
+  },
+
+  // Deepwrought Scholarate - Share Knowledge
+  {
+    id: 'share_knowledge',
+    name: 'Share Knowledge',
+    owner: 'deepwrought',
+    description:
+      'Place this card face-up in your play area. Gain 1 non-faction, non-unit upgrade technology that the Deepwrought player has. At the end of the status phase, return that technology card and this card to the Deepwrought player.',
+    playTiming: 'action',
+    staysInPlay: true,
+    immediatePlay: false,
+    returnCondition: 'custom',
+    expansion: 'thunders_edge',
+  },
+
+  // Ral Nel Consortium - Nano-Link Permit
+  {
+    id: 'nano_link_permit',
+    name: 'Nano-Link Permit',
+    owner: 'ral_nel',
+    description:
+      'After you activate a system: You may move your structures from adjacent systems that do not contain your command tokens onto planets you control in the active system. Then, return this card to the Ral Nel player.',
+    playTiming: 'after_activation',
+    staysInPlay: false,
+    immediatePlay: false,
+    returnCondition: 'resolve',
+    expansion: 'thunders_edge',
+  },
+
+  // Crimson Rebellion - Sever
+  {
+    id: 'sever',
+    name: 'Sever',
+    owner: 'crimson_rebellion',
+    description:
+      'Place this card face-up in your play area. Place the sever token in a system that contains your units; wormholes in that system cannot be used. At the end of the status phase, remove the sever token and return this card to the Crimson Rebellion player.',
+    playTiming: 'action',
+    staysInPlay: true,
+    immediatePlay: false,
+    returnCondition: 'custom',
+    expansion: 'thunders_edge',
+  },
+
+  // The Firmament - Black Ops
+  {
+    id: 'black_ops',
+    name: 'Black Ops',
+    owner: 'firmament',
+    description:
+      'Place a face-down plot card with your control token on it. Gain 2 command tokens and 2 trade goods. Then, return this card to the Firmament player.',
+    playTiming: 'action',
+    staysInPlay: false,
+    immediatePlay: false,
+    returnCondition: 'resolve',
+    expansion: 'thunders_edge',
+  },
+
+  // The Obsidian - Malevolency
+  {
+    id: 'malevolency',
+    name: 'Malevolency',
+    owner: 'obsidian',
+    description:
+      'You may spend influence to pass this card to one of your neighbors. At the end of the status phase, if you are not The Obsidian player, lose 1 command token from your fleet pool.',
+    playTiming: 'action',
+    staysInPlay: true,
+    immediatePlay: false,
+    returnCondition: 'custom',
+    expansion: 'thunders_edge',
+  },
 ];
 
 // =============================================================================

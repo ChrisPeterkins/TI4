@@ -218,6 +218,16 @@ const mentakPillage: AbilityHandler = (
     return { success: false, error: 'Target player not found' };
   }
 
+  // PROMISE OF PROTECTION CHECK
+  // "While this card is in your play area, the Mentak player cannot use their
+  // PILLAGE faction ability against you."
+  const hasPromiseOfProtection = targetPlayer.promissoryNotesInPlay.some(
+    note => note.noteId === 'promise_of_protection' && note.originalOwnerId === playerId
+  );
+  if (hasPromiseOfProtection) {
+    return { success: false, error: 'Target has Promise of Protection - cannot Pillage' };
+  }
+
   // Check target has trade goods to steal
   if (targetPlayer.tradeGoods < 1) {
     return { success: false, error: 'Target has no trade goods' };
@@ -696,11 +706,49 @@ const yinIndoctrination: AbilityHandler = (
   // Replace opponent infantry with Yin infantry
   opponentInfantry.ownerId = playerId;
 
+  // Check if opponent has Greyfire Mutagen in play
+  // "After the Yin player uses their INDOCTRINATION faction ability:
+  // Gain the infantry unit that was replaced."
+  const opponent = state.players.find(p => p.id === opponentId);
+  let greyfireMutagenTriggered = false;
+
+  if (opponent) {
+    const greyfireMutagenIndex = opponent.promissoryNotesInPlay.findIndex(
+      note => note.noteId === 'greyfire_mutagen'
+    );
+
+    if (greyfireMutagenIndex !== -1) {
+      // Give the opponent a new infantry unit on the combat planet
+      const planet = tile.planets.find(p => p.planetId === combat.planetId);
+      if (planet) {
+        planet.units.push({
+          id: `infantry-gm-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'infantry',
+          ownerId: opponentId,
+          damaged: false,
+        });
+        greyfireMutagenTriggered = true;
+
+        // Return Greyfire Mutagen to Yin player
+        opponent.promissoryNotesInPlay.splice(greyfireMutagenIndex, 1);
+        player.promissoryNotesInHand.push('greyfire_mutagen');
+      }
+    }
+  }
+
+  const triggeredEvents: string[] = ['indoctrination_triggered'];
+  if (greyfireMutagenTriggered) {
+    triggeredEvents.push('greyfire_mutagen_triggered');
+  }
+
   return {
     success: true,
     stateModified: true,
-    triggeredEvents: ['indoctrination_triggered'],
-    data: { convertedUnitId: opponentInfantry.id },
+    triggeredEvents,
+    data: {
+      convertedUnitId: opponentInfantry.id,
+      greyfireMutagenTriggered,
+    },
   };
 };
 

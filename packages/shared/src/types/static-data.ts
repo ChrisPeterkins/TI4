@@ -79,6 +79,7 @@ export type AbilityTrigger =
   | 'combat_round_end'
   | 'space_combat_round_end'
   | 'ground_combat_round_end'
+  | 'combat' // General combat trigger (for after-combat effects)
   | 'unit_destroyed'
   | 'ship_destroyed'
   | 'ground_unit_destroyed'
@@ -87,6 +88,7 @@ export type AbilityTrigger =
   | 'planet_control_gained'
   | 'movement_into_system'
   | 'system_activated'
+  | 'system_activated_by_other' // When another player activates a system with your units
   | 'agenda_revealed'
   | 'agenda_outcome'
   | 'agenda_outcome_resolved'
@@ -104,7 +106,12 @@ export type AbilityTrigger =
   | 'custodians_removed'
   | 'mecatol_control_gained'
   | 'token_gain'
-  | 'anti_fighter_barrage';
+  | 'anti_fighter_barrage'
+  // Thunder's Edge triggers
+  | 'commit_ground_forces' // When committing ground forces to a planet
+  | 'coexistence_start' // When units begin coexisting on a planet
+  | 'secret_objective_scored' // When a secret objective is scored
+  | 'faction_transform'; // When a faction transforms (Firmament -> Obsidian)
 
 // What kind of effect the ability has
 export type AbilityEffectType =
@@ -138,7 +145,17 @@ export type AbilityEffectType =
   | 'draw_cards'
   | 'resource_conversion'
   | 'token_placement'
-  | 'voting_modifier';
+  | 'voting_modifier'
+  // Thunder's Edge effect types
+  | 'planet_ready' // Ready a planet
+  | 'coexistence' // Enable coexistence with another player's units
+  | 'card_gain' // Gain a specific card (ocean cards, plot cards)
+  | 'ship_movement' // Move ships (relocate, retreat advance)
+  | 'transport_modifier' // Modify transport rules
+  | 'movement_restriction' // Restrict movement
+  | 'setup_modifier' // Modify game setup
+  | 'faction_transform' // Transform into another faction
+  | 'setup_restriction'; // Restrict setup options
 
 // Requirements to activate an ability
 export interface AbilityRequirement {
@@ -368,6 +385,54 @@ export interface AttachmentData {
   abilities?: string[];
 }
 
+// =============================================================================
+// THUNDER'S EDGE TYPES
+// =============================================================================
+
+// Breakthrough Data (Thunder's Edge)
+export type BreakthroughSynergy = {
+  color1: TechColor;
+  color2: TechColor;
+};
+
+export interface BreakthroughData {
+  id: string;
+  factionId: string;
+  name: string;
+  description: string;
+  synergy: BreakthroughSynergy;
+  isExhaustable: boolean;
+  expansion: Expansion;
+}
+
+// Galactic Event Data (Codex IV + Thunder's Edge)
+export type GalacticEventComplexity = 1 | 2 | 3;
+
+export interface GalacticEventData {
+  id: string;
+  name: string;
+  complexity: GalacticEventComplexity;
+  description: string;
+  setupInstructions?: string;
+  ruleModifications: string[];
+  expansion: 'codex4' | 'thunders_edge';
+}
+
+// Plot Card Data (Firmament faction)
+export interface PlotCardData {
+  id: string;
+  name: string;
+  description: string;
+  timing: string;
+}
+
+// Ocean Card Data (Deepwrought faction)
+export interface OceanCardData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 // Complete Game Data Container
 export interface GameDataContainer {
   factions: Record<string, FactionData>;
@@ -383,4 +448,7 @@ export interface GameDataContainer {
   relics: Record<string, RelicData>;
   attachments: Record<string, AttachmentData>;
   units: Record<UnitType, UnitData>;
+  // Thunder's Edge
+  breakthroughs?: Record<string, BreakthroughData>;
+  galacticEvents?: Record<string, GalacticEventData>;
 }
