@@ -436,9 +436,19 @@ function advanceVoting(state: GameState): void {
   // Get players who played riders - they cannot vote
   const riderPlayerIds = state.agendaPhase.riders.map(r => r.playerId);
 
-  // Check if all players have voted
-  if (state.agendaPhase.votingComplete.length >= state.agendaPhase.votingOrder.length) {
-    // All votes in - tally and determine outcome
+  // Get Nekro player ID - Nekro cannot vote (GALACTIC THREAT ability)
+  const nekroPlayer = state.players.find(p => p.faction === 'nekro');
+  const nekroPlayerId = nekroPlayer?.id;
+
+  // Check if all players have voted (excluding those who can't vote)
+  const cannotVoteIds = new Set([...riderPlayerIds]);
+  if (nekroPlayerId) cannotVoteIds.add(nekroPlayerId);
+
+  const eligibleVoters = state.agendaPhase.votingOrder.filter(id => !cannotVoteIds.has(id));
+  const votedCount = state.agendaPhase.votingComplete.filter(id => eligibleVoters.includes(id)).length;
+
+  if (votedCount >= eligibleVoters.length) {
+    // All eligible voters have voted - tally and determine outcome
     tallyAndResolve(state);
     return;
   }
@@ -446,13 +456,13 @@ function advanceVoting(state: GameState): void {
   // Move to next voter
   state.agendaPhase.currentVoterIndex++;
 
-  // Find next player who hasn't voted and hasn't played a rider
+  // Find next player who hasn't voted, hasn't played a rider, and is not Nekro
   while (state.agendaPhase.currentVoterIndex < state.agendaPhase.votingOrder.length) {
     const nextVoter = state.agendaPhase.votingOrder[state.agendaPhase.currentVoterIndex];
-    if (
-      !state.agendaPhase.votingComplete.includes(nextVoter) &&
-      !riderPlayerIds.includes(nextVoter)
-    ) {
+    const canVote = !state.agendaPhase.votingComplete.includes(nextVoter) &&
+                    !riderPlayerIds.includes(nextVoter) &&
+                    nextVoter !== nekroPlayerId;
+    if (canVote) {
       state.activePlayerId = nextVoter;
       return;
     }

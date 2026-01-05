@@ -10,7 +10,8 @@ import type {
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { findTileAtPosition } from '../utils/hex.js';
-import { isShipType, getUnitStats } from '../utils/units.js';
+import { isShipType, isGroundUnit, getUnitStats } from '../utils/units.js';
+import { logAbilityTriggered } from '../utils/game-log.js';
 import {
   rollDiceForPlayer,
   rollAFBDice,
@@ -367,6 +368,17 @@ export function handleAssignHits(
       return executeRetreat(state);
     }
 
+    // L1Z1X HARROW: At the end of each round of ground combat, ships may use Bombardment
+    // Only triggers when L1Z1X is the attacker (active player)
+    if (combat.type === 'ground') {
+      const harrowResult = checkAndApplyHarrow(state, combat, triggeredEvents);
+      if (harrowResult && harrowResult.harrowHits > 0) {
+        // Harrow hits need to be assigned to defender ground forces
+        // This is handled as automatic hits against the defender
+        triggeredEvents.push('harrow_triggered');
+      }
+    }
+
     // Continue to next round
     combat.roundNumber++;
     combat.state = 'announce_retreat';
@@ -380,6 +392,116 @@ export function handleAssignHits(
     triggeredEvents,
     data: repairedUnitId ? { repairedUnitId } : undefined,
   };
+}
+
+/**
+ * Check and apply L1Z1X Harrow ability
+ * At the end of each round of ground combat, L1Z1X ships may use Bombardment
+ * against opponent's ground forces on the planet.
+ *
+ * IMPORTANT: Only the ACTIVE player (attacker) can use Harrow
+ */
+function checkAndApplyHarrow(
+  state: GameState,
+  combat: CombatInstance,
+  triggeredEvents: string[]
+): { harrowHits: number } | null {
+  const attacker = state.players.find(p => p.id === combat.attackerId);
+  if (!attacker || attacker.faction !== 'l1z1x') {
+    return null;
+  }
+
+  const tile = state.map.tiles.find(t => t.id === combat.systemId);
+  if (!tile) return null;
+
+  const planet = tile.planets.find(p => p.planetId === combat.planetId);
+  if (!planet) return null;
+
+  // Check if defender has Planetary Shield (blocks bombardment unless 2RAM unlocked)
+  const defender = state.players.find(p => p.id === combat.defenderId);
+  const hasL1z1xCommander = attacker.leaders?.commander?.unlocked ?? false;
+
+  // 2RAM Commander: "Units that have Planetary Shield do not prevent you from using Bombardment"
+  if (!hasL1z1xCommander) {
+    const hasShield = planet.units.some(u =>
+      u.ownerId === combat.defenderId && (u.type === 'pds' || u.type === 'mech')
+    );
+    // Check for Magen Defense Grid on defender's PDS
+    const defenderHasMagen = defender?.technologies?.includes('magen_defense_grid');
+    if (hasShield || defenderHasMagen) {
+      // Planetary Shield blocks Harrow bombardment
+      return null;
+    }
+  }
+
+  // Get all ships with Bombardment in the system
+  const bombardmentUnits = tile.units.filter(u => {
+    if (u.ownerId !== combat.attackerId) return false;
+    const stats = getUnitStats(u.type, attacker);
+    return stats.bombardment !== undefined;
+  });
+
+  if (bombardmentUnits.length === 0) return null;
+
+  // Roll bombardment dice for each unit
+  let totalHits = 0;
+  const rolls: DiceRoll[] = [];
+
+  for (const unit of bombardmentUnits) {
+    const stats = getUnitStats(unit.type, attacker);
+    if (!stats.bombardment) continue;
+
+    const diceCount = stats.bombardment.count || 1;
+    const hitValue = stats.bombardment.value;
+
+    for (let i = 0; i < diceCount; i++) {
+      const roll = Math.floor(Math.random() * 10) + 1;
+      const isHit = roll >= hitValue;
+      rolls.push({
+        roll,
+        combatValue: hitValue,
+        hit: isHit,
+        unitId: unit.id,
+        unitType: unit.type,
+        modifiers: [],
+      });
+      if (isHit) totalHits++;
+    }
+  }
+
+  if (totalHits > 0) {
+    // Apply hits to defender's ground forces
+    const defenderGroundForces = planet.units
+      .filter(u => u.ownerId === combat.defenderId && isGroundUnit(u.type))
+      .sort((a, b) => {
+        // Priority: infantry first, then mechs
+        if (a.type === 'infantry' && b.type !== 'infantry') return -1;
+        if (b.type === 'infantry' && a.type !== 'infantry') return 1;
+        return 0;
+      });
+
+    let hitsAssigned = 0;
+    for (const unit of defenderGroundForces) {
+      if (hitsAssigned >= totalHits) break;
+
+      // Mechs can sustain damage
+      if (unit.type === 'mech' && !unit.damaged && canUnitSustainDamage(unit, defender!)) {
+        damageUnit(state, unit.id);
+        hitsAssigned++;
+      } else {
+        removeUnit(state, unit.id);
+        // Remove from combat defender units
+        const idx = combat.defenderUnits.indexOf(unit.id);
+        if (idx !== -1) combat.defenderUnits.splice(idx, 1);
+        hitsAssigned++;
+      }
+    }
+
+    // Log the harrow
+    logAbilityTriggered(state, combat.attackerId, 'Harrow');
+  }
+
+  return { harrowHits: totalHits };
 }
 
 /**

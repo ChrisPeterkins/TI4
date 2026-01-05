@@ -385,29 +385,42 @@ describe('Transaction Handlers', () => {
       expect(state.players[1].actionCards).toContain('action_1');
     });
 
-    it('should reject action card trade from non-Hacan player', () => {
+    it('should reject action card trade when neither party is Hacan', () => {
       const state = createMockGameState();
-      // Player is Sol, not Hacan - cannot trade action cards
-      state.pendingTransaction = {
-        id: 'tx-1',
-        initiatorId: 'player1',
-        targetId: 'player2',
-        initiatorOffer: { actionCards: ['action_1'] },
-        requestedOffer: {},
-        createdAt: Date.now(),
-      };
-
-      const action: AcceptTransactionAction = {
-        type: 'accept_transaction',
-        playerId: 'player2',
-        transactionId: 'tx-1',
+      // Neither player is Hacan - action card trading should be rejected at proposal time
+      const proposeAction: ProposeTransactionAction = {
+        type: 'propose_transaction',
+        playerId: 'player1',
+        targetPlayerId: 'player2',
+        offering: { actionCards: ['action_1'] },
+        requesting: {},
         timestamp: Date.now(),
       };
 
-      const result = handleAcceptTransaction(state, action);
+      const result = handleProposeTransaction(state, proposeAction);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Only the Emirates of Hacan can trade action cards');
+      expect(result.error).toContain('Hacan');
+    });
+
+    it('should allow non-Hacan player to trade action cards when Hacan is the other party', () => {
+      const state = createMockGameState();
+      // Player2 is now Hacan
+      state.players[1].faction = 'hacan';
+
+      // Player1 (Sol) can trade action cards WHEN transacting with Hacan
+      const proposeAction: ProposeTransactionAction = {
+        type: 'propose_transaction',
+        playerId: 'player1',
+        targetPlayerId: 'player2',
+        offering: { actionCards: ['action_1'] },
+        requesting: {},
+        timestamp: Date.now(),
+      };
+
+      const result = handleProposeTransaction(state, proposeAction);
+
+      expect(result.success).toBe(true);
     });
 
     it('should mark players as having transacted', () => {

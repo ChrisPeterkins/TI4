@@ -752,13 +752,40 @@ function handleStallTactics(
   state.actionCardDiscard.push(cardToDiscard);
 
   logComponentAction(state, playerId, 'Stall Tactics', 'Discarded 1 action card');
+
+  // Blackshade Infiltrator mech DEPLOY trigger:
+  // "After you use your Stall Tactics faction ability, you may place 1 mech on a planet you control."
+  // This is tracked via the triggered event so the UI can prompt for mech deployment
+  const canDeployMech = canDeployBlackshadeInfiltrator(state, playerId);
+
   advanceAfterComponentAction(state);
 
   return {
     success: true,
-    triggeredEvents: ['component_action_used', 'action_card_discarded'],
-    data: { abilityId: 'stall_tactics', cardId: cardToDiscard },
+    triggeredEvents: canDeployMech
+      ? ['component_action_used', 'action_card_discarded', 'blackshade_infiltrator_deploy_available']
+      : ['component_action_used', 'action_card_discarded'],
+    data: { abilityId: 'stall_tactics', cardId: cardToDiscard, canDeployMech },
   };
+}
+
+/**
+ * Check if Yssaril can deploy Blackshade Infiltrator mech
+ * Requires: player controls at least one planet and has mechs in reinforcements
+ */
+function canDeployBlackshadeInfiltrator(state: GameState, playerId: string): boolean {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.faction !== 'yssaril') return false;
+
+  // Check if player controls any planets
+  if (!player.planets || player.planets.length === 0) return false;
+
+  // Check if player has mechs available in reinforcements (max 4)
+  const mechCount = state.map.tiles.reduce((count, tile) => {
+    return count + tile.units.filter((u) => u.ownerId === playerId && u.type === 'mech').length;
+  }, 0);
+
+  return mechCount < 4;
 }
 
 /**

@@ -90,6 +90,14 @@ export function validateCastVote(
     return { valid: false, error: 'Already voted on this agenda' };
   }
 
+  // Nekro GALACTIC THREAT: You cannot vote on agendas
+  if (player.faction === 'nekro') {
+    return {
+      valid: false,
+      error: 'Nekro Virus cannot vote on agendas (Galactic Threat ability)',
+    };
+  }
+
   // Check for Political Secret - original owner cannot vote when their Political Secret is in play
   for (const otherPlayer of state.players) {
     if (otherPlayer.id === player.id) continue;

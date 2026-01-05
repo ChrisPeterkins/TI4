@@ -37,6 +37,7 @@ import {
 } from '../utils/combat.js';
 import { systems } from '@ti4/game-data';
 import { handleExplore } from './exploration.js';
+import { logAbilityTriggered } from '../utils/game-log.js';
 
 /**
  * Initialize invasion phase
@@ -998,11 +999,40 @@ export function establishControl(
   newControllerId: string
 ): HandlerResult {
   const previousController = planet.controlledBy;
+  const newPlayer = state.players.find(p => p.id === newControllerId);
 
-  // If control is changing, destroy structures
+  // If control is changing, handle structures
   if (previousController && previousController !== newControllerId) {
+    // Count enemy structures before removing them (for L1Z1X Assimilate)
+    const enemyPds = planet.units.filter(u => u.type === 'pds' && u.ownerId === previousController);
+    const enemySpaceDocks = planet.units.filter(u => u.type === 'space_dock' && u.ownerId === previousController);
+
     // Remove structures (PDS, Space Dock)
     planet.units = planet.units.filter(u => !isStructure(u.type));
+
+    // L1Z1X ASSIMILATE: "When you gain control of a planet, replace each PDS and
+    // space dock that is on that planet with a matching unit from your reinforcements."
+    if (newPlayer?.faction === 'l1z1x') {
+      // Replace enemy PDS with L1Z1X PDS
+      for (let i = 0; i < enemyPds.length; i++) {
+        const newPds = createUnitInstance('pds', newControllerId);
+        newPds.planetId = planet.planetId;
+        planet.units.push(newPds);
+      }
+
+      // Replace enemy Space Docks with L1Z1X Space Docks
+      for (let i = 0; i < enemySpaceDocks.length; i++) {
+        const newSpaceDock = createUnitInstance('space_dock', newControllerId);
+        newSpaceDock.planetId = planet.planetId;
+        planet.units.push(newSpaceDock);
+      }
+
+      // Log if structures were assimilated
+      const totalAssimilated = enemyPds.length + enemySpaceDocks.length;
+      if (totalAssimilated > 0) {
+        logAbilityTriggered(state, newControllerId, 'Assimilate');
+      }
+    }
 
     // Remove planet from previous controller's list
     const prevPlayer = state.players.find(p => p.id === previousController);
@@ -1015,7 +1045,6 @@ export function establishControl(
   planet.controlledBy = newControllerId;
 
   // Add planet to new controller's list if not already there
-  const newPlayer = state.players.find(p => p.id === newControllerId);
   if (newPlayer) {
     const alreadyOwns = newPlayer.planets.some(p => p.planetId === planet.planetId);
     if (!alreadyOwns) {

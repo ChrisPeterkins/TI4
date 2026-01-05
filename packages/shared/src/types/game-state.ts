@@ -691,6 +691,12 @@ export interface AgendaPhaseTracking {
   confusingLegalText?: boolean;
   /** Sanctions forces TG payment to vote */
   sanctionsActive?: UUID;
+  /** Nekro GALACTIC THREAT prediction - once per agenda phase */
+  nekroPrediction?: {
+    playerId: UUID;
+    prediction: string;
+    hasPredicted: boolean;
+  };
 }
 
 export interface AgendaVoteRecord {

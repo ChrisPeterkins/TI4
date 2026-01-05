@@ -80,6 +80,12 @@ export function handleProposeTransaction(
     return { success: false, error: `Invalid request: ${targetOfferValid.error}` };
   }
 
+  // Validate action card trading (requires Hacan Arbiters ability)
+  const actionCardValidation = validateActionCardTrading(initiator, target, action.offering, action.requesting);
+  if (!actionCardValidation.valid) {
+    return { success: false, error: actionCardValidation.error! };
+  }
+
   // Create pending transaction
   state.pendingTransaction = {
     id: uuidv4(),
@@ -240,18 +246,51 @@ function validateOffer(
     }
   }
 
-  // Validate action cards (only Hacan can trade via Arbiters ability)
+  // Validate action cards
+  // NOTE: Action card trading validation requires transaction context
+  // This is handled separately in validateOfferWithContext()
   if (offer.actionCards && offer.actionCards.length > 0) {
-    // Only Hacan can trade action cards (Arbiters faction ability)
-    if (player.faction !== 'hacan') {
-      return { valid: false, error: 'Only the Emirates of Hacan can trade action cards' };
-    }
-
     for (const cardId of offer.actionCards) {
       if (!player.actionCards.includes(cardId)) {
         return { valid: false, error: 'Action card not in hand' };
       }
     }
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate action card trading between two players
+ *
+ * Hacan ARBITERS ability: "When you are negotiating a transaction,
+ * action cards can be exchanged as part of that transaction."
+ *
+ * This means BOTH players can trade action cards when Hacan is
+ * one of the parties in the transaction.
+ */
+function validateActionCardTrading(
+  player1: PlayerState,
+  player2: PlayerState,
+  offer1: PendingTransaction['initiatorOffer'],
+  offer2: PendingTransaction['initiatorOffer']
+): { valid: boolean; error?: string } {
+  const player1TradingCards = offer1.actionCards && offer1.actionCards.length > 0;
+  const player2TradingCards = offer2.actionCards && offer2.actionCards.length > 0;
+
+  // If no action cards are being traded, it's valid
+  if (!player1TradingCards && !player2TradingCards) {
+    return { valid: true };
+  }
+
+  // Action cards can only be traded if Hacan is involved (Arbiters ability)
+  const hacanInvolved = player1.faction === 'hacan' || player2.faction === 'hacan';
+
+  if (!hacanInvolved) {
+    return {
+      valid: false,
+      error: 'Action cards can only be traded when the Emirates of Hacan is involved (Arbiters ability)',
+    };
   }
 
   return { valid: true };
