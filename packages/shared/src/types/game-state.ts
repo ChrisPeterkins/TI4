@@ -260,6 +260,30 @@ export interface GameState {
   tacticalModifiers?: {
     [playerId: string]: TacticalModifiers;
   };
+  /** Ion Storm token - creates a wormhole that flips when ships pass through */
+  ionStormToken?: IonStormToken | null;
+  /** Pending card discards required by abilities (e.g., Yssaril Scheming) */
+  pendingDiscards?: PendingDiscard[];
+  /** Pending emergency agenda phase triggered by Emergency Meeting action card */
+  pendingEmergencyAgenda?: UUID;
+}
+
+/** Pending discard requirement (e.g., from Yssaril Scheming) */
+export interface PendingDiscard {
+  /** Player who must discard */
+  playerId: UUID;
+  /** Reason for the discard */
+  reason: 'scheming' | 'hand_limit' | 'ability';
+  /** Number of cards that must be discarded */
+  count: number;
+}
+
+/** Ion Storm token state - creates alpha or beta wormhole that flips on ship passage */
+export interface IonStormToken {
+  /** The system where the token is placed */
+  systemId: string;
+  /** Which wormhole type the token currently shows */
+  side: 'alpha' | 'beta';
 }
 
 /** Temporary tactical modifiers from action cards and relics */
@@ -378,6 +402,25 @@ export interface PlayerState {
   usedFactionAbility?: Record<string, boolean>;
   /** Command tokens collected from other players (Mahact - playerId -> count) */
   collectedCommandTokens?: Record<string, number>;
+  /** Units available in reinforcement pool (not yet on the map) */
+  reinforcements?: ReinforcementPool;
+  /** Naalu's 0 initiative token - always acts first in action phase */
+  hasZeroToken?: boolean;
+}
+
+/** Track available reinforcements per unit type */
+export interface ReinforcementPool {
+  infantry: number;
+  fighter: number;
+  carrier: number;
+  cruiser: number;
+  destroyer: number;
+  dreadnought: number;
+  war_sun: number;
+  flagship: number;
+  pds: number;
+  space_dock: number;
+  mech: number;
 }
 
 export interface CapturedUnit {
@@ -419,6 +462,8 @@ export interface MapTile {
   units: UnitInstance[];
   commandTokens: UUID[];
   frontier?: boolean;
+  /** For hyperlane tiles: which side is face-up ('A' or 'B'). Defaults to 'A'. */
+  hyperlaneSide?: 'A' | 'B';
 }
 
 export interface PlanetInstance {
@@ -542,6 +587,10 @@ export interface CombatModifiers {
   fighterBonus?: number;
   /** Cannot make combat rolls this round (Magen Defense Grid) */
   blockedFromCombat?: boolean;
+  /** Cannot retreat this combat (Waylay) */
+  cannotRetreat?: boolean;
+  /** Unit ID targeted for boarding party cargo steal */
+  boardingPartyTarget?: string;
 }
 
 // Timing Windows for Action Cards

@@ -17,6 +17,7 @@ import {
 import { systems } from '@ti4/game-data';
 import { getStatusPhaseTokenGain } from '../abilities/fleet-modifiers.js';
 import { checkAllHeroUnlocks } from './leaders.js';
+import { checkAbilityTriggers } from '../abilities/ability-triggers.js';
 
 // =============================================================================
 // STATUS PHASE STEP DEFINITIONS
@@ -371,6 +372,7 @@ export function revealPublicObjective(state: GameState): string | null {
  * Draw action cards for all players
  * Base: 1 action card per player
  * Neural Motivator: Draw 1 additional action card (2 total)
+ * Yssaril Scheming: Draw 1 additional card, then discard 1 (handled via trigger)
  */
 export function drawActionCards(state: GameState): void {
   const BASE_CARDS_TO_DRAW = 1;
@@ -381,7 +383,16 @@ export function drawActionCards(state: GameState): void {
 
     // Neural Motivator: Draw 1 additional action card (2 total)
     const hasNeuralMotivator = player.technologies?.includes('neural_motivator') ?? false;
-    const cardsToDraw = hasNeuralMotivator ? 2 : BASE_CARDS_TO_DRAW;
+    let cardsToDraw = hasNeuralMotivator ? 2 : BASE_CARDS_TO_DRAW;
+
+    // Yssaril Scheming: Draw 1 additional card (then must discard 1)
+    // Check if player is Yssaril (Scheming is a faction ability, always active)
+    const hasScheming = player.faction === 'yssaril';
+    if (hasScheming) {
+      cardsToDraw += 1;
+    }
+
+    const drawnCards: string[] = [];
 
     for (let i = 0; i < cardsToDraw; i++) {
       // Reshuffle discard if deck is empty
@@ -394,7 +405,30 @@ export function drawActionCards(state: GameState): void {
       if (state.actionCardDeck.length > 0) {
         const drawnCard = state.actionCardDeck.shift()!;
         player.actionCards.push(drawnCard);
+        drawnCards.push(drawnCard);
       }
+    }
+
+    // Fire action_cards_drawn trigger (for Yssaril Scheming and other abilities)
+    if (drawnCards.length > 0) {
+      checkAbilityTriggers(state, 'action_cards_drawn', {
+        playerId,
+        count: drawnCards.length,
+        cardIds: drawnCards,
+      });
+    }
+
+    // Yssaril Scheming: Must discard 1 card after drawing
+    // Set up pending discard requirement (handled in separate action)
+    if (hasScheming && drawnCards.length > 0) {
+      if (!state.pendingDiscards) {
+        state.pendingDiscards = [];
+      }
+      state.pendingDiscards.push({
+        playerId,
+        reason: 'scheming',
+        count: 1,
+      });
     }
   }
 }

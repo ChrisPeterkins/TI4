@@ -2,33 +2,61 @@
  * Legendary Planet Handlers
  *
  * Handles legendary planet ability usage for Prophecy of Kings expansion.
- * Legendary planets have special abilities that can be exhausted.
+ * Legendary planets have special abilities that can be exhausted at END of turn.
+ *
+ * Official abilities:
+ * - Primor (The Atrament): Place up to 2 infantry on any planet you control
+ * - Hope's End (Imperial Arms Vault): Place 1 mech on any planet OR draw 1 action card
+ * - Mallice (Exterrix Headquarters): Gain 2 TG OR convert all commodities to TG
+ * - Mirage (Flight Academy): Place up to 2 fighters in any system with your ships
  */
 
 import type {
   GameState,
   UseLegendaryAbilityAction,
+  PlayerState,
+  UnitType,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { addLogEntry } from '../utils/game-log.js';
-import { systems } from '@ti4/game-data';
 
-// Map of legendary planet IDs to their ability types
+// Legendary planet ability types
+type LegendaryAbilityType =
+  | 'place_infantry'      // Primor
+  | 'place_mech_or_draw'  // Hope's End
+  | 'gain_tg_or_convert'  // Mallice
+  | 'place_fighters';     // Mirage
+
+// Map of legendary planet IDs to their ability data
 const LEGENDARY_PLANETS: Record<string, {
   name: string;
-  abilityType: 'purge_attachments' | 'action_card_cycle' | 'limited_production';
+  abilityName: string;
+  abilityType: LegendaryAbilityType;
+  description: string;
 }> = {
   primor: {
     name: 'Primor',
-    abilityType: 'purge_attachments',
+    abilityName: 'The Atrament',
+    abilityType: 'place_infantry',
+    description: 'Place up to 2 infantry from your reinforcements on any planet you control.',
   },
   hopes_end: {
     name: "Hope's End",
-    abilityType: 'action_card_cycle',
+    abilityName: 'Imperial Arms Vault',
+    abilityType: 'place_mech_or_draw',
+    description: 'Place 1 mech from your reinforcements on any planet you control, or draw 1 action card.',
   },
   mallice: {
     name: 'Mallice',
-    abilityType: 'limited_production',
+    abilityName: 'Exterrix Headquarters',
+    abilityType: 'gain_tg_or_convert',
+    description: 'Gain 2 trade goods or convert all of your commodities into trade goods.',
+  },
+  mirage: {
+    name: 'Mirage',
+    abilityName: 'Flight Academy',
+    abilityType: 'place_fighters',
+    description: 'Place up to 2 fighters from your reinforcements in any system that contains 1 or more of your ships.',
   },
 };
 
@@ -44,6 +72,13 @@ export function isLegendaryPlanet(planetId: string): boolean {
  */
 export function getLegendaryPlanet(planetId: string): typeof LEGENDARY_PLANETS[string] | null {
   return LEGENDARY_PLANETS[planetId] || null;
+}
+
+/**
+ * Get all legendary planet definitions (for UI)
+ */
+export function getAllLegendaryPlanets(): typeof LEGENDARY_PLANETS {
+  return LEGENDARY_PLANETS;
 }
 
 /**
@@ -81,14 +116,17 @@ export function handleUseLegendaryAbility(
   let effectResult: HandlerResult;
 
   switch (legendaryData.abilityType) {
-    case 'purge_attachments':
+    case 'place_infantry':
       effectResult = executePrimorAbility(state, player, targets);
       break;
-    case 'action_card_cycle':
+    case 'place_mech_or_draw':
       effectResult = executeHopesEndAbility(state, player, targets);
       break;
-    case 'limited_production':
-      effectResult = executeMalliceAbility(state, player, planetId, targets);
+    case 'gain_tg_or_convert':
+      effectResult = executeMalliceAbility(state, player, targets);
+      break;
+    case 'place_fighters':
+      effectResult = executeMirageAbility(state, player, targets);
       break;
     default:
       return { success: false, error: 'Unknown legendary ability type' };
@@ -104,16 +142,19 @@ export function handleUseLegendaryAbility(
   addLogEntry(
     state,
     'ability_triggered',
-    `${player.name} used ${legendaryData.name}'s legendary ability`,
+    `${player.name} used ${legendaryData.abilityName} (${legendaryData.name})`,
     {
       playerId,
       details: {
         planetId,
         planetName: legendaryData.name,
+        abilityName: legendaryData.abilityName,
         effect: effectResult.data,
       },
     }
   );
+
+  state.version++;
 
   return {
     success: true,
@@ -121,174 +162,252 @@ export function handleUseLegendaryAbility(
     data: {
       planetId,
       planetName: legendaryData.name,
+      abilityName: legendaryData.abilityName,
       effect: effectResult.data,
     },
   };
 }
 
 /**
- * Primor: Purge up to 2 attachments from planets you control
+ * Primor - The Atrament: Place up to 2 infantry on any planet you control
  */
 function executePrimorAbility(
   state: GameState,
-  player: { id: string; name: string; planets: { planetId: string; attachments: string[] }[] },
+  player: PlayerState,
   targets?: UseLegendaryAbilityAction['targets']
 ): HandlerResult {
-  if (!targets?.attachmentIds || targets.attachmentIds.length === 0) {
-    return { success: false, error: 'Must specify attachments to purge' };
+  if (!targets?.targetPlanetId) {
+    return { success: false, error: 'Must specify a target planet' };
   }
 
-  if (targets.attachmentIds.length > 2) {
-    return { success: false, error: 'Can only purge up to 2 attachments' };
+  const count = targets.count ?? 2; // Default to 2 infantry
+  if (count < 1 || count > 2) {
+    return { success: false, error: 'Can place 1 or 2 infantry' };
   }
 
-  const purgedAttachments: string[] = [];
+  // Check player controls target planet
+  if (!player.planets.some(p => p.planetId === targets.targetPlanetId)) {
+    return { success: false, error: 'You do not control the target planet' };
+  }
 
-  for (const attachmentId of targets.attachmentIds) {
-    // Find which planet has this attachment
-    let found = false;
-    for (const controlledPlanet of player.planets) {
-      // Find the planet in the map
-      for (const tile of state.map.tiles) {
-        const planet = tile.planets.find((p) => p.planetId === controlledPlanet.planetId);
-        if (planet && planet.attachments.includes(attachmentId)) {
-          // Remove the attachment
-          planet.attachments = planet.attachments.filter((a) => a !== attachmentId);
-          controlledPlanet.attachments = controlledPlanet.attachments.filter((a) => a !== attachmentId);
-          purgedAttachments.push(attachmentId);
-          found = true;
-          break;
-        }
-      }
-      if (found) break;
-    }
-
-    if (!found) {
-      return { success: false, error: `Attachment ${attachmentId} not found on your planets` };
+  // Find the planet in the map
+  let targetPlanet = null;
+  for (const tile of state.map.tiles) {
+    const planet = tile.planets.find(p => p.planetId === targets.targetPlanetId);
+    if (planet) {
+      targetPlanet = planet;
+      break;
     }
   }
 
-  return {
-    success: true,
-    data: { purgedAttachments },
-  };
-}
-
-/**
- * Hope's End: Draw 3 action cards, then put 3 on bottom of deck
- */
-function executeHopesEndAbility(
-  state: GameState,
-  player: { id: string; name: string },
-  targets?: UseLegendaryAbilityAction['targets']
-): HandlerResult {
-  const fullPlayer = state.players.find((p) => p.id === player.id);
-  if (!fullPlayer) {
-    return { success: false, error: 'Player not found' };
+  if (!targetPlanet) {
+    return { success: false, error: 'Target planet not found' };
   }
 
-  // Draw 3 action cards
-  const drawnCards: string[] = [];
-  for (let i = 0; i < 3; i++) {
-    if (state.actionCardDeck.length > 0) {
-      const card = state.actionCardDeck.shift()!;
-      fullPlayer.actionCards.push(card);
-      drawnCards.push(card);
-    }
+  // Place infantry
+  for (let i = 0; i < count; i++) {
+    const unitId = `infantry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    targetPlanet.units.push({
+      id: unitId,
+      type: 'infantry',
+      ownerId: player.id,
+      damaged: false,
+    });
   }
 
-  // Check if we need to return cards (targets provided)
-  if (targets?.actionCardIds && targets.actionCardIds.length === 3) {
-    // Verify player has these cards
-    for (const cardId of targets.actionCardIds) {
-      if (!fullPlayer.actionCards.includes(cardId)) {
-        return { success: false, error: `You do not have action card: ${cardId}` };
-      }
-    }
-
-    // Remove from hand and place on bottom of deck
-    for (const cardId of targets.actionCardIds) {
-      fullPlayer.actionCards = fullPlayer.actionCards.filter((c) => c !== cardId);
-      state.actionCardDeck.push(cardId);
-    }
-
-    return {
-      success: true,
-      data: { drawnCards: drawnCards.length, returnedCards: 3 },
-    };
-  }
-
-  // If no targets provided, ability is in progress (waiting for card selection)
   return {
     success: true,
     data: {
-      drawnCards: drawnCards.length,
-      awaitingCardSelection: true,
-      message: 'Select 3 action cards to place on bottom of deck',
+      unitsPlaced: count,
+      unitType: 'infantry',
+      targetPlanet: targets.targetPlanetId,
     },
   };
 }
 
 /**
- * Mallice: Produce up to 2 units in this system
+ * Hope's End - Imperial Arms Vault: Place 1 mech OR draw 1 action card
+ */
+function executeHopesEndAbility(
+  state: GameState,
+  player: PlayerState,
+  targets?: UseLegendaryAbilityAction['targets']
+): HandlerResult {
+  const choice = targets?.choice;
+
+  if (choice === 'draw_card' || choice === 'action_card') {
+    // Draw 1 action card
+    if (state.actionCardDeck.length === 0) {
+      // Reshuffle discard if needed
+      if (state.actionCardDiscard.length > 0) {
+        state.actionCardDeck = [...state.actionCardDiscard].sort(() => Math.random() - 0.5);
+        state.actionCardDiscard = [];
+      } else {
+        return { success: false, error: 'No action cards available' };
+      }
+    }
+
+    const card = state.actionCardDeck.shift()!;
+    player.actionCards.push(card);
+
+    return {
+      success: true,
+      data: {
+        effect: 'drew_action_card',
+        cardDrawn: 1,
+      },
+    };
+  } else if (choice === 'place_mech' || targets?.targetPlanetId) {
+    // Place 1 mech on a planet
+    if (!targets?.targetPlanetId) {
+      return { success: false, error: 'Must specify a target planet for mech placement' };
+    }
+
+    // Check player controls target planet
+    if (!player.planets.some(p => p.planetId === targets.targetPlanetId)) {
+      return { success: false, error: 'You do not control the target planet' };
+    }
+
+    // Find the planet in the map
+    let targetPlanet = null;
+    for (const tile of state.map.tiles) {
+      const planet = tile.planets.find(p => p.planetId === targets.targetPlanetId);
+      if (planet) {
+        targetPlanet = planet;
+        break;
+      }
+    }
+
+    if (!targetPlanet) {
+      return { success: false, error: 'Target planet not found' };
+    }
+
+    // Place mech
+    const unitId = `mech-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    targetPlanet.units.push({
+      id: unitId,
+      type: 'mech',
+      ownerId: player.id,
+      damaged: false,
+    });
+
+    return {
+      success: true,
+      data: {
+        effect: 'placed_mech',
+        targetPlanet: targets.targetPlanetId,
+      },
+    };
+  }
+
+  return { success: false, error: 'Must choose: draw_card or place_mech with targetPlanetId' };
+}
+
+/**
+ * Mallice - Exterrix Headquarters: Gain 2 TG OR convert all commodities to TG
  */
 function executeMalliceAbility(
   state: GameState,
-  player: { id: string; name: string },
-  planetId: string,
+  player: PlayerState,
   targets?: UseLegendaryAbilityAction['targets']
 ): HandlerResult {
-  if (!targets?.unitProduction || targets.unitProduction.length === 0) {
-    return { success: false, error: 'Must specify units to produce' };
+  const choice = targets?.choice;
+
+  if (choice === 'gain_tg' || choice === 'trade_goods') {
+    // Gain 2 trade goods
+    player.tradeGoods += 2;
+
+    return {
+      success: true,
+      data: {
+        effect: 'gained_trade_goods',
+        tradeGoodsGained: 2,
+      },
+    };
+  } else if (choice === 'convert' || choice === 'convert_commodities') {
+    // Convert all commodities to trade goods
+    const converted = player.commodities;
+    player.tradeGoods += player.commodities;
+    player.commodities = 0;
+
+    return {
+      success: true,
+      data: {
+        effect: 'converted_commodities',
+        commoditiesConverted: converted,
+      },
+    };
   }
 
-  // Count total units
-  const totalUnits = targets.unitProduction.reduce((sum, u) => sum + u.count, 0);
-  if (totalUnits > 2) {
-    return { success: false, error: 'Can only produce up to 2 units' };
-  }
-
-  // Find the system containing Mallice
-  let systemTile = null;
-  for (const tile of state.map.tiles) {
-    if (tile.planets.some((p) => p.planetId === planetId)) {
-      systemTile = tile;
-      break;
-    }
-  }
-
-  if (!systemTile) {
-    return { success: false, error: 'System not found' };
-  }
-
-  // Place units
-  const producedUnits: Array<{ type: string; count: number }> = [];
-  for (const production of targets.unitProduction) {
-    for (let i = 0; i < production.count; i++) {
-      const unitId = `${production.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      systemTile.units.push({
-        id: unitId,
-        type: production.type as any,
-        ownerId: player.id,
-        damaged: false,
-        // Ground units go on the planet
-        ...(isGroundUnit(production.type) ? { planetId } : {}),
-      });
-    }
-    producedUnits.push(production);
-  }
-
+  // Default: gain 2 TG if no choice specified (most common use)
+  player.tradeGoods += 2;
   return {
     success: true,
-    data: { producedUnits },
+    data: {
+      effect: 'gained_trade_goods',
+      tradeGoodsGained: 2,
+    },
   };
 }
 
 /**
- * Check if a unit type is a ground unit
+ * Mirage - Flight Academy: Place up to 2 fighters in any system with your ships
  */
-function isGroundUnit(unitType: string): boolean {
-  return ['infantry', 'mech'].includes(unitType);
+function executeMirageAbility(
+  state: GameState,
+  player: PlayerState,
+  targets?: UseLegendaryAbilityAction['targets']
+): HandlerResult {
+  if (!targets?.systemId) {
+    return { success: false, error: 'Must specify a target system' };
+  }
+
+  const count = targets.count ?? 2; // Default to 2 fighters
+  if (count < 1 || count > 2) {
+    return { success: false, error: 'Can place 1 or 2 fighters' };
+  }
+
+  // Find the system
+  const targetTile = state.map.tiles.find(t => t.id === targets.systemId);
+  if (!targetTile) {
+    return { success: false, error: 'Target system not found' };
+  }
+
+  // Check player has ships in this system
+  const playerShips = targetTile.units.filter(
+    u => u.ownerId === player.id && isShip(u.type)
+  );
+
+  if (playerShips.length === 0) {
+    return { success: false, error: 'You have no ships in this system' };
+  }
+
+  // Place fighters
+  for (let i = 0; i < count; i++) {
+    const unitId = `fighter-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    targetTile.units.push({
+      id: unitId,
+      type: 'fighter',
+      ownerId: player.id,
+      damaged: false,
+    });
+  }
+
+  return {
+    success: true,
+    data: {
+      unitsPlaced: count,
+      unitType: 'fighter',
+      targetSystem: targets.systemId,
+    },
+  };
+}
+
+/**
+ * Check if a unit type is a ship
+ */
+function isShip(unitType: UnitType | string): boolean {
+  return ['carrier', 'cruiser', 'destroyer', 'dreadnought', 'flagship', 'war_sun', 'fighter'].includes(unitType);
 }
 
 /**
@@ -297,7 +416,7 @@ function isGroundUnit(unitType: string): boolean {
 export function getPlayerLegendaryPlanets(
   state: GameState,
   playerId: string
-): Array<{ planetId: string; name: string; exhausted: boolean }> {
+): Array<{ planetId: string; name: string; abilityName: string; exhausted: boolean }> {
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return [];
 
@@ -306,6 +425,7 @@ export function getPlayerLegendaryPlanets(
     .map((p) => ({
       planetId: p.planetId,
       name: LEGENDARY_PLANETS[p.planetId]?.name || p.planetId,
+      abilityName: LEGENDARY_PLANETS[p.planetId]?.abilityName || '',
       exhausted: p.exhausted,
     }));
 }

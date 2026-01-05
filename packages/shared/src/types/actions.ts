@@ -88,6 +88,8 @@ export interface ActionCardTargets {
   agendaId?: string;
   /** Card ID passed through for riders */
   cardId?: string;
+  /** For Hack Election - reordered agenda IDs */
+  agendaOrder?: string[];
 }
 
 export interface ComponentAction extends BaseAction {
@@ -483,9 +485,20 @@ export interface UseLegendaryAbilityAction extends BaseAction {
   planetId: string;
   /** For abilities that require targets */
   targets?: {
-    attachmentIds?: string[];  // For Primor (purge attachments)
-    actionCardIds?: string[];  // For Hope's End (return to deck)
-    unitProduction?: { type: string; count: number }[];  // For Mallice
+    /** Target planet for placing units (Primor infantry, Hope's End mech) */
+    targetPlanetId?: string;
+    /** Target system for placing units (Mirage fighters) */
+    systemId?: string;
+    /** Choice for abilities with options (Hope's End: draw_card/place_mech, Mallice: gain_tg/convert) */
+    choice?: string;
+    /** Unit count for abilities with variable placement (Primor 1-2 infantry, Mirage 1-2 fighters) */
+    count?: number;
+    /** Legacy: attachment IDs */
+    attachmentIds?: string[];
+    /** Legacy: action card IDs */
+    actionCardIds?: string[];
+    /** Legacy: unit production */
+    unitProduction?: { type: string; count: number }[];
   };
 }
 
@@ -507,6 +520,19 @@ export interface PurgeHeroAction extends BaseAction {
 // Combat Flow Actions
 export interface AdvanceCombatAction extends BaseAction {
   type: 'advance_combat';
+}
+
+// Ion Storm Actions
+export interface PlaceIonStormAction extends BaseAction {
+  type: 'place_ion_storm';
+  /** The system where to place the Ion Storm token */
+  systemId: string;
+  /** Which wormhole side to start with (alpha or beta) */
+  side: 'alpha' | 'beta';
+}
+
+export interface FlipIonStormAction extends BaseAction {
+  type: 'flip_ion_storm';
 }
 
 // Union of all action types
@@ -564,7 +590,9 @@ export type GameAction =
   | UnlockCommanderAction
   | UseAgentAction
   | PurgeHeroAction
-  | AdvanceCombatAction;
+  | AdvanceCombatAction
+  | PlaceIonStormAction
+  | FlipIonStormAction;
 
 // Action result
 export interface ActionResult {

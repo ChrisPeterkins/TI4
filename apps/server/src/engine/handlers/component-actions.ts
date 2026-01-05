@@ -599,6 +599,9 @@ function handleFactionAbilityAction(
     case 'stall_tactics':
       return handleStallTactics(state, action, playerId);
 
+    case 'peace_accords':
+      return handlePeaceAccords(state, action, playerId);
+
     default:
       return { success: false, error: `Unknown faction ability: ${action.componentId}` };
   }
@@ -755,6 +758,128 @@ function handleStallTactics(
     success: true,
     triggeredEvents: ['component_action_used', 'action_card_discarded'],
     data: { abilityId: 'stall_tactics', cardId: cardToDiscard },
+  };
+}
+
+/**
+ * Peace Accords (Xxcha Faction Ability)
+ * After you resolve the primary or secondary ability of the "Diplomacy" strategy card,
+ * you may gain control of 1 planet other than Mecatol Rex that does not contain any
+ * units and is in a system that is adjacent to a planet you control.
+ *
+ * Note: This is triggered via the 'peace_accords_available' event from Diplomacy resolution.
+ */
+function handlePeaceAccords(
+  state: GameState,
+  action: ComponentAction,
+  playerId: string
+): HandlerResult {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Verify player is Xxcha
+  if (player.faction !== 'xxcha') {
+    return { success: false, error: 'Only Xxcha can use Peace Accords' };
+  }
+
+  // Must specify target planet
+  const targetPlanetId = action.targets?.planetId;
+  if (!targetPlanetId) {
+    return { success: false, error: 'Must specify a planet to claim' };
+  }
+
+  // Validate the target planet:
+  // 1. Not Mecatol Rex
+  // 2. No units on it
+  // 3. In a system adjacent to a system where Xxcha controls a planet
+
+  let targetPlanet = null;
+  let targetTile = null;
+
+  for (const tile of state.map.tiles) {
+    for (const planet of tile.planets) {
+      if (planet.planetId === targetPlanetId) {
+        targetPlanet = planet;
+        targetTile = tile;
+        break;
+      }
+    }
+    if (targetPlanet) break;
+  }
+
+  if (!targetPlanet || !targetTile) {
+    return { success: false, error: 'Planet not found' };
+  }
+
+  // Check not Mecatol Rex
+  if (targetPlanetId === 'mecatol_rex') {
+    return { success: false, error: 'Cannot claim Mecatol Rex with Peace Accords' };
+  }
+
+  // Check no units on the planet
+  if (targetPlanet.units && targetPlanet.units.length > 0) {
+    return { success: false, error: 'Planet has units on it' };
+  }
+
+  // Check if it's the player's own planet
+  if (targetPlanet.controlledBy === playerId) {
+    return { success: false, error: 'You already control this planet' };
+  }
+
+  // Check adjacency to a system where player controls a planet
+  let isAdjacentToControlled = false;
+  for (const tile of state.map.tiles) {
+    const controlsPlanetInTile = tile.planets.some((p) => p.controlledBy === playerId);
+    if (controlsPlanetInTile) {
+      // Check if target tile is adjacent to this tile
+      const dq = Math.abs(targetTile.position.q - tile.position.q);
+      const dr = Math.abs(targetTile.position.r - tile.position.r);
+      const ds = Math.abs(
+        (-targetTile.position.q - targetTile.position.r) - (-tile.position.q - tile.position.r)
+      );
+      if (dq <= 1 && dr <= 1 && ds <= 1 && dq + dr + ds === 2) {
+        isAdjacentToControlled = true;
+        break;
+      }
+    }
+  }
+
+  if (!isAdjacentToControlled) {
+    return { success: false, error: 'Planet must be in a system adjacent to one you control' };
+  }
+
+  // Transfer control
+  const previousOwner = targetPlanet.controlledBy;
+  targetPlanet.controlledBy = playerId;
+  targetPlanet.exhausted = true; // Planets are gained exhausted
+
+  // Update player's planet list
+  player.planets.push({
+    planetId: targetPlanetId,
+    exhausted: true,
+    attachments: [],
+  });
+
+  // Remove from previous owner if any
+  if (previousOwner) {
+    const prevPlayer = state.players.find((p) => p.id === previousOwner);
+    if (prevPlayer) {
+      const idx = prevPlayer.planets.findIndex((p) => p.planetId === targetPlanetId);
+      if (idx !== -1) {
+        prevPlayer.planets.splice(idx, 1);
+      }
+    }
+  }
+
+  logComponentAction(state, playerId, 'Peace Accords', `Claimed planet ${targetPlanetId}`);
+  // Note: No advanceAfterComponentAction - Peace Accords is triggered during strategic action, not as standalone action
+
+  return {
+    success: true,
+    triggeredEvents: ['peace_accords_claimed', 'planet_control_changed'],
+    data: { abilityId: 'peace_accords', planetId: targetPlanetId, previousOwner },
   };
 }
 
@@ -1144,4 +1269,133 @@ function areSystemsAdjacent(state: GameState, systemId1: number, systemId2: numb
 
   // Adjacent hexes have exactly 2 coordinates differ by 1
   return (dq + dr + ds) === 2;
+}
+
+// ============================================================================
+// ION STORM TOKEN HANDLERS
+// ============================================================================
+
+/**
+ * Handle placing the Ion Storm token
+ * ACTION: Place the Ion Storm token in any system, choosing alpha or beta side.
+ */
+export function handlePlaceIonStorm(
+  state: GameState,
+  action: { playerId: string; systemId: string; side: 'alpha' | 'beta' }
+): HandlerResult {
+  const player = state.players.find((p) => p.id === action.playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Find the target system
+  const targetTile = state.map.tiles.find((t) => t.id === action.systemId);
+  if (!targetTile) {
+    return { success: false, error: 'System not found' };
+  }
+
+  // Cannot place in home systems
+  if (isHomeSystemTile(targetTile)) {
+    return { success: false, error: 'Cannot place Ion Storm in a home system' };
+  }
+
+  // Cannot place in system that already has a wormhole
+  if (targetTile.wormhole) {
+    return { success: false, error: 'Cannot place Ion Storm in a system with an existing wormhole' };
+  }
+
+  // Place the Ion Storm token
+  state.ionStormToken = {
+    systemId: action.systemId,
+    side: action.side,
+  };
+
+  logComponentAction(state, action.playerId, 'Ion Storm', `Placed Ion Storm (${action.side}) in system ${targetTile.systemId}`);
+  advanceAfterComponentAction(state);
+
+  return {
+    success: true,
+    triggeredEvents: ['ion_storm_placed'],
+    data: { systemId: action.systemId, side: action.side },
+  };
+}
+
+/**
+ * Flip the Ion Storm token to the opposite side
+ * Called when ships pass through the Ion Storm wormhole during movement.
+ * NOTE: Does NOT flip for Skilled Retreat action card.
+ */
+export function flipIonStorm(state: GameState): void {
+  if (!state.ionStormToken) return;
+
+  // Flip to opposite side
+  state.ionStormToken.side = state.ionStormToken.side === 'alpha' ? 'beta' : 'alpha';
+}
+
+/**
+ * Check if a system has the Ion Storm token and get its wormhole type
+ */
+export function getIonStormWormhole(state: GameState, systemId: string): 'alpha' | 'beta' | null {
+  if (state.ionStormToken && state.ionStormToken.systemId === systemId) {
+    return state.ionStormToken.side;
+  }
+  return null;
+}
+
+/**
+ * Check if movement through wormhole should trigger Ion Storm flip
+ * Returns true if ships used the Ion Storm wormhole for movement
+ */
+export function shouldFlipIonStorm(
+  state: GameState,
+  fromSystemId: string,
+  toSystemId: string,
+  isSkillRetreat: boolean = false
+): boolean {
+  // Skilled Retreat does NOT flip the Ion Storm
+  if (isSkillRetreat) return false;
+
+  // No Ion Storm token placed
+  if (!state.ionStormToken) return false;
+
+  const ionStormSystemId = state.ionStormToken.systemId;
+  const ionStormSide = state.ionStormToken.side;
+
+  // Check if either system is the Ion Storm system
+  const fromIsIonStorm = fromSystemId === ionStormSystemId;
+  const toIsIonStorm = toSystemId === ionStormSystemId;
+
+  if (!fromIsIonStorm && !toIsIonStorm) return false;
+
+  // Find the tiles
+  const fromTile = state.map.tiles.find((t) => t.id === fromSystemId);
+  const toTile = state.map.tiles.find((t) => t.id === toSystemId);
+
+  if (!fromTile || !toTile) return false;
+
+  // Check if movement used the wormhole connection
+  // (not hex adjacency - must have gone through wormhole)
+  const isHexAdjacent = checkHexAdjacent(fromTile.position, toTile.position);
+  if (isHexAdjacent) return false; // Moved via hex adjacency, not wormhole
+
+  // Check if the other system has a matching wormhole
+  const otherSystem = fromIsIonStorm ? toTile : fromTile;
+  const otherWormhole = otherSystem.wormhole;
+
+  // If the other system's wormhole matches the Ion Storm side, ships used the wormhole
+  if (otherWormhole === ionStormSide) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Helper to check hex adjacency
+ */
+function checkHexAdjacent(pos1: { q: number; r: number }, pos2: { q: number; r: number }): boolean {
+  const dq = Math.abs(pos1.q - pos2.q);
+  const dr = Math.abs(pos1.r - pos2.r);
+  const ds = Math.abs((-pos1.q - pos1.r) - (-pos2.q - pos2.r));
+  return Math.max(dq, dr, ds) === 1;
 }

@@ -1437,84 +1437,173 @@ export const systems: Record<number, SystemData> = {
   // Hyperlane tiles are used to connect different parts of the 7-8 player maps.
   // They contain no planets but provide movement paths between systems.
 
-  // Tile 83A/83B: Hyperlane tile
+  // HYPERLANE TILES (83-91)
+  // Edge indices: 0=top, 1=top-right, 2=bottom-right, 3=bottom, 4=bottom-left, 5=top-left
+  // Each tile has A and B sides with different connection patterns.
+  // hyperlaneConnections = A side, hyperlaneConnectionsB = B side
+  // Connections are at rotation 0; actual connections depend on tile rotation in map.
+  // IMPORTANT: Edges that converge at a single point are NOT connected to each other.
+  // E.g., if edge 0 connects to edges 2, 3, and 4, those three edges don't connect to each other.
+
+  // Tile 83: Straight line (A) / Bent Y-shape (B)
   83: {
     id: 83,
-    tileNumber: '83A',
+    tileNumber: '83',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → d (straight vertical)
+    hyperlaneConnections: [[0, 3]],
+    // B side: a → c,d / d → f (bent Y-shape)
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [0, 3],
+      [3, 5],
+    ],
   },
 
-  // Tile 84A/84B: Hyperlane tile
+  // Tile 84: Straight line (A) / Fan with crossover (B)
   84: {
     id: 84,
-    tileNumber: '84A',
+    tileNumber: '84',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → d (straight vertical)
+    hyperlaneConnections: [[0, 3]],
+    // B side: a → d,e / d → b (fan from top with crossover)
+    hyperlaneConnectionsB: [
+      [0, 3],
+      [0, 4],
+      [3, 1],
+    ],
   },
 
-  // Tile 85A/85B: Hyperlane tile
+  // Tile 85: Diagonal (A) / Bent Y-shape (B)
   85: {
     id: 85,
-    tileNumber: '85A',
+    tileNumber: '85',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → c (diagonal)
+    hyperlaneConnections: [[0, 2]],
+    // B side: a → c,d / d → f (bent Y-shape)
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [0, 3],
+      [3, 5],
+    ],
   },
 
-  // Tile 86A/86B: Hyperlane tile
+  // Tile 86: Diagonal (A) / Same as A (B)
   86: {
     id: 86,
-    tileNumber: '86A',
+    tileNumber: '86',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → c (diagonal)
+    hyperlaneConnections: [[0, 2]],
+    // B side: same pattern as A
+    hyperlaneConnectionsB: [[0, 2]],
   },
 
-  // Tile 87A/87B: Hyperlane tile
+  // Tile 87: Fan to three edges (A) / Fan to two edges (B)
   87: {
     id: 87,
-    tileNumber: '87A',
+    tileNumber: '87',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → c,d,e (fan from top to three edges)
+    hyperlaneConnections: [
+      [0, 2],
+      [0, 3],
+      [0, 4],
+    ],
+    // B side: a → c,d (fan from top to two edges)
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [0, 3],
+    ],
   },
 
-  // Tile 88A/88B: Hyperlane tile
+  // Tile 88: Fan to three edges (A) / Bent Y-shape (B)
   88: {
     id: 88,
-    tileNumber: '88A',
+    tileNumber: '88',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: a → c,d,e (fan from top to three edges)
+    hyperlaneConnections: [
+      [0, 2],
+      [0, 3],
+      [0, 4],
+    ],
+    // B side: a → c,d / d → f (bent Y-shape)
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [0, 3],
+      [3, 5],
+    ],
   },
 
-  // Tile 89A/89B: Hyperlane tile
+  // Tile 89: Two bent paths (A) / Two diagonal paths (B)
   89: {
     id: 89,
-    tileNumber: '89A',
+    tileNumber: '89',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: two bent lines
+    hyperlaneConnections: [
+      [0, 2],
+      [3, 5],
+    ],
+    // B side: two different bent lines
+    hyperlaneConnectionsB: [
+      [1, 3],
+      [4, 0],
+    ],
   },
 
-  // Tile 90A/90B: Hyperlane tile
+  // Tile 90: Two crossing paths (A) / Two parallel diagonals (B)
   90: {
     id: 90,
-    tileNumber: '90A',
+    tileNumber: '90',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: two crossing diagonal paths
+    hyperlaneConnections: [
+      [0, 2],
+      [1, 5],
+    ],
+    // B side: two parallel diagonal paths
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [3, 5],
+    ],
   },
 
-  // Tile 91A/91B: Hyperlane tile
+  // Tile 91: Two straight lines (A) / Complex pattern (B)
   91: {
     id: 91,
-    tileNumber: '91A',
+    tileNumber: '91',
     type: 'hyperlane',
     planets: [],
     expansion: 'pok',
+    // A side: two straight parallel lines
+    hyperlaneConnections: [
+      [0, 3],
+      [1, 4],
+    ],
+    // B side: different arrangement
+    hyperlaneConnectionsB: [
+      [0, 3],
+      [2, 5],
+    ],
   },
 };

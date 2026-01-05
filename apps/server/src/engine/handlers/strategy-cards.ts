@@ -334,9 +334,16 @@ function handleDiplomacyPrimary(
     }
   }
 
+  const triggeredEvents = ['diplomacy_primary_resolved'];
+
+  // Xxcha Peace Accords trigger
+  if (player.faction === 'xxcha') {
+    triggeredEvents.push('peace_accords_available');
+  }
+
   return {
     success: true,
-    triggeredEvents: ['diplomacy_primary_resolved'],
+    triggeredEvents,
     data: { lockedSystem: choices.targetSystemPosition },
   };
 }
@@ -676,9 +683,16 @@ function handleDiplomacySecondary(
     }
   }
 
+  const triggeredEvents = ['diplomacy_secondary_resolved'];
+
+  // Xxcha Peace Accords trigger
+  if (player.faction === 'xxcha') {
+    triggeredEvents.push('peace_accords_available');
+  }
+
   return {
     success: true,
-    triggeredEvents: ['diplomacy_secondary_resolved'],
+    triggeredEvents,
     data: { planetsReadied: choices.readiedPlanets?.length || 0 },
   };
 }

@@ -8,7 +8,15 @@ import type {
   DiceRoll,
   HexCoord,
 } from '@ti4/shared';
-import { getUnitStats, isShipType, isGroundUnit } from './units.js';
+import {
+  getUnitStats,
+  isShipType,
+  isGroundUnit,
+  isCarrierType,
+  calculateCapacityInSystem,
+  countCapacityRequiredUnits,
+  getUnitCapacity,
+} from './units.js';
 import { getCombatModifiers } from '../abilities/index.js';
 
 // Number of dice each unit type rolls in combat
@@ -304,6 +312,91 @@ export function getSpaceCannonUnits(units: UnitInstance[], player: PlayerState):
 }
 
 /**
+ * Get PDS II units from adjacent systems that can fire Space Cannon Offense
+ * PDS II has the ability to fire at ships in adjacent systems
+ * @param state - The game state
+ * @param targetSystemId - The system being targeted (where enemy ships are)
+ * @param playerId - The player who owns the PDS
+ * @returns Array of PDS II units that can fire from adjacent systems
+ */
+export function getAdjacentPDSIIUnits(
+  state: GameState,
+  targetSystemId: string,
+  playerId: string
+): UnitInstance[] {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return [];
+
+  // Check if player has PDS II upgrade
+  const hasPDSII = player.technologies.includes('pds_ii');
+  if (!hasPDSII) return [];
+
+  const targetTile = state.map.tiles.find(t => t.id === targetSystemId);
+  if (!targetTile) return [];
+
+  const adjacentPDSUnits: UnitInstance[] = [];
+
+  // Find all adjacent systems
+  for (const tile of state.map.tiles) {
+    // Skip the target system itself
+    if (tile.id === targetSystemId) continue;
+
+    // Check if adjacent (distance 1)
+    if (!isAdjacentHex(targetTile.position, tile.position)) continue;
+
+    // Get PDS units from this adjacent system (on planets)
+    for (const planet of tile.planets) {
+      const pdsUnits = planet.units.filter(u =>
+        u.ownerId === playerId && u.type === 'pds'
+      );
+      adjacentPDSUnits.push(...pdsUnits);
+    }
+  }
+
+  return adjacentPDSUnits;
+}
+
+/**
+ * Get all PDS units that can fire Space Cannon Offense at a target system
+ * Includes PDS in the target system AND PDS II from adjacent systems
+ */
+export function getAllSpaceCannonOffenseUnits(
+  state: GameState,
+  targetSystemId: string,
+  playerId: string
+): UnitInstance[] {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return [];
+
+  const tile = state.map.tiles.find(t => t.id === targetSystemId);
+  if (!tile) return [];
+
+  // Get PDS in the target system (on planets)
+  const localPDS: UnitInstance[] = [];
+  for (const planet of tile.planets) {
+    const pdsUnits = planet.units.filter(u =>
+      u.ownerId === playerId && u.type === 'pds'
+    );
+    localPDS.push(...pdsUnits);
+  }
+
+  // Get PDS II from adjacent systems
+  const adjacentPDS = getAdjacentPDSIIUnits(state, targetSystemId, playerId);
+
+  return [...localPDS, ...adjacentPDS];
+}
+
+/**
+ * Helper: Check if two hex positions are adjacent
+ */
+function isAdjacentHex(a: HexCoord, b: HexCoord): boolean {
+  const dq = Math.abs(a.q - b.q);
+  const dr = Math.abs(a.r - b.r);
+  const ds = Math.abs((-a.q - a.r) - (-b.q - b.r));
+  return (dq + dr + ds) === 2;
+}
+
+/**
  * Roll Bombardment dice
  * @param plasmaScoring - If true, one unit gets +1 die (player's choice - we add to first unit)
  * @param bunkerPenalty - Penalty from Bunker action card (typically -4)
@@ -565,13 +658,26 @@ export function findDefenderId(tile: MapTile, attackerId: string): string | null
 
 /**
  * Remove a unit from the game state (destroyed)
+ * If the unit was a carrier-type ship, checks for capacity overflow
+ * and destroys excess fighters/ground forces
  */
 export function removeUnit(state: GameState, unitId: string): boolean {
   for (const tile of state.map.tiles) {
     // Check space units
     const spaceIndex = tile.units.findIndex(u => u.id === unitId);
     if (spaceIndex !== -1) {
+      const unit = tile.units[spaceIndex];
+      const wasCarrier = isCarrierType(unit.type);
+      const ownerId = unit.ownerId;
+
+      // Remove the unit
       tile.units.splice(spaceIndex, 1);
+
+      // If it was a carrier, check for capacity overflow
+      if (wasCarrier) {
+        resolveCapacityOverflow(state, tile, ownerId);
+      }
+
       return true;
     }
 
@@ -586,6 +692,77 @@ export function removeUnit(state: GameState, unitId: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Check if there's a capacity overflow in a system for a player
+ * @returns Array of unit IDs that exceed capacity (need to be destroyed)
+ */
+export function checkCapacityOverflow(
+  state: GameState,
+  tile: MapTile,
+  playerId: string
+): UnitInstance[] {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return [];
+
+  // Calculate current capacity (from remaining carriers)
+  const capacity = calculateCapacityInSystem(tile, player);
+
+  // Count units requiring capacity (fighters in space, ground units not on planets)
+  const unitsNeedingCapacity = tile.units.filter(u =>
+    u.ownerId === playerId &&
+    (u.type === 'fighter' || (isGroundUnit(u.type) && !u.planetId))
+  );
+
+  const overflow = unitsNeedingCapacity.length - capacity;
+
+  if (overflow <= 0) {
+    return []; // No overflow
+  }
+
+  // Return excess units - prioritize fighters first, then ground units
+  // This is player's choice in real game, but we auto-select for simplicity
+  const sortedUnits = unitsNeedingCapacity.sort((a, b) => {
+    // Fighters first, then infantry, then mechs (mechs are most valuable)
+    const priority: Record<UnitType, number> = {
+      fighter: 0,
+      infantry: 1,
+      mech: 2,
+    } as Record<UnitType, number>;
+    return (priority[a.type] ?? 99) - (priority[b.type] ?? 99);
+  });
+
+  return sortedUnits.slice(0, overflow);
+}
+
+/**
+ * Resolve capacity overflow by destroying excess units
+ * @returns Object containing destroyed units info
+ */
+export function resolveCapacityOverflow(
+  state: GameState,
+  tile: MapTile,
+  playerId: string
+): { destroyed: UnitInstance[] } {
+  const overflowUnits = checkCapacityOverflow(state, tile, playerId);
+
+  if (overflowUnits.length === 0) {
+    return { destroyed: [] };
+  }
+
+  // Remove each overflow unit
+  const destroyed: UnitInstance[] = [];
+  for (const unit of overflowUnits) {
+    // Find and remove from tile.units
+    const index = tile.units.findIndex(u => u.id === unit.id);
+    if (index !== -1) {
+      destroyed.push({ ...tile.units[index] });
+      tile.units.splice(index, 1);
+    }
+  }
+
+  return { destroyed };
 }
 
 /**
@@ -707,6 +884,62 @@ export function getSpaceCannonOptions(
     antimassDeflectors: targetPlayer?.technologies.includes('antimass_deflectors') ?? false,
     gravitonLaser: firingPlayer?.technologies.includes('graviton_laser_system') ?? false,
   };
+}
+
+/**
+ * Validate space cannon hit assignments for Graviton Laser System
+ * When the firing player has Graviton Laser System, hits must be assigned to non-fighters first
+ * @param units - All targetable units owned by the target player
+ * @param assignments - The hit assignments being validated
+ * @param gravitonLaser - Whether the firing player has Graviton Laser System
+ * @returns Validation result with valid flag and optional error
+ */
+export function validateGravitonLaserAssignment(
+  units: UnitInstance[],
+  assignments: Array<{ unitId: string; destroyed?: boolean; sustainDamage?: boolean }>,
+  gravitonLaser: boolean
+): { valid: boolean; error?: string } {
+  if (!gravitonLaser) {
+    return { valid: true }; // No restriction if no Graviton Laser
+  }
+
+  // Get non-fighters that could be targeted
+  const nonFighters = units.filter(u => u.type !== 'fighter');
+  const fighters = units.filter(u => u.type === 'fighter');
+
+  // Count how many hits are going to fighters vs non-fighters
+  let fighterHits = 0;
+  let nonFighterHits = 0;
+
+  for (const assignment of assignments) {
+    if (assignment.destroyed || assignment.sustainDamage) {
+      const unit = units.find(u => u.id === assignment.unitId);
+      if (unit) {
+        if (unit.type === 'fighter') {
+          fighterHits++;
+        } else {
+          nonFighterHits++;
+        }
+      }
+    }
+  }
+
+  // Calculate total hits
+  const totalHits = fighterHits + nonFighterHits;
+
+  // If there are non-fighters available, they must be targeted first
+  // (before any fighters can be targeted)
+  const nonFighterCapacity = nonFighters.length; // How many non-fighters can take hits
+
+  // With Graviton Laser, non-fighters must be exhausted before fighters can be hit
+  if (fighterHits > 0 && nonFighterHits < nonFighterCapacity) {
+    return {
+      valid: false,
+      error: 'Graviton Laser System: Must assign hits to non-fighters before fighters',
+    };
+  }
+
+  return { valid: true };
 }
 
 /**

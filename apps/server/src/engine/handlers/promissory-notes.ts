@@ -502,3 +502,75 @@ export function getNoteOriginalOwner(player: PlayerState, baseNoteId: string): s
   );
   return note?.originalOwnerId ?? null;
 }
+
+/**
+ * Check if a player can use a commander ability via Alliance promissory note
+ *
+ * Alliance allows the holder to use the commander ability of the note's original owner
+ * as if it were unlocked (requires the original owner's commander to be unlocked).
+ *
+ * @param state - Current game state
+ * @param playerId - The player who wants to use an ability
+ * @param factionId - The faction whose commander is being checked
+ * @returns Object indicating if Alliance grants access and the ally player ID
+ */
+export function canUseCommanderViaAlliance(
+  state: GameState,
+  playerId: string,
+  factionId: string
+): { canUse: boolean; allyPlayerId?: string } {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) {
+    return { canUse: false };
+  }
+
+  // Check if player has Alliance in play
+  for (const noteInPlay of player.promissoryNotesInPlay) {
+    if (getBaseNoteId(noteInPlay.noteId) === 'alliance') {
+      // Find the original owner of the Alliance
+      const allyPlayer = state.players.find(p => p.id === noteInPlay.originalOwnerId);
+      if (!allyPlayer) continue;
+
+      // Check if ally is the faction we're looking for
+      if (allyPlayer.faction !== factionId) continue;
+
+      // Check if ally's commander is unlocked
+      if (allyPlayer.leaders?.commander?.unlocked) {
+        return { canUse: true, allyPlayerId: allyPlayer.id };
+      }
+    }
+  }
+
+  return { canUse: false };
+}
+
+/**
+ * Check if a player has access to a commander (own or via Alliance)
+ *
+ * @param state - Current game state
+ * @param playerId - The player checking access
+ * @param factionId - Optional: specific faction's commander to check. If not provided, checks player's own.
+ * @returns Whether the player can use the commander ability
+ */
+export function hasCommanderAccess(
+  state: GameState,
+  playerId: string,
+  factionId?: string
+): boolean {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return false;
+
+  // If checking a specific faction, see if it's via Alliance
+  if (factionId) {
+    // If it's the player's own faction, check their commander
+    if (player.faction === factionId) {
+      return player.leaders?.commander?.unlocked ?? false;
+    }
+
+    // Otherwise check Alliance
+    return canUseCommanderViaAlliance(state, playerId, factionId).canUse;
+  }
+
+  // Default: check own commander
+  return player.leaders?.commander?.unlocked ?? false;
+}

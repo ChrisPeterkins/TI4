@@ -818,6 +818,147 @@ const MISC_CARDS: ActionCardData[] = [
 ];
 
 // =============================================================================
+// POK ACTION CARDS
+// =============================================================================
+
+const POK_ACTION_CARDS: ActionCardData[] = [
+  // Combat Cards
+  {
+    id: 'waylay',
+    name: 'Waylay',
+    count: 1,
+    timing: 'space_combat',
+    description: 'At the start of a space combat in which you are the defender: Your opponent cannot retreat during the ANNOUNCE RETREATS step of this combat.',
+    expansion: 'pok',
+  },
+  {
+    id: 'decoy_operation',
+    name: 'Decoy Operation',
+    count: 1,
+    timing: 'tactical',
+    description: 'After you activate a system: During this tactical action, you may swap the positions of 1 of your ships with capacity with 1 of your other ships that is being transported by that ship.',
+    expansion: 'pok',
+  },
+  {
+    id: 'intercept',
+    name: 'Intercept',
+    count: 1,
+    timing: 'tactical',
+    description: 'After a player activates a system that contains 1 or more of your ships: Place 1 destroyer from your reinforcements in that system.',
+    expansion: 'pok',
+  },
+  {
+    id: 'rally',
+    name: 'Rally',
+    count: 1,
+    timing: 'action',
+    description: 'ACTION: Place 2 fighters from your reinforcements in a system that contains 1 or more of your ships with capacity.',
+    expansion: 'pok',
+  },
+  // Exploration/Relic Cards
+  {
+    id: 'seize_artifact',
+    name: 'Seize Artifact',
+    count: 1,
+    timing: 'action',
+    description: 'ACTION: Choose 1 of your neighbors that has 1 or more relic fragments; that player gives you 1 of their relic fragments of your choice.',
+    expansion: 'pok',
+  },
+  {
+    id: 'ancient_burial_sites',
+    name: 'Ancient Burial Sites',
+    count: 1,
+    timing: 'action',
+    description: 'Before you explore a planet: Gain 1 relic fragment of the same trait as that planet.',
+    expansion: 'pok',
+  },
+  {
+    id: 'salvage',
+    name: 'Salvage',
+    count: 1,
+    timing: 'combat',
+    description: 'After you win a space combat: Choose 1 of your opponent\'s non-fighter ships that was destroyed during the combat and place it in the space area of the active system; that ship is now yours.',
+    expansion: 'pok',
+  },
+  // Agenda Cards
+  {
+    id: 'deadly_plot',
+    name: 'Deadly Plot',
+    count: 1,
+    timing: 'agenda',
+    description: 'After an agenda is revealed: Choose 1 player; if that player does not cast at least 4 votes on this agenda, they cannot research technology this game round.',
+    expansion: 'pok',
+  },
+  {
+    id: 'emergency_meeting',
+    name: 'Emergency Meeting',
+    count: 1,
+    timing: 'agenda',
+    description: 'At the start of the first agenda this agenda phase: Do not reveal an agenda from the top of the deck. Instead, you may resolve the outcome of an agenda that matches a law in play without voting.',
+    expansion: 'pok',
+  },
+  {
+    id: 'hack_election',
+    name: 'Hack Election',
+    count: 1,
+    timing: 'agenda',
+    description: 'When votes are being counted: Exchange the vote totals of 2 outcomes.',
+    expansion: 'pok',
+  },
+  // Tactical Cards
+  {
+    id: 'boarding_party',
+    name: 'Boarding Party',
+    count: 1,
+    timing: 'space_combat',
+    description: 'At the start of a space combat: Choose 1 of your opponent\'s non-fighter ships; replace that ship with a ship of the same type from your reinforcements if able.',
+    expansion: 'pok',
+  },
+  {
+    id: 'scuttle',
+    name: 'Scuttle',
+    count: 1,
+    timing: 'action',
+    description: 'ACTION: Choose 1 non-fighter ship you control; destroy that ship to place an equal number of trade goods on this card. You may spend these trade goods as if they were in your trade good area.',
+    expansion: 'pok',
+  },
+  {
+    id: 'forward_supply_base',
+    name: 'Forward Supply Base',
+    count: 1,
+    timing: 'action',
+    description: 'ACTION: Choose 1 planet that contains 1 or more of your ground forces; gain trade goods equal to the combined resource value of your exhausted planets.',
+    expansion: 'pok',
+  },
+  // Leader Cards
+  {
+    id: 'coup_detat',
+    name: 'Coup d\'Etat',
+    count: 1,
+    timing: 'action',
+    description: 'ACTION: Choose 1 player other than the speaker; that player becomes the speaker. Then, exhaust each planet you control.',
+    expansion: 'pok',
+  },
+  // Riders (PoK additions)
+  {
+    id: 'sanction_rider',
+    name: 'Sanction Rider',
+    count: 1,
+    timing: 'agenda',
+    description: 'After an agenda is revealed: You cannot vote on this agenda. Predict an outcome of this agenda. If your prediction is correct, the player who voted most against the chosen outcome loses 2 command tokens.',
+    expansion: 'pok',
+  },
+  {
+    id: 'keleres_rider',
+    name: 'Keleres Rider',
+    count: 1,
+    timing: 'agenda',
+    description: 'After an agenda is revealed: You cannot vote on this agenda. Predict an outcome of this agenda. If your prediction is correct, choose 1 non-home planet controlled by another player; gain control of that planet.',
+    expansion: 'pok',
+  },
+];
+
+// =============================================================================
 // ALL ACTION CARDS COMBINED
 // =============================================================================
 
@@ -834,6 +975,7 @@ export const ACTION_CARDS: ActionCardData[] = [
   ...RIDER_CARDS,
   ...STRATEGY_CARDS,
   ...MISC_CARDS,
+  ...POK_ACTION_CARDS,
 ];
 
 // =============================================================================

@@ -4,7 +4,11 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useSocket } from '@/hooks/useSocket';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useGameStore } from '@/stores/game-store';
+import { confirm } from '@/stores/confirm-store';
+import { KeyboardHints, getHintsForPhase } from '@/components/ui/KeyboardHints';
+import { ShortcutsHelpModal } from '@/components/ui/ShortcutsHelpModal';
 import { useLobbyStore } from '@/stores/lobby-store';
 import dynamic from 'next/dynamic';
 import { StrategyPhasePanel, PlayerDashboard, ActionPhasePanel, TurnIndicator, StatusPhasePanel, CombatPanel, AgendaPhasePanel, InvasionPanel, StrategyActionPanel, TransactionModal, CanvasOverlayPanel } from '@/components/game';
@@ -106,6 +110,9 @@ export default function GamePage() {
     }
     return true;
   });
+
+  // Keyboard shortcuts help modal
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   // Save preference to localStorage when changed
   useEffect(() => {
@@ -524,6 +531,50 @@ export default function GamePage() {
     } as Omit<StrategicSecondaryAction, 'playerId' | 'timestamp'>);
   };
 
+  // Handle pass with confirmation
+  const handlePassWithConfirm = useCallback(async () => {
+    if (!isMyTurn || gameState.phase !== 'action') return;
+
+    const confirmed = await confirm({
+      title: 'Pass Turn',
+      message: "Are you sure you want to pass? You won't be able to take actions until next round.",
+      confirmText: 'Pass',
+      cancelText: 'Cancel',
+      variant: 'warning',
+      dontAskAgainKey: 'pass_turn',
+    });
+
+    if (confirmed) {
+      handlePass();
+    }
+  }, [isMyTurn, gameState.phase, handlePass]);
+
+  // Keyboard shortcuts
+  const keyboardHandlers = useMemo(() => ({
+    '?': () => setShowShortcutsHelp(true),
+    'Escape': () => {
+      if (showShortcutsHelp) {
+        setShowShortcutsHelp(false);
+      } else if (tacticalUIState === 'selecting_system') {
+        handleCancelSelection();
+      }
+    },
+    'p': () => {
+      if (isMyTurn && gameState.phase === 'action' && gameState.subPhase === 'awaiting_action') {
+        handlePassWithConfirm();
+      }
+    },
+    't': () => toggleTransactionModal(),
+  }), [showShortcutsHelp, tacticalUIState, isMyTurn, gameState.phase, gameState.subPhase, handlePassWithConfirm, toggleTransactionModal]);
+
+  useKeyboardShortcuts(keyboardHandlers);
+
+  // Get contextual keyboard hints
+  const keyboardHints = useMemo(() =>
+    getHintsForPhase(gameState.phase, isMyTurn),
+    [gameState.phase, isMyTurn]
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header - Compact with player info and resources */}
@@ -788,6 +839,15 @@ export default function GamePage() {
           onClose={toggleTransactionModal}
         />
       )}
+
+      {/* Keyboard Hints */}
+      <KeyboardHints hints={keyboardHints} />
+
+      {/* Shortcuts Help Modal */}
+      <ShortcutsHelpModal
+        isOpen={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+      />
     </div>
   );
 }

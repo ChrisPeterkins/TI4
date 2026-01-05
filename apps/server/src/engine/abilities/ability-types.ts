@@ -10,10 +10,16 @@ import type { GameState, UnitType, HexCoord } from '@ti4/shared';
 export interface AbilityContext {
   // The trigger that caused this ability to be checked
   trigger?: string;
+  // The player whose ability is being triggered
+  playerId?: string;
   // Target player (for abilities affecting other players)
   targetPlayerId?: string;
   // Target system coordinates
   targetSystem?: HexCoord;
+  // System ID (for combat/location context)
+  systemId?: string;
+  // Combat type (for combat abilities)
+  combatType?: 'space' | 'ground';
   // Target planet ID
   targetPlanetId?: string;
   // Target unit IDs
@@ -24,6 +30,10 @@ export interface AbilityContext {
   data?: Record<string, unknown>;
   // Player choices (for abilities requiring input)
   choices?: AbilityChoices;
+  // Count (for counting triggers like action cards drawn)
+  count?: number;
+  // Card IDs (for card-related triggers)
+  cardIds?: string[];
 }
 
 /**

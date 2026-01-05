@@ -69,7 +69,8 @@ export function canProduceUnitType(
 
 /**
  * Get production capacity for Saar floating space docks
- * Saar space docks have Production 5 instead of normal production
+ * Saar space docks have Production 5 instead of normal production (resource-based)
+ * Space Dock II upgrade increases this to Production 7
  */
 export function getSaarProductionCapacity(
   state: GameState,
@@ -89,8 +90,13 @@ export function getSaarProductionCapacity(
     (u) => u.ownerId === playerId && u.type === 'space_dock'
   );
 
-  // Each Saar space dock has Production 5
-  return saarDocks.length * 5;
+  // Check if player has Space Dock II upgrade
+  const hasSpaceDockII = player.technologies.includes('space_dock_ii');
+
+  // Base Saar dock has Production 5, upgraded has Production 7
+  const productionPerDock = hasSpaceDockII ? 7 : 5;
+
+  return saarDocks.length * productionPerDock;
 }
 
 /**

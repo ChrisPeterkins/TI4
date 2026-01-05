@@ -10,6 +10,7 @@ import type {
   HexCoord,
   UnitType,
 } from '@ti4/shared';
+import { getBaseNoteId } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { findTileAtPosition, getAdjacentPositions, findPath, hexDistance, findPathWithAbilities } from '../utils/hex.js';
 import {
@@ -29,6 +30,7 @@ import {
   calculateProductionCount,
   countsTowardsFleetSupply,
   canProduceUnit,
+  validateReinforcementsForProduction,
 } from '../utils/units.js';
 
 /**
@@ -169,31 +171,59 @@ export function validateStrategicAction(
 }
 
 /**
+ * Map of faction IDs to home system IDs
+ */
+const FACTION_HOME_SYSTEM_MAP: Record<string, number> = {
+  sol: 1,
+  mentak: 2,
+  letnev: 3,
+  muaat: 4,
+  arborec: 5,
+  l1z1x: 6,
+  winnu: 7,
+  nekro: 8,
+  naalu: 9,
+  hacan: 10,
+  saar: 11,
+  jolnar: 12,
+  sardakk: 13,
+  xxcha: 14,
+  yin: 15,
+  yssaril: 16,
+  creuss: 51, // Creuss has special home system
+  // PoK factions
+  argent: 52,
+  empyrean: 53,
+  mahact: 54,
+  naaz_rokha: 55,
+  nomad: 56,
+  titans: 57,
+  vuil_raith: 58,
+  keleres: 59, // Council Keleres
+};
+
+/**
  * Check if a system is a player's home system based on faction
  */
 function isPlayerHomeSystem(state: GameState, factionId: string, systemId: number): boolean {
-  // Map faction IDs to home system IDs
-  const factionHomeSystemMap: Record<string, number> = {
-    sol: 1,
-    mentak: 2,
-    letnev: 3,
-    muaat: 4,
-    arborec: 5,
-    l1z1x: 6,
-    winnu: 7,
-    nekro: 8,
-    naalu: 9,
-    hacan: 10,
-    saar: 11,
-    jolnar: 12,
-    sardakk: 13,
-    xxcha: 14,
-    yin: 15,
-    yssaril: 16,
-    creuss: 51, // Creuss has special home system
-  };
+  return FACTION_HOME_SYSTEM_MAP[factionId] === systemId;
+}
 
-  return factionHomeSystemMap[factionId] === systemId;
+/**
+ * Check if a system is any player's home system (excluding a specific player)
+ * @param state - The game state
+ * @param systemId - The system ID to check
+ * @param excludePlayerId - Player ID to exclude from the check
+ * @returns True if any other player has this as their home system
+ */
+function isAnyPlayerHomeSystem(state: GameState, systemId: number, excludePlayerId: string): boolean {
+  for (const player of state.players) {
+    if (player.id === excludePlayerId) continue;
+    if (FACTION_HOME_SYSTEM_MAP[player.faction] === systemId) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -425,6 +455,49 @@ export function validateProduceUnits(
     return { valid: false, error: 'No space dock in this system' };
   }
 
+  // Check for Stymie (Arborec promissory note)
+  // If anyone has Stymie in play where this player is the original owner,
+  // production is blocked in/adjacent to systems with the holder's units
+  for (const otherPlayer of state.players) {
+    if (otherPlayer.id === action.playerId) continue;
+
+    for (const noteInPlay of otherPlayer.promissoryNotesInPlay) {
+      if (getBaseNoteId(noteInPlay.noteId) === 'stymie' &&
+          noteInPlay.originalOwnerId === action.playerId) {
+        // Check if production system contains or is adjacent to holder's units
+        const productionPosition = action.systemPosition;
+
+        // Check if holder has units in the production system
+        const hasUnitsInProductionSystem = tile.units.some(u => u.ownerId === otherPlayer.id) ||
+          tile.planets.some(p => p.units.some(u => u.ownerId === otherPlayer.id));
+
+        if (hasUnitsInProductionSystem) {
+          return {
+            valid: false,
+            error: `Stymie prevents production in systems containing ${otherPlayer.name}'s units`,
+          };
+        }
+
+        // Check if holder has units in adjacent systems
+        const adjacentPositions = getAdjacentPositions(productionPosition);
+        for (const adjPos of adjacentPositions) {
+          const adjTile = findTileAtPosition(state.map, adjPos);
+          if (adjTile) {
+            const hasUnitsInAdjacentSystem = adjTile.units.some(u => u.ownerId === otherPlayer.id) ||
+              adjTile.planets.some(p => p.units.some(u => u.ownerId === otherPlayer.id));
+
+            if (hasUnitsInAdjacentSystem) {
+              return {
+                valid: false,
+                error: `Stymie prevents production in systems adjacent to ${otherPlayer.name}'s units`,
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Calculate production capacity (uses faction abilities like Saar Production 5)
   const productionCapacity = calculateProductionCapacityWithAbilities(state, tile, action.playerId);
   const unitCount = calculateProductionCount(action.units);
@@ -444,6 +517,49 @@ export function validateProduceUnits(
         error: `Cannot produce ${prod.type} - blocked by faction ability`,
       };
     }
+  }
+
+  // Space Dock placement rules
+  const spaceDocksToProduce = action.units.filter(u => u.type === 'space_dock');
+  if (spaceDocksToProduce.length > 0) {
+    // Check: Cannot build space dock in opponent's home system
+    if (isAnyPlayerHomeSystem(state, tile.systemId, action.playerId)) {
+      return {
+        valid: false,
+        error: 'Cannot build space dock in opponent\'s home system',
+      };
+    }
+
+    // Check: One space dock per planet
+    // Find planets where player already has a space dock
+    const planetsWithDock = tile.planets
+      .filter(p => p.units.some(u => u.ownerId === action.playerId && u.type === 'space_dock'))
+      .map(p => p.planetId);
+
+    // Count existing space docks in this system owned by this player
+    const existingDocks = tile.planets.reduce((count, p) =>
+      count + p.units.filter(u => u.ownerId === action.playerId && u.type === 'space_dock').length, 0
+    );
+
+    // Total space docks that would exist after production
+    const totalDocksAfter = existingDocks + spaceDocksToProduce.reduce((sum, u) => sum + u.count, 0);
+    const planetCount = tile.planets.length;
+
+    // Cannot have more space docks than planets
+    if (totalDocksAfter > planetCount) {
+      return {
+        valid: false,
+        error: planetCount === 1
+          ? 'Planet already has a space dock'
+          : `Cannot build more space docks than planets in system (${planetCount} planets, ${existingDocks} existing docks)`,
+      };
+    }
+  }
+
+  // Check reinforcement limits (unit maximums per player)
+  const reinforcementCheck = validateReinforcementsForProduction(state, action.playerId, action.units);
+  if (!reinforcementCheck.valid) {
+    return reinforcementCheck;
   }
 
   // Calculate cost

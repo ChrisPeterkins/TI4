@@ -6,6 +6,7 @@ import type {
   UnitType,
   UnitData,
   HexCoord,
+  ReinforcementPool,
 } from '@ti4/shared';
 import { units, upgradedUnits } from '@ti4/game-data';
 import { systems } from '@ti4/game-data';
@@ -18,6 +19,36 @@ import {
   getSaarProductionCapacity,
   isFloatingDock,
 } from '../abilities/production-modifiers.js';
+
+// =============================================================================
+// UNIT REINFORCEMENT LIMITS
+// =============================================================================
+
+/**
+ * Standard unit limits per player (base game)
+ * Source: TI4 Rules Reference - Reinforcements
+ */
+export const BASE_UNIT_LIMITS: Record<keyof ReinforcementPool, number> = {
+  infantry: 12,
+  fighter: 10,
+  carrier: 4,
+  cruiser: 8,
+  destroyer: 8,
+  dreadnought: 5,
+  war_sun: 2,
+  flagship: 1,
+  pds: 6,
+  space_dock: 3,
+  mech: 4,
+};
+
+/**
+ * PoK expansion unit limits (infantry increased)
+ */
+export const POK_UNIT_LIMITS: Record<keyof ReinforcementPool, number> = {
+  ...BASE_UNIT_LIMITS,
+  infantry: 20, // Increased from 12 to 20 in PoK
+};
 
 // Unit category types for easy categorization
 export type ShipType = 'fighter' | 'destroyer' | 'carrier' | 'cruiser' | 'dreadnought' | 'war_sun' | 'flagship';
@@ -472,4 +503,176 @@ export function createUnitInstance(
     damaged: false,
     planetId,
   };
+}
+
+// =============================================================================
+// REINFORCEMENT POOL FUNCTIONS
+// =============================================================================
+
+/**
+ * Get the unit limit for a specific unit type
+ * @param state - The game state (to check for PoK expansion)
+ * @param unitType - The type of unit
+ * @returns The maximum number of that unit type a player can have
+ */
+export function getUnitLimit(
+  state: GameState,
+  unitType: UnitType
+): number {
+  // Check if PoK expansion is enabled (presence of exploration decks indicates PoK)
+  const isPok = state.explorationDecks !== undefined;
+  const limits = isPok ? POK_UNIT_LIMITS : BASE_UNIT_LIMITS;
+
+  return limits[unitType as keyof ReinforcementPool] ?? 0;
+}
+
+/**
+ * Count all units of a specific type owned by a player across the entire map
+ * Includes units in space areas and on planets
+ */
+export function countUnitsOnMap(
+  state: GameState,
+  playerId: string,
+  unitType: UnitType
+): number {
+  let count = 0;
+
+  for (const tile of state.map.tiles) {
+    // Count units in space area
+    for (const unit of tile.units) {
+      if (unit.ownerId === playerId && unit.type === unitType) {
+        count++;
+      }
+    }
+
+    // Count units on planets
+    for (const planet of tile.planets) {
+      for (const unit of planet.units) {
+        if (unit.ownerId === playerId && unit.type === unitType) {
+          count++;
+        }
+      }
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Count all units of all types owned by a player
+ * Returns a map of unit type to count
+ */
+export function countAllUnitsOnMap(
+  state: GameState,
+  playerId: string
+): Record<UnitType, number> {
+  const counts: Partial<Record<UnitType, number>> = {};
+
+  for (const tile of state.map.tiles) {
+    // Count units in space area
+    for (const unit of tile.units) {
+      if (unit.ownerId === playerId) {
+        counts[unit.type] = (counts[unit.type] || 0) + 1;
+      }
+    }
+
+    // Count units on planets
+    for (const planet of tile.planets) {
+      for (const unit of planet.units) {
+        if (unit.ownerId === playerId) {
+          counts[unit.type] = (counts[unit.type] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  // Fill in zeros for missing types
+  const allTypes: UnitType[] = [
+    'infantry', 'fighter', 'carrier', 'cruiser', 'destroyer',
+    'dreadnought', 'war_sun', 'flagship', 'pds', 'space_dock', 'mech'
+  ];
+  for (const type of allTypes) {
+    if (counts[type] === undefined) {
+      counts[type] = 0;
+    }
+  }
+
+  return counts as Record<UnitType, number>;
+}
+
+/**
+ * Get the number of units available in a player's reinforcement pool
+ * @returns Available units (limit - units on map)
+ */
+export function getAvailableReinforcements(
+  state: GameState,
+  playerId: string,
+  unitType: UnitType
+): number {
+  const limit = getUnitLimit(state, unitType);
+  const onMap = countUnitsOnMap(state, playerId, unitType);
+  return Math.max(0, limit - onMap);
+}
+
+/**
+ * Check if a player has reinforcements available for a unit type
+ */
+export function hasReinforcementsAvailable(
+  state: GameState,
+  playerId: string,
+  unitType: UnitType,
+  count: number = 1
+): boolean {
+  return getAvailableReinforcements(state, playerId, unitType) >= count;
+}
+
+/**
+ * Initialize the reinforcement pool for a player at game start
+ * Sets all unit types to their maximum values
+ */
+export function initializeReinforcementPool(
+  state: GameState,
+  playerId: string
+): void {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player) return;
+
+  const isPok = state.explorationDecks !== undefined;
+  const limits = isPok ? POK_UNIT_LIMITS : BASE_UNIT_LIMITS;
+
+  player.reinforcements = {
+    infantry: limits.infantry,
+    fighter: limits.fighter,
+    carrier: limits.carrier,
+    cruiser: limits.cruiser,
+    destroyer: limits.destroyer,
+    dreadnought: limits.dreadnought,
+    war_sun: limits.war_sun,
+    flagship: limits.flagship,
+    pds: limits.pds,
+    space_dock: limits.space_dock,
+    mech: limits.mech,
+  };
+}
+
+/**
+ * Check if production would exceed reinforcement limits
+ * @returns Object with valid flag and error message if invalid
+ */
+export function validateReinforcementsForProduction(
+  state: GameState,
+  playerId: string,
+  unitsToProduce: { type: UnitType; count: number }[]
+): { valid: boolean; error?: string } {
+  for (const production of unitsToProduce) {
+    const available = getAvailableReinforcements(state, playerId, production.type);
+    if (production.count > available) {
+      const unitName = production.type.replace('_', ' ');
+      return {
+        valid: false,
+        error: `Not enough ${unitName} in reinforcements: need ${production.count}, have ${available}`,
+      };
+    }
+  }
+  return { valid: true };
 }

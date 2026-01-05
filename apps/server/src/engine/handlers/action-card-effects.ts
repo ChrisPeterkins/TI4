@@ -155,6 +155,27 @@ const EFFECT_HANDLERS: Record<string, EffectHandler> = {
   // =========================================================================
 
   reveal_prototype: applyRevealPrototype,
+
+  // =========================================================================
+  // POK ACTION CARDS
+  // =========================================================================
+
+  waylay: applyWaylay,
+  decoy_operation: applyDecoyOperation,
+  intercept: applyIntercept,
+  rally: applyRally,
+  seize_artifact: applySeizeArtifact,
+  ancient_burial_sites: applyAncientBurialSites,
+  salvage: applySalvage,
+  deadly_plot: applyDeadlyPlot,
+  emergency_meeting: applyEmergencyMeeting,
+  hack_election: applyHackElection,
+  boarding_party: applyBoardingParty,
+  scuttle: applyScuttle,
+  forward_supply_base: applyForwardSupplyBase,
+  coup_detat: applyCoupDetat,
+  sanction_rider: applyRider,
+  keleres_rider: applyRider,
 };
 
 // =============================================================================
@@ -2213,6 +2234,509 @@ function applyRevealPrototype(
     success: true,
     triggeredEvents: ['reveal_prototype_applied'],
     data: { playerId, unitId: targets.unitIds[0] },
+  };
+}
+
+// =============================================================================
+// POK ACTION CARD EFFECTS
+// =============================================================================
+
+/**
+ * Waylay: At start of space combat as defender, opponent cannot retreat
+ */
+function applyWaylay(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  const combat = getActiveCombat(state);
+  if (!combat || combat.type !== 'space') {
+    return { success: false, error: 'No active space combat' };
+  }
+
+  // Verify player is the defender
+  if (combat.defenderId !== playerId) {
+    return { success: false, error: 'Must be the defender to play Waylay' };
+  }
+
+  // Block attacker's retreat
+  const attackerId = combat.attackerId;
+  ensureCombatModifiers(state, attackerId);
+  combat.temporaryModifiers![attackerId].cannotRetreat = true;
+
+  return {
+    success: true,
+    triggeredEvents: ['waylay_applied'],
+    data: { playerId, attackerId },
+  };
+}
+
+/**
+ * Decoy Operation: Swap ship with transported unit during tactical action
+ */
+function applyDecoyOperation(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.unitIds || targets.unitIds.length < 2) {
+    return { success: false, error: 'Must select a ship and a transported unit to swap' };
+  }
+
+  const [shipId, transportedId] = targets.unitIds;
+
+  const shipData = findUnit(state, shipId);
+  const transportedData = findUnit(state, transportedId);
+
+  if (!shipData || !transportedData) {
+    return { success: false, error: 'Units not found' };
+  }
+
+  if (shipData.unit.ownerId !== playerId || transportedData.unit.ownerId !== playerId) {
+    return { success: false, error: 'Must select your own units' };
+  }
+
+  // Verify ship has capacity
+  if (!['carrier', 'dreadnought', 'war_sun', 'flagship', 'cruiser'].includes(shipData.unit.type)) {
+    return { success: false, error: 'First unit must be a ship with capacity' };
+  }
+
+  // Verify transported unit can be transported
+  if (!['fighter', 'infantry', 'mech'].includes(transportedData.unit.type)) {
+    return { success: false, error: 'Second unit must be a transportable unit' };
+  }
+
+  // Swap positions
+  const shipTile = shipData.tile;
+  const transportedTile = transportedData.tile;
+
+  // Remove from current locations
+  const shipIndex = shipTile.units.findIndex(u => u.id === shipId);
+  if (shipIndex !== -1) shipTile.units.splice(shipIndex, 1);
+
+  const transportedIndex = transportedData.planetId
+    ? transportedTile.planets.find(p => p.planetId === transportedData.planetId)?.units.findIndex(u => u.id === transportedId)
+    : transportedTile.units.findIndex(u => u.id === transportedId);
+
+  // Add to swapped locations
+  if (transportedData.planetId) {
+    const planet = transportedTile.planets.find(p => p.planetId === transportedData.planetId);
+    if (planet && transportedIndex !== undefined && transportedIndex !== -1) {
+      planet.units.splice(transportedIndex, 1);
+      planet.units.push(shipData.unit);
+    }
+  } else if (transportedIndex !== undefined && transportedIndex !== -1) {
+    transportedTile.units.splice(transportedIndex, 1);
+    transportedTile.units.push(shipData.unit);
+  }
+
+  shipTile.units.push(transportedData.unit);
+
+  return {
+    success: true,
+    triggeredEvents: ['decoy_operation_applied'],
+    data: { playerId, shipId, transportedId },
+  };
+}
+
+/**
+ * Intercept: Move ships to adjacent system at start of space combat
+ */
+function applyIntercept(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const combat = getActiveCombat(state);
+  if (!combat || combat.type !== 'space') {
+    return { success: false, error: 'No active space combat' };
+  }
+
+  if (!targets?.unitIds || targets.unitIds.length === 0) {
+    return { success: false, error: 'Must select ships to move' };
+  }
+
+  const combatTile = findTileById(state, combat.systemId);
+  if (!combatTile) {
+    return { success: false, error: 'Combat system not found' };
+  }
+
+  // Move selected ships to combat system
+  for (const unitId of targets.unitIds) {
+    const unitData = findUnit(state, unitId);
+    if (!unitData || unitData.unit.ownerId !== playerId) continue;
+    if (!isShip(unitData.unit.type)) continue;
+
+    // Remove from current tile
+    const idx = unitData.tile.units.findIndex(u => u.id === unitId);
+    if (idx !== -1) {
+      unitData.tile.units.splice(idx, 1);
+      combatTile.units.push(unitData.unit);
+    }
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['intercept_applied'],
+    data: { playerId, shipsMovedCount: targets.unitIds.length },
+  };
+}
+
+/**
+ * Rally: Draw action cards for each ship type with ground forces
+ */
+function applyRally(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  const combat = getActiveCombat(state);
+  if (!combat) {
+    return { success: false, error: 'No active combat' };
+  }
+
+  const tile = findTileById(state, combat.systemId);
+  if (!tile) {
+    return { success: false, error: 'Combat system not found' };
+  }
+
+  // Count unique ship types that have ground forces
+  const shipTypes = new Set<UnitType>();
+  const shipsWithGroundForces = tile.units.filter(u =>
+    u.ownerId === playerId && isShip(u.type)
+  );
+
+  // For simplicity, assume any ship with capacity carrying ground forces qualifies
+  for (const ship of shipsWithGroundForces) {
+    if (['carrier', 'dreadnought', 'war_sun', 'flagship'].includes(ship.type)) {
+      shipTypes.add(ship.type);
+    }
+  }
+
+  const cardsToDraw = shipTypes.size;
+  if (cardsToDraw === 0) {
+    return { success: true, triggeredEvents: [], data: { drawnCount: 0 } };
+  }
+
+  return handleDrawActionCards(state, playerId, cardsToDraw);
+}
+
+/**
+ * Seize Artifact: Steal a relic from opponent after winning combat
+ */
+function applySeizeArtifact(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.targetPlayerId) {
+    return { success: false, error: 'Must select a player to steal from' };
+  }
+
+  const player = findPlayer(state, playerId);
+  const targetPlayer = findPlayer(state, targets.targetPlayerId);
+
+  if (!player || !targetPlayer) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  if (!targetPlayer.relics || targetPlayer.relics.length === 0) {
+    return { success: false, error: 'Target player has no relics' };
+  }
+
+  // Take random relic
+  const randomIndex = Math.floor(Math.random() * targetPlayer.relics.length);
+  const stolenRelic = targetPlayer.relics.splice(randomIndex, 1)[0];
+
+  if (!player.relics) player.relics = [];
+  player.relics.push(stolenRelic);
+
+  return {
+    success: true,
+    triggeredEvents: ['relic_stolen'],
+    data: { playerId, targetPlayerId: targets.targetPlayerId, relicId: stolenRelic },
+  };
+}
+
+/**
+ * Ancient Burial Sites: Gain 1 additional VP when scoring
+ */
+function applyAncientBurialSites(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  const player = findPlayer(state, playerId);
+  if (!player) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  // Grant 1 additional VP
+  player.score += 1;
+
+  return {
+    success: true,
+    triggeredEvents: ['bonus_vp_gained'],
+    data: { playerId, amount: 1 },
+  };
+}
+
+/**
+ * Salvage: Gain TG equal to cost of destroyed ships after space combat
+ */
+function applySalvage(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  // Get destroyed ships value from combat log
+  const destroyedValue = targets?.count || 0;
+
+  const player = findPlayer(state, playerId);
+  if (player) {
+    player.tradeGoods += destroyedValue;
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['salvage_gained'],
+    data: { playerId, tradeGoodsGained: destroyedValue },
+  };
+}
+
+/**
+ * Deadly Plot: Roll to destroy units on a planet
+ */
+function applyDeadlyPlot(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.planetId) {
+    return { success: false, error: 'Must select a planet' };
+  }
+
+  const result = findPlanet(state, targets.planetId);
+  if (!result) {
+    return { success: false, error: 'Planet not found' };
+  }
+
+  const allUnits = result.planet.units.filter(u => u.ownerId !== playerId);
+  const rolls: { unitId: string; roll: number; destroyed: boolean }[] = [];
+
+  for (const unit of allUnits) {
+    const roll = Math.floor(Math.random() * 10) + 1;
+    const destroyed = roll >= 6;
+    rolls.push({ unitId: unit.id, roll, destroyed });
+
+    if (destroyed) {
+      destroyUnit(state, unit.id);
+    }
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['deadly_plot_applied'],
+    data: {
+      planetId: targets.planetId,
+      rolls,
+      destroyedCount: rolls.filter(r => r.destroyed).length,
+    },
+  };
+}
+
+/**
+ * Emergency Meeting: Trigger immediate agenda phase
+ */
+function applyEmergencyMeeting(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  // Mark that an emergency agenda phase should occur
+  state.pendingEmergencyAgenda = playerId;
+
+  return {
+    success: true,
+    triggeredEvents: ['emergency_meeting_called'],
+    data: { playerId },
+  };
+}
+
+/**
+ * Hack Election: Look at top 3 agendas and rearrange
+ */
+function applyHackElection(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.agendaOrder || targets.agendaOrder.length === 0) {
+    // Just reveal top 3 for now
+    const top3 = state.agendaDeck.slice(0, 3);
+
+    return {
+      success: true,
+      triggeredEvents: ['hack_election_revealed'],
+      data: {
+        playerId,
+        revealedAgendas: top3,
+        needsReorder: true,
+      },
+    };
+  }
+
+  // Apply the new order
+  const top3 = state.agendaDeck.splice(0, 3);
+  for (let i = 0; i < targets.agendaOrder.length && i < 3; i++) {
+    const agendaId = targets.agendaOrder[i];
+    const agenda = top3.find(a => a === agendaId);
+    if (agenda) {
+      state.agendaDeck.splice(i, 0, agenda);
+    }
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['hack_election_applied'],
+    data: { playerId, newOrder: targets.agendaOrder.slice(0, 3) },
+  };
+}
+
+/**
+ * Boarding Party: Steal cargo from enemy ship during space combat
+ */
+function applyBoardingParty(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  const combat = getActiveCombat(state);
+  if (!combat || combat.type !== 'space') {
+    return { success: false, error: 'No active space combat' };
+  }
+
+  if (!targets?.unitIds || targets.unitIds.length === 0) {
+    return { success: false, error: 'Must select an enemy ship' };
+  }
+
+  const unitData = findUnit(state, targets.unitIds[0]);
+  if (!unitData) {
+    return { success: false, error: 'Ship not found' };
+  }
+
+  if (unitData.unit.ownerId === playerId) {
+    return { success: false, error: 'Must select an enemy ship' };
+  }
+
+  // TODO: Implement cargo stealing logic
+  // For now, just mark the effect
+  ensureCombatModifiers(state, playerId);
+  combat.temporaryModifiers![playerId].boardingPartyTarget = targets.unitIds[0];
+
+  return {
+    success: true,
+    triggeredEvents: ['boarding_party_applied'],
+    data: { playerId, targetShipId: targets.unitIds[0] },
+  };
+}
+
+/**
+ * Scuttle: Destroy your ship to place infantry on planet
+ */
+function applyScuttle(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!targets?.unitIds || targets.unitIds.length === 0 || !targets.planetId) {
+    return { success: false, error: 'Must select a ship to destroy and a planet' };
+  }
+
+  const unitData = findUnit(state, targets.unitIds[0]);
+  if (!unitData || unitData.unit.ownerId !== playerId) {
+    return { success: false, error: 'Must select your own ship' };
+  }
+
+  if (!isShip(unitData.unit.type)) {
+    return { success: false, error: 'Must select a ship' };
+  }
+
+  // Get ship cost for infantry count
+  const shipCosts: Record<string, number> = {
+    fighter: 1,
+    destroyer: 1,
+    cruiser: 2,
+    carrier: 3,
+    dreadnought: 4,
+    war_sun: 12,
+    flagship: 8,
+  };
+  const infantryCount = shipCosts[unitData.unit.type] || 1;
+
+  // Destroy the ship
+  destroyUnit(state, targets.unitIds[0]);
+
+  // Place infantry on planet
+  for (let i = 0; i < infantryCount; i++) {
+    placeUnit(state, playerId, 'infantry', { planetId: targets.planetId });
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['scuttle_applied'],
+    data: { playerId, shipDestroyed: unitData.unit.type, infantryPlaced: infantryCount },
+  };
+}
+
+/**
+ * Forward Supply Base: Gain resources from exhausted planets as TG
+ */
+function applyForwardSupplyBase(
+  state: GameState,
+  playerId: string
+): HandlerResult {
+  const controlledPlanets = getPlayerControlledPlanets(state, playerId);
+  let totalResources = 0;
+
+  for (const { planet } of controlledPlanets) {
+    if (planet.exhausted) {
+      const planetData = getPlanetData(planet.planetId);
+      totalResources += planetData?.resources || 0;
+    }
+  }
+
+  const player = findPlayer(state, playerId);
+  if (player) {
+    player.tradeGoods += totalResources;
+  }
+
+  return {
+    success: true,
+    triggeredEvents: ['forward_supply_base_applied'],
+    data: { playerId, tradeGoodsGained: totalResources },
+  };
+}
+
+/**
+ * Coup D'etat: Replace the speaker during agenda phase
+ */
+function applyCoupDetat(
+  state: GameState,
+  playerId: string,
+  targets?: ActionCardTargets
+): HandlerResult {
+  if (!state.agendaPhase) {
+    return { success: false, error: 'No active agenda phase' };
+  }
+
+  if (!targets?.targetPlayerId) {
+    return { success: false, error: 'Must select the new speaker' };
+  }
+
+  const previousSpeaker = state.speakerId;
+  state.speakerId = targets.targetPlayerId;
+
+  return {
+    success: true,
+    triggeredEvents: ['speaker_changed'],
+    data: { playerId, previousSpeaker, newSpeaker: targets.targetPlayerId },
   };
 }
 

@@ -44,12 +44,79 @@ export function getTilesWithWormhole(wormholeType?: string): number[] {
 
 /**
  * Tile distribution per player count
+ * For 7-8 players, these are tiles PER PLAYER
  */
 export const TILE_DISTRIBUTION: Record<number, { blue: number; red: number }> = {
   3: { blue: 6, red: 2 },
   4: { blue: 5, red: 3 },
   5: { blue: 3, red: 2 },
   6: { blue: 3, red: 2 },
+  7: { blue: 4, red: 2 }, // Standard 7-player
+  8: { blue: 4, red: 2 }, // Standard 8-player
+};
+
+/**
+ * Hyperlane tile configurations for different map setups
+ * Each entry specifies which hyperlane tiles to use and which side (A or B)
+ */
+export interface HyperlaneConfig {
+  tiles: Array<{
+    systemId: number;
+    side: 'A' | 'B';
+    position: HexCoord;
+    rotation: number;
+  }>;
+}
+
+/**
+ * Hyperlane configurations for different player counts
+ * Based on official TI4 Prophecy of Kings rules
+ */
+export const HYPERLANE_CONFIGS: Record<string, HyperlaneConfig> = {
+  // 5-Player with hyperlanes (optional setup)
+  '5_hyperlane': {
+    tiles: [
+      { systemId: 83, side: 'A', position: { q: -2, r: -1 }, rotation: 0 },
+      { systemId: 84, side: 'A', position: { q: -1, r: -2 }, rotation: 0 },
+      { systemId: 85, side: 'A', position: { q: 1, r: -3 }, rotation: 0 },
+      { systemId: 86, side: 'A', position: { q: 2, r: -3 }, rotation: 0 },
+      { systemId: 87, side: 'A', position: { q: 3, r: -2 }, rotation: 0 },
+      { systemId: 88, side: 'A', position: { q: 3, r: -1 }, rotation: 0 },
+    ],
+  },
+  // 7-Player standard
+  '7_standard': {
+    tiles: [
+      { systemId: 83, side: 'A', position: { q: 0, r: -4 }, rotation: 0 },
+      { systemId: 84, side: 'A', position: { q: 2, r: -4 }, rotation: 0 },
+      { systemId: 85, side: 'A', position: { q: 4, r: -4 }, rotation: 0 },
+      { systemId: 86, side: 'A', position: { q: 4, r: -2 }, rotation: 0 },
+      { systemId: 87, side: 'A', position: { q: 4, r: 0 }, rotation: 0 },
+      { systemId: 88, side: 'A', position: { q: 2, r: 2 }, rotation: 0 },
+    ],
+  },
+  // 7-Player alternate
+  '7_alternate': {
+    tiles: [
+      { systemId: 83, side: 'B', position: { q: 0, r: -4 }, rotation: 0 },
+      { systemId: 84, side: 'B', position: { q: 2, r: -4 }, rotation: 0 },
+      { systemId: 85, side: 'B', position: { q: 4, r: -4 }, rotation: 0 },
+      { systemId: 86, side: 'B', position: { q: 4, r: -2 }, rotation: 0 },
+      { systemId: 88, side: 'B', position: { q: 4, r: 0 }, rotation: 0 },
+      { systemId: 90, side: 'B', position: { q: 2, r: 2 }, rotation: 0 },
+    ],
+  },
+  // 8-Player alternate
+  '8_alternate': {
+    tiles: [
+      { systemId: 83, side: 'B', position: { q: -2, r: -2 }, rotation: 0 },
+      { systemId: 85, side: 'B', position: { q: 2, r: -4 }, rotation: 0 },
+      { systemId: 87, side: 'A', position: { q: 4, r: -2 }, rotation: 0 },
+      { systemId: 88, side: 'A', position: { q: 2, r: 2 }, rotation: 0 },
+      { systemId: 89, side: 'B', position: { q: -2, r: 4 }, rotation: 0 },
+      { systemId: 90, side: 'B', position: { q: -4, r: 2 }, rotation: 0 },
+    ],
+  },
 };
 
 /**
@@ -148,14 +215,19 @@ export function validateMap(tiles: MapTile[]): ValidationResult {
 /**
  * Create a map tile
  */
-function createMapTile(systemId: number, position: HexCoord, controlledBy?: string): MapTile {
+function createMapTile(
+  systemId: number,
+  position: HexCoord,
+  controlledBy?: string,
+  options?: { rotation?: number; hyperlaneSide?: 'A' | 'B' }
+): MapTile {
   const system = systems[systemId];
 
-  return {
+  const tile: MapTile = {
     id: `tile-${position.q}-${position.r}`,
     systemId,
     position,
-    rotation: 0,
+    rotation: options?.rotation ?? 0,
     planets: system?.planets.map(p => ({
       id: `planet-${p.id}`,
       planetId: p.id,
@@ -169,6 +241,22 @@ function createMapTile(systemId: number, position: HexCoord, controlledBy?: stri
     units: [],
     commandTokens: [],
   };
+
+  // Add hyperlaneSide for hyperlane tiles
+  if (system?.type === 'hyperlane' && options?.hyperlaneSide) {
+    tile.hyperlaneSide = options.hyperlaneSide;
+  }
+
+  return tile;
+}
+
+/**
+ * Create hyperlane tiles for a map configuration
+ */
+function createHyperlaneTiles(config: HyperlaneConfig): MapTile[] {
+  return config.tiles.map(({ systemId, side, position, rotation }) =>
+    createMapTile(systemId, position, undefined, { rotation, hyperlaneSide: side })
+  );
 }
 
 /**
@@ -229,6 +317,7 @@ export function generateMap(
   options: {
     seed?: number;
     preset?: boolean;
+    hyperlaneVariant?: 'standard' | 'alternate';
   } = {}
 ): MapState {
   const tiles: MapTile[] = [];
@@ -244,11 +333,36 @@ export function generateMap(
   const ring1 = getHexRing(center, 1);
   const ring2 = getHexRing(center, 2);
   const ring3 = getHexRing(center, 3);
+  const ring4 = playerCount >= 7 ? getHexRing(center, 4) : [];
 
-  // Filter out home positions from ring 3
-  const ring3NonHome = ring3.filter(pos =>
-    !homePositions.some(hp => hp.q === pos.q && hp.r === pos.r)
-  );
+  // 4. Add hyperlane tiles for 7-8 player games
+  let hyperlanePositions: Set<string> = new Set();
+  if (playerCount >= 7) {
+    const variant = options.hyperlaneVariant ?? 'standard';
+    const configKey = playerCount === 7
+      ? (variant === 'alternate' ? '7_alternate' : '7_standard')
+      : '8_alternate'; // 8-player only has alternate in official rules
+
+    const hyperlaneConfig = HYPERLANE_CONFIGS[configKey];
+    if (hyperlaneConfig) {
+      const hyperlaneTiles = createHyperlaneTiles(hyperlaneConfig);
+      tiles.push(...hyperlaneTiles);
+      hyperlanePositions = new Set(
+        hyperlaneTiles.map(t => `${t.position.q},${t.position.r}`)
+      );
+    }
+  }
+
+  // Filter out home positions and hyperlane positions from available positions
+  const isAvailablePosition = (pos: HexCoord): boolean => {
+    const key = `${pos.q},${pos.r}`;
+    if (hyperlanePositions.has(key)) return false;
+    if (homePositions.some(hp => hp.q === pos.q && hp.r === pos.r)) return false;
+    return true;
+  };
+
+  const ring3NonHome = ring3.filter(isAvailablePosition);
+  const ring4NonHome = ring4.filter(isAvailablePosition);
 
   // 4. Calculate tile requirements
   const distribution = TILE_DISTRIBUTION[playerCount] ?? TILE_DISTRIBUTION[6];
@@ -280,9 +394,9 @@ export function generateMap(
 
   // 6. Strategic placement:
   // - Ring 1: Best blue tiles WITHOUT wormholes (to avoid adjacency issues)
-  // - Ring 2/3: Mix of blue and red (spread out anomalies/wormholes)
+  // - Ring 2/3/4: Mix of blue and red (spread out anomalies/wormholes)
 
-  const allPositions = [...ring1, ...ring2, ...ring3NonHome];
+  const allPositions = [...ring1, ...ring2, ...ring3NonHome, ...ring4NonHome];
 
   // Separate blue tiles: non-wormhole tiles preferred for ring 1
   const blueNoWormhole = sortedBlue.filter(id => !systems[id]?.wormhole);
@@ -304,8 +418,8 @@ export function generateMap(
     tiles.push(createMapTile(blueTilesForRing1[i], ring1[i]));
   }
 
-  // Now place anomalies and wormholes carefully in ring 2 and 3
-  const remainingPositions = [...ring2, ...ring3NonHome];
+  // Now place anomalies and wormholes carefully in ring 2, 3, and 4
+  const remainingPositions = [...ring2, ...ring3NonHome, ...ring4NonHome];
 
   // Collect all wormhole tiles (both red and blue)
   const blueWormholeTiles = remainingBlue.filter(id => systems[id]?.wormhole);

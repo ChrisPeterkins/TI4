@@ -19,6 +19,10 @@ import { findTileAtPosition } from '../../../utils/hex.js';
  * MITOSIS (Arborec)
  * At the start of the status phase, you may place 1 infantry from your
  * reinforcements on any planet you control that contains 1 of your infantry.
+ *
+ * LETANI BEHEMOTH (Mech Enhancement)
+ * When you use your MITOSIS faction ability, you may replace 1 of your
+ * infantry on the game board with 1 mech from your reinforcements instead.
  */
 const arborecMitosis: AbilityHandler = (
   state: GameState,
@@ -36,39 +40,85 @@ const arborecMitosis: AbilityHandler = (
     return { success: false, error: 'Must select a planet with your infantry' };
   }
 
+  // Check if player chose to place a mech instead (Letani Behemoth enhancement)
+  const placeMech = context.choices?.selectedUnitType === 'mech';
+
   // Find the planet and verify it has Arborec infantry
   for (const tile of state.map.tiles) {
     for (const planet of tile.planets || []) {
       if (planet.id === targetPlanetId) {
-        const hasArborecInfantry = tile.units.some(
+        const arborecInfantry = tile.units.filter(
           u => u.ownerId === playerId && u.type === 'infantry' && u.planetId === targetPlanetId
         );
 
-        if (!hasArborecInfantry) {
+        if (arborecInfantry.length === 0) {
           return { success: false, error: 'Selected planet must have your infantry' };
         }
 
-        // Place 1 infantry
-        tile.units.push({
-          id: `infantry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          type: 'infantry',
-          ownerId: playerId,
-          planetId: targetPlanetId,
-          damaged: false,
-        });
+        if (placeMech) {
+          // Letani Behemoth: Replace 1 infantry with 1 mech
+          // Check mech limit (max 4 mechs)
+          const mechCount = countPlayerMechs(state, playerId);
+          if (mechCount >= 4) {
+            return { success: false, error: 'Maximum mech limit reached (4)' };
+          }
 
-        return {
-          success: true,
-          stateModified: true,
-          triggeredEvents: ['unit_placed'],
-          data: { unitType: 'infantry', planetId: targetPlanetId },
-        };
+          // Remove one infantry
+          const infantryToReplace = arborecInfantry[0];
+          const infantryIndex = tile.units.findIndex(u => u.id === infantryToReplace.id);
+          if (infantryIndex !== -1) {
+            tile.units.splice(infantryIndex, 1);
+          }
+
+          // Place the mech
+          tile.units.push({
+            id: `mech-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'mech',
+            ownerId: playerId,
+            planetId: targetPlanetId,
+            damaged: false,
+          });
+
+          return {
+            success: true,
+            stateModified: true,
+            triggeredEvents: ['unit_placed', 'unit_removed'],
+            data: { unitType: 'mech', planetId: targetPlanetId, replacedInfantry: true },
+          };
+        } else {
+          // Standard Mitosis: Place 1 infantry
+          tile.units.push({
+            id: `infantry-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'infantry',
+            ownerId: playerId,
+            planetId: targetPlanetId,
+            damaged: false,
+          });
+
+          return {
+            success: true,
+            stateModified: true,
+            triggeredEvents: ['unit_placed'],
+            data: { unitType: 'infantry', planetId: targetPlanetId },
+          };
+        }
       }
     }
   }
 
   return { success: false, error: 'Planet not found' };
 };
+
+/**
+ * Helper: Count player's mechs on the board
+ */
+function countPlayerMechs(state: GameState, playerId: string): number {
+  let count = 0;
+  for (const tile of state.map.tiles) {
+    count += tile.units.filter(u => u.ownerId === playerId && u.type === 'mech').length;
+  }
+  return count;
+}
 
 // =============================================================================
 // MENTAK COALITION
@@ -804,6 +854,150 @@ const xxchaQuash: AbilityHandler = (
   };
 };
 
+/**
+ * PEACE ACCORDS (Xxcha)
+ * After you resolve the primary or secondary ability of the "Diplomacy" strategy card,
+ * you may gain control of 1 planet other than Mecatol Rex that does not contain any
+ * units and is in a system that is adjacent to a planet you control.
+ */
+const xxchaPeaceAccords: AbilityHandler = (
+  state: GameState,
+  playerId: string,
+  context: AbilityContext
+): AbilityResult => {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player || player.faction !== 'xxcha') {
+    return { success: false, error: 'Not Xxcha player' };
+  }
+
+  // Get target planet from choices
+  const targetPlanetId = context.choices?.selectedPlanetId;
+  if (!targetPlanetId) {
+    // Return valid planets for selection
+    const validPlanets = getValidPeaceAccordsPlanets(state, playerId);
+    if (validPlanets.length === 0) {
+      return { success: false, error: 'No valid planets to claim' };
+    }
+    return {
+      success: false,
+      error: 'Must select a planet to claim',
+      data: { validPlanets },
+    };
+  }
+
+  // Validate the target planet
+  const validPlanets = getValidPeaceAccordsPlanets(state, playerId);
+  if (!validPlanets.includes(targetPlanetId)) {
+    return { success: false, error: 'Invalid planet selection' };
+  }
+
+  // Find and claim the planet
+  for (const tile of state.map.tiles) {
+    for (const planet of tile.planets) {
+      if (planet.planetId === targetPlanetId) {
+        // Transfer control
+        const previousOwner = planet.controlledBy;
+        planet.controlledBy = playerId;
+        planet.exhausted = true; // Planets are gained exhausted
+
+        // Update player's planet list
+        player.planets.push({
+          planetId: targetPlanetId,
+          exhausted: true,
+          attachments: [],
+        });
+
+        // Remove from previous owner if any
+        if (previousOwner) {
+          const prevPlayer = state.players.find(p => p.id === previousOwner);
+          if (prevPlayer) {
+            const idx = prevPlayer.planets.findIndex(p => p.planetId === targetPlanetId);
+            if (idx !== -1) {
+              prevPlayer.planets.splice(idx, 1);
+            }
+          }
+        }
+
+        return {
+          success: true,
+          stateModified: true,
+          triggeredEvents: ['peace_accords_claimed'],
+          data: { planetId: targetPlanetId, previousOwner },
+        };
+      }
+    }
+  }
+
+  return { success: false, error: 'Planet not found' };
+};
+
+/**
+ * Helper: Get valid planets for Peace Accords
+ * - Not Mecatol Rex
+ * - Contains no units (from any player)
+ * - Is in a system adjacent to a planet the player controls
+ */
+function getValidPeaceAccordsPlanets(state: GameState, playerId: string): string[] {
+  const validPlanets: string[] = [];
+
+  // Get all systems where player controls at least one planet
+  const controlledSystemPositions = new Set<string>();
+  for (const tile of state.map.tiles) {
+    for (const planet of tile.planets) {
+      if (planet.controlledBy === playerId) {
+        controlledSystemPositions.add(`${tile.position.q},${tile.position.r}`);
+      }
+    }
+  }
+
+  // Find adjacent systems with empty planets
+  for (const tile of state.map.tiles) {
+    const tileKey = `${tile.position.q},${tile.position.r}`;
+
+    // Check if this tile is adjacent to any controlled system
+    let isAdjacent = false;
+    for (const controlledKey of controlledSystemPositions) {
+      const [q, r] = controlledKey.split(',').map(Number);
+      const controlledPos: HexCoord = { q, r };
+      if (areHexAdjacent(tile.position, controlledPos)) {
+        isAdjacent = true;
+        break;
+      }
+    }
+
+    if (!isAdjacent) continue;
+
+    // Check each planet in this adjacent system
+    for (const planet of tile.planets) {
+      // Skip Mecatol Rex
+      if (planet.planetId === 'mecatol_rex') continue;
+
+      // Skip if planet has any units
+      if (planet.units && planet.units.length > 0) continue;
+
+      // Skip if it's the player's own planet
+      if (planet.controlledBy === playerId) continue;
+
+      validPlanets.push(planet.planetId);
+    }
+  }
+
+  return validPlanets;
+}
+
+/**
+ * Helper: Check if two hex positions are adjacent
+ */
+function areHexAdjacent(a: HexCoord, b: HexCoord): boolean {
+  const dq = Math.abs(a.q - b.q);
+  const dr = Math.abs(a.r - b.r);
+  const ds = Math.abs((-a.q - a.r) - (-b.q - b.r)); // s = -q - r in cube coords
+
+  // Two hexes are adjacent if the sum of absolute differences is 2
+  // and each individual difference is at most 1
+  return (dq <= 1 && dr <= 1 && ds <= 1) && (dq + dr + ds === 2);
+}
+
 // =============================================================================
 // WINNU
 // =============================================================================
@@ -1084,6 +1278,7 @@ export function registerBaseGameFactionAbilities(): void {
 
   // Xxcha
   registerAbilityHandler('xxcha_quash', xxchaQuash);
+  registerAbilityHandler('xxcha_peace_accords', xxchaPeaceAccords);
 
   // Winnu
   registerAbilityHandler('winnu_blood_ties', winnuBloodTies);

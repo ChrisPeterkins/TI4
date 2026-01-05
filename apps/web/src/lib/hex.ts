@@ -302,10 +302,45 @@ export function areHexesAdjacent(a: HexCoord, b: HexCoord): boolean {
 
 /**
  * TI4-specific: Get home system positions for a given player count
- * Returns positions in ring 3 for standard 6-player layout
+ * Returns positions in ring 3 for 3-6 players, ring 3-4 for 7-8 players
  */
 export function getHomeSystemPositions(playerCount: number): HexCoord[] {
   const center: HexCoord = { q: 0, r: 0 };
+
+  // 7-8 player games use an extended map with home systems in layers 3 and 4
+  if (playerCount === 7) {
+    // 7-player: homes at layer 3 azimuth 3,6 and layer 4 azimuth 0,12,15,18,21
+    // Based on ti4-cartographer data: (3,3), (3,6), (4,0), (4,12), (4,15), (4,18), (4,21)
+    const ring3 = getHexRing(center, 3);
+    const ring4 = getHexRing(center, 4);
+    return [
+      ring3[3],   // Player 1
+      ring3[6],   // Player 2
+      ring4[0],   // Player 3
+      ring4[12],  // Player 4
+      ring4[15],  // Player 5
+      ring4[18],  // Player 6
+      ring4[21],  // Player 7
+    ];
+  }
+
+  if (playerCount === 8) {
+    // 8-player: all homes in layer 4, evenly distributed
+    // Based on ti4-cartographer: (4,0), (4,3), (4,6), (4,9), (4,12), (4,15), (4,18), (4,21)
+    const ring4 = getHexRing(center, 4);
+    return [
+      ring4[0],   // Player 1
+      ring4[3],   // Player 2
+      ring4[6],   // Player 3
+      ring4[9],   // Player 4
+      ring4[12],  // Player 5
+      ring4[15],  // Player 6
+      ring4[18],  // Player 7
+      ring4[21],  // Player 8
+    ];
+  }
+
+  // Standard 3-6 player layout uses ring 3
   const ring3 = getHexRing(center, 3);
 
   // Ring 3 has 18 positions, home systems are evenly distributed

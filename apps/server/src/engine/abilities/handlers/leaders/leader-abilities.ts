@@ -13,6 +13,7 @@
 import type { GameState, UnitType, HexCoord } from '@ti4/shared';
 import type { AbilityHandler, AbilityContext, AbilityResult } from '../../ability-types.js';
 import { registerAbilityHandler } from '../../ability-registry.js';
+import { hasCommanderAccess } from '../../../handlers/promissory-notes.js';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -34,6 +35,13 @@ function isCommanderUnlocked(state: GameState, playerId: string): boolean {
   const player = state.players.find(p => p.id === playerId);
   if (!player?.leaders) return false;
   return player.leaders.commander.unlocked;
+}
+
+/**
+ * Check if a player can use a specific faction's commander (own or via Alliance)
+ */
+function canUseCommanderAbility(state: GameState, playerId: string, factionId: string): boolean {
+  return hasCommanderAccess(state, playerId, factionId);
 }
 
 /**
@@ -122,12 +130,13 @@ const arborecCommander: AbilityHandler = (
   context: AbilityContext
 ): AbilityResult => {
   const player = state.players.find(p => p.id === playerId);
-  if (!player || player.faction !== 'arborec') {
-    return { success: false, error: 'Not Arborec player' };
+  if (!player) {
+    return { success: false, error: 'Player not found' };
   }
 
-  if (!isCommanderUnlocked(state, playerId)) {
-    return { success: false, error: 'Commander not unlocked' };
+  // Check if player can use Arborec commander (own or via Alliance)
+  if (!canUseCommanderAbility(state, playerId, 'arborec')) {
+    return { success: false, error: 'Arborec commander not accessible (need unlocked or Alliance)' };
   }
 
   return {
@@ -262,12 +271,13 @@ const solCommander: AbilityHandler = (
   context: AbilityContext
 ): AbilityResult => {
   const player = state.players.find(p => p.id === playerId);
-  if (!player || player.faction !== 'sol') {
-    return { success: false, error: 'Not Sol player' };
+  if (!player) {
+    return { success: false, error: 'Player not found' };
   }
 
-  if (!isCommanderUnlocked(state, playerId)) {
-    return { success: false, error: 'Commander not unlocked' };
+  // Check if player can use Sol commander (own or via Alliance)
+  if (!canUseCommanderAbility(state, playerId, 'sol')) {
+    return { success: false, error: 'Sol commander not accessible (need unlocked or Alliance)' };
   }
 
   const combat = state.activeCombat;
@@ -391,12 +401,13 @@ const empyreanCommander: AbilityHandler = (
   context: AbilityContext
 ): AbilityResult => {
   const player = state.players.find(p => p.id === playerId);
-  if (!player || player.faction !== 'empyrean') {
-    return { success: false, error: 'Not Empyrean player' };
+  if (!player) {
+    return { success: false, error: 'Player not found' };
   }
 
-  if (!isCommanderUnlocked(state, playerId)) {
-    return { success: false, error: 'Commander not unlocked' };
+  // Check if player can use Empyrean commander (own or via Alliance)
+  if (!canUseCommanderAbility(state, playerId, 'empyrean')) {
+    return { success: false, error: 'Empyrean commander not accessible (need unlocked or Alliance)' };
   }
 
   return {
@@ -458,12 +469,13 @@ const mahactCommander: AbilityHandler = (
   context: AbilityContext
 ): AbilityResult => {
   const player = state.players.find(p => p.id === playerId);
-  if (!player || player.faction !== 'mahact') {
-    return { success: false, error: 'Not Mahact player' };
+  if (!player) {
+    return { success: false, error: 'Player not found' };
   }
 
-  if (!isCommanderUnlocked(state, playerId)) {
-    return { success: false, error: 'Commander not unlocked' };
+  // Check if player can use Mahact commander (own or via Alliance)
+  if (!canUseCommanderAbility(state, playerId, 'mahact')) {
+    return { success: false, error: 'Mahact commander not accessible (need unlocked or Alliance)' };
   }
 
   return {

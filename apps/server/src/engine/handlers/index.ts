@@ -36,6 +36,7 @@ import type {
   UnlockCommanderAction,
   PurgeHeroAction,
   ComponentAction,
+  PlaceIonStormAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -104,7 +105,7 @@ import {
   handleUnlockCommander,
   handlePurgeHero,
 } from './leaders.js';
-import { handleComponentAction } from './component-actions.js';
+import { handleComponentAction, handlePlaceIonStorm } from './component-actions.js';
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -262,6 +263,14 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
 
     case 'purge_hero':
       return handlePurgeHero(state, action as PurgeHeroAction);
+
+    // Ion Storm Token
+    case 'place_ion_storm':
+      return handlePlaceIonStorm(state, action as PlaceIonStormAction);
+
+    case 'flip_ion_storm':
+      // Flip is handled automatically during movement, not as a direct action
+      return { success: false, error: 'Ion Storm flips automatically when ships pass through' };
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };

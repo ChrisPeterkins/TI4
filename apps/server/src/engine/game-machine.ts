@@ -178,10 +178,24 @@ export class GameMachine {
   }
 
   private enterActionPhase(): void {
+    // Grant Naalu Collective the "0" initiative token (Telepathy ability)
+    // This happens at the end of strategy phase when entering action phase
+    const naaluPlayer = this.state.players.find(p => p.faction === 'naalu');
+    if (naaluPlayer) {
+      naaluPlayer.hasZeroToken = true;
+    }
+
     // Build initiative order based on strategy card numbers
+    // Naalu with 0 token always goes first (before initiative 1)
     this.state.initiativeOrder = this.state.players
       .filter(p => p.strategyCard !== null)
-      .sort((a, b) => (a.strategyCard ?? 99) - (b.strategyCard ?? 99))
+      .sort((a, b) => {
+        // Naalu with 0 token always first
+        if (a.hasZeroToken && !b.hasZeroToken) return -1;
+        if (!a.hasZeroToken && b.hasZeroToken) return 1;
+        // Otherwise sort by strategy card number
+        return (a.strategyCard ?? 99) - (b.strategyCard ?? 99);
+      })
       .map(p => p.id);
 
     // Set first player in initiative order as active

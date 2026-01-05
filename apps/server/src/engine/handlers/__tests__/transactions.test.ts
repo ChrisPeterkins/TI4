@@ -358,8 +358,10 @@ describe('Transaction Handlers', () => {
       expect(state.players[0].score).toBe(1);
     });
 
-    it('should transfer action cards', () => {
+    it('should transfer action cards (Hacan Arbiters)', () => {
       const state = createMockGameState();
+      // Only Hacan can trade action cards via Arbiters ability
+      state.players[0].faction = 'hacan';
       state.pendingTransaction = {
         id: 'tx-1',
         initiatorId: 'player1',
@@ -381,6 +383,31 @@ describe('Transaction Handlers', () => {
       expect(result.success).toBe(true);
       expect(state.players[0].actionCards).not.toContain('action_1');
       expect(state.players[1].actionCards).toContain('action_1');
+    });
+
+    it('should reject action card trade from non-Hacan player', () => {
+      const state = createMockGameState();
+      // Player is Sol, not Hacan - cannot trade action cards
+      state.pendingTransaction = {
+        id: 'tx-1',
+        initiatorId: 'player1',
+        targetId: 'player2',
+        initiatorOffer: { actionCards: ['action_1'] },
+        requestedOffer: {},
+        createdAt: Date.now(),
+      };
+
+      const action: AcceptTransactionAction = {
+        type: 'accept_transaction',
+        playerId: 'player2',
+        transactionId: 'tx-1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleAcceptTransaction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Only the Emirates of Hacan can trade action cards');
     });
 
     it('should mark players as having transacted', () => {

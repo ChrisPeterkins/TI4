@@ -22,15 +22,16 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
     color: 'blue',
     isBot: false,
     seatPosition: 0,
-    victoryPoints: 0,
+    score: 0,
     resources: 0,
     influence: 0,
     tradeGoods: 0,
-    commodities: 0,
+    commodities: 3,
     maxCommodities: 4,
     planets: [],
     technologies: [],
     promissoryNotes: [],
+    promissoryNotesInPlay: [],
     actionCards: [],
     scoredObjectives: [],
     secretObjectives: [],
@@ -43,6 +44,7 @@ function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
       hero: { unlocked: false, purged: false },
     },
     strategyCard: null,
+    strategyCardUsed: false,
     passed: false,
     speaker: false,
     ...overrides,
@@ -72,6 +74,7 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
     round: 1,
     turn: 1,
     activePlayerId: 'player1',
+    speakerId: 'player1',
     version: 1,
     players: [createMockPlayer()],
     map: {
@@ -86,9 +89,10 @@ function createMockGameState(overrides: Partial<GameState> = {}): GameState {
     },
     laws: [],
     actionCardDeck: [],
+    actionCardDiscard: [],
     agendaDeck: [],
     relicDeck: [],
-    strategyCardState: {},
+    strategyCards: [],
     log: [],
     settings: {
       victoryPointLimit: 10,
@@ -113,6 +117,10 @@ describe('Legendary Planet Handlers', () => {
       expect(isLegendaryPlanet('mallice')).toBe(true);
     });
 
+    it('should return true for Mirage', () => {
+      expect(isLegendaryPlanet('mirage')).toBe(true);
+    });
+
     it('should return false for regular planets', () => {
       expect(isLegendaryPlanet('mecatol_rex')).toBe(false);
       expect(isLegendaryPlanet('jord')).toBe(false);
@@ -125,21 +133,32 @@ describe('Legendary Planet Handlers', () => {
       const data = getLegendaryPlanet('primor');
       expect(data).not.toBeNull();
       expect(data?.name).toBe('Primor');
-      expect(data?.abilityType).toBe('purge_attachments');
+      expect(data?.abilityName).toBe('The Atrament');
+      expect(data?.abilityType).toBe('place_infantry');
     });
 
     it('should return data for Hope\'s End', () => {
       const data = getLegendaryPlanet('hopes_end');
       expect(data).not.toBeNull();
       expect(data?.name).toBe("Hope's End");
-      expect(data?.abilityType).toBe('action_card_cycle');
+      expect(data?.abilityName).toBe('Imperial Arms Vault');
+      expect(data?.abilityType).toBe('place_mech_or_draw');
     });
 
     it('should return data for Mallice', () => {
       const data = getLegendaryPlanet('mallice');
       expect(data).not.toBeNull();
       expect(data?.name).toBe('Mallice');
-      expect(data?.abilityType).toBe('limited_production');
+      expect(data?.abilityName).toBe('Exterrix Headquarters');
+      expect(data?.abilityType).toBe('gain_tg_or_convert');
+    });
+
+    it('should return data for Mirage', () => {
+      const data = getLegendaryPlanet('mirage');
+      expect(data).not.toBeNull();
+      expect(data?.name).toBe('Mirage');
+      expect(data?.abilityName).toBe('Flight Academy');
+      expect(data?.abilityType).toBe('place_fighters');
     });
 
     it('should return null for non-legendary planets', () => {
@@ -215,7 +234,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
-          targets: { attachmentIds: ['demilitarized_zone'] },
+          targets: { targetPlanetId: 'primor' },
           timestamp: Date.now(),
         };
 
@@ -226,8 +245,8 @@ describe('Legendary Planet Handlers', () => {
       });
     });
 
-    describe('Primor ability (purge attachments)', () => {
-      it('should fail if no attachments specified', () => {
+    describe('Primor ability (place infantry)', () => {
+      it('should fail if no target planet specified', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
@@ -245,16 +264,14 @@ describe('Legendary Planet Handlers', () => {
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('Must specify attachments to purge');
+        expect(result.error).toBe('Must specify a target planet');
       });
 
-      it('should fail if trying to purge more than 2 attachments', () => {
+      it('should fail if player does not control target planet', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
-              planets: [
-                { planetId: 'primor', exhausted: false, attachments: ['a1', 'a2', 'a3'] },
-              ],
+              planets: [{ planetId: 'primor', exhausted: false, attachments: [] }],
             }),
           ],
         });
@@ -262,33 +279,33 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
-          targets: { attachmentIds: ['a1', 'a2', 'a3'] },
+          targets: { targetPlanetId: 'abyz' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe('Can only purge up to 2 attachments');
+        expect(result.error).toBe('You do not control the target planet');
       });
 
-      it('should fail if attachment not found on player planets', () => {
+      it('should successfully place 2 infantry on target planet', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
               planets: [
                 { planetId: 'primor', exhausted: false, attachments: [] },
-                { planetId: 'abyz', exhausted: false, attachments: ['research_station'] },
+                { planetId: 'abyz', exhausted: false, attachments: [] },
               ],
             }),
           ],
           map: {
             tiles: [
               createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'primor', attachments: [] } as any],
+                planets: [{ planetId: 'primor', attachments: [], units: [] } as any],
               }),
               createMockTile({ q: 1, r: 0 }, {
-                planets: [{ planetId: 'abyz', attachments: ['research_station'] } as any],
+                planets: [{ planetId: 'abyz', attachments: [], units: [] } as any],
               }),
             ],
             playerCount: 6,
@@ -298,43 +315,7 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
-          targets: { attachmentIds: ['nonexistent_attachment'] },
-          timestamp: Date.now(),
-        };
-
-        const result = handleUseLegendaryAbility(state, action);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toBe('Attachment nonexistent_attachment not found on your planets');
-      });
-
-      it('should successfully purge 1 attachment', () => {
-        const state = createMockGameState({
-          players: [
-            createMockPlayer({
-              planets: [
-                { planetId: 'primor', exhausted: false, attachments: [] },
-                { planetId: 'abyz', exhausted: false, attachments: ['research_station'] },
-              ],
-            }),
-          ],
-          map: {
-            tiles: [
-              createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'primor', attachments: [] } as any],
-              }),
-              createMockTile({ q: 1, r: 0 }, {
-                planets: [{ planetId: 'abyz', attachments: ['research_station'] } as any],
-              }),
-            ],
-            playerCount: 6,
-          },
-        });
-        const action: UseLegendaryAbilityAction = {
-          type: 'use_legendary_ability',
-          playerId: 'player1',
-          planetId: 'primor',
-          targets: { attachmentIds: ['research_station'] },
+          targets: { targetPlanetId: 'abyz' },
           timestamp: Date.now(),
         };
 
@@ -342,30 +323,26 @@ describe('Legendary Planet Handlers', () => {
 
         expect(result.success).toBe(true);
         expect(result.triggeredEvents).toContain('legendary_ability_used');
-        expect((result.data as any)?.effect.purgedAttachments).toContain('research_station');
-        // Verify attachment was removed from map
-        expect(state.map.tiles[1].planets[0].attachments).not.toContain('research_station');
+        expect((result.data as any)?.effect.unitsPlaced).toBe(2);
+        expect((result.data as any)?.effect.unitType).toBe('infantry');
+        // Verify infantry were placed
+        expect(state.map.tiles[1].planets[0].units).toHaveLength(2);
+        expect(state.map.tiles[1].planets[0].units[0].type).toBe('infantry');
         // Verify planet was exhausted
         expect(state.players[0].planets[0].exhausted).toBe(true);
       });
 
-      it('should successfully purge 2 attachments', () => {
+      it('should successfully place 1 infantry if count is 1', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
-              planets: [
-                { planetId: 'primor', exhausted: false, attachments: [] },
-                { planetId: 'abyz', exhausted: false, attachments: ['research_station', 'demilitarized_zone'] },
-              ],
+              planets: [{ planetId: 'primor', exhausted: false, attachments: [] }],
             }),
           ],
           map: {
             tiles: [
               createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'primor', attachments: [] } as any],
-              }),
-              createMockTile({ q: 1, r: 0 }, {
-                planets: [{ planetId: 'abyz', attachments: ['research_station', 'demilitarized_zone'] } as any],
+                planets: [{ planetId: 'primor', attachments: [], units: [] } as any],
               }),
             ],
             playerCount: 6,
@@ -375,20 +352,20 @@ describe('Legendary Planet Handlers', () => {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'primor',
-          targets: { attachmentIds: ['research_station', 'demilitarized_zone'] },
+          targets: { targetPlanetId: 'primor', count: 1 },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect((result.data as any)?.effect.purgedAttachments).toHaveLength(2);
-        expect(state.map.tiles[1].planets[0].attachments).toHaveLength(0);
+        expect((result.data as any)?.effect.unitsPlaced).toBe(1);
+        expect(state.map.tiles[0].planets[0].units).toHaveLength(1);
       });
     });
 
-    describe('Hope\'s End ability (action card cycle)', () => {
-      it('should draw 3 action cards when no return cards specified', () => {
+    describe('Hope\'s End ability (place mech or draw card)', () => {
+      it('should draw 1 action card when choice is draw_card', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
@@ -396,84 +373,86 @@ describe('Legendary Planet Handlers', () => {
               actionCards: [],
             }),
           ],
-          actionCardDeck: ['card1', 'card2', 'card3', 'card4', 'card5'],
+          actionCardDeck: ['card1', 'card2', 'card3'],
         });
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'hopes_end',
+          targets: { choice: 'draw_card' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect((result.data as any)?.effect.awaitingCardSelection).toBe(true);
-        expect(state.players[0].actionCards).toHaveLength(3);
-        expect(state.actionCardDeck).toHaveLength(2);
-      });
-
-      it('should draw and return 3 cards when specified', () => {
-        const state = createMockGameState({
-          players: [
-            createMockPlayer({
-              planets: [{ planetId: 'hopes_end', exhausted: false, attachments: [] }],
-              actionCards: ['existing_card'],
-            }),
-          ],
-          actionCardDeck: ['card1', 'card2', 'card3', 'card4'],
-        });
-        const action: UseLegendaryAbilityAction = {
-          type: 'use_legendary_ability',
-          playerId: 'player1',
-          planetId: 'hopes_end',
-          targets: {
-            actionCardIds: ['existing_card', 'card1', 'card2'],
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = handleUseLegendaryAbility(state, action);
-
-        expect(result.success).toBe(true);
-        expect((result.data as any)?.effect.drawnCards).toBe(3);
-        expect((result.data as any)?.effect.returnedCards).toBe(3);
-        // Started with 1, drew 3, returned 3 = 1 card in hand
+        expect((result.data as any)?.effect.effect).toBe('drew_action_card');
         expect(state.players[0].actionCards).toHaveLength(1);
-        expect(state.players[0].actionCards[0]).toBe('card3'); // The one not returned
-        // Deck had 4, drew 3 = 1, then returned 3 = 4 at bottom
-        expect(state.actionCardDeck).toContain('existing_card');
-        expect(state.actionCardDeck).toContain('card1');
-        expect(state.actionCardDeck).toContain('card2');
+        expect(state.actionCardDeck).toHaveLength(2);
+        expect(state.players[0].planets[0].exhausted).toBe(true);
       });
 
-      it('should fail if player does not have specified return cards', () => {
+      it('should place 1 mech when choice is place_mech with target planet', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
-              planets: [{ planetId: 'hopes_end', exhausted: false, attachments: [] }],
-              actionCards: ['card1'],
+              planets: [
+                { planetId: 'hopes_end', exhausted: false, attachments: [] },
+                { planetId: 'abyz', exhausted: false, attachments: [] },
+              ],
             }),
           ],
-          actionCardDeck: ['deck_card1', 'deck_card2', 'deck_card3'],
+          map: {
+            tiles: [
+              createMockTile({ q: 0, r: 0 }, {
+                planets: [{ planetId: 'hopes_end', attachments: [], units: [] } as any],
+              }),
+              createMockTile({ q: 1, r: 0 }, {
+                planets: [{ planetId: 'abyz', attachments: [], units: [] } as any],
+              }),
+            ],
+            playerCount: 6,
+          },
         });
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'hopes_end',
-          targets: {
-            actionCardIds: ['card1', 'card_i_dont_have', 'another_missing'],
-          },
+          targets: { choice: 'place_mech', targetPlanetId: 'abyz' },
+          timestamp: Date.now(),
+        };
+
+        const result = handleUseLegendaryAbility(state, action);
+
+        expect(result.success).toBe(true);
+        expect((result.data as any)?.effect.effect).toBe('placed_mech');
+        expect(state.map.tiles[1].planets[0].units).toHaveLength(1);
+        expect(state.map.tiles[1].planets[0].units[0].type).toBe('mech');
+        expect(state.players[0].planets[0].exhausted).toBe(true);
+      });
+
+      it('should fail if no choice and no target planet', () => {
+        const state = createMockGameState({
+          players: [
+            createMockPlayer({
+              planets: [{ planetId: 'hopes_end', exhausted: false, attachments: [] }],
+            }),
+          ],
+        });
+        const action: UseLegendaryAbilityAction = {
+          type: 'use_legendary_ability',
+          playerId: 'player1',
+          planetId: 'hopes_end',
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('You do not have action card');
+        expect(result.error).toContain('Must choose');
       });
 
-      it('should handle empty action card deck gracefully', () => {
+      it('should reshuffle discard if deck is empty', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
@@ -482,173 +461,136 @@ describe('Legendary Planet Handlers', () => {
             }),
           ],
           actionCardDeck: [],
+          actionCardDiscard: ['discarded1', 'discarded2'],
         });
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'hopes_end',
+          targets: { choice: 'draw_card' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect((result.data as any)?.effect.drawnCards).toBe(0);
-        expect(state.players[0].actionCards).toHaveLength(0);
+        expect(state.players[0].actionCards).toHaveLength(1);
+        expect(state.actionCardDiscard).toHaveLength(0);
       });
     });
 
-    describe('Mallice ability (limited production)', () => {
-      it('should fail if no units specified', () => {
+    describe('Mallice ability (gain TG or convert commodities)', () => {
+      it('should gain 2 trade goods when choice is gain_tg', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
               planets: [{ planetId: 'mallice', exhausted: false, attachments: [] }],
+              tradeGoods: 5,
             }),
           ],
-          map: {
-            tiles: [
-              createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'mallice', attachments: [] } as any],
-              }),
-            ],
-            playerCount: 6,
-          },
         });
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'mallice',
-          timestamp: Date.now(),
-        };
-
-        const result = handleUseLegendaryAbility(state, action);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toBe('Must specify units to produce');
-      });
-
-      it('should fail if trying to produce more than 2 units', () => {
-        const state = createMockGameState({
-          players: [
-            createMockPlayer({
-              planets: [{ planetId: 'mallice', exhausted: false, attachments: [] }],
-            }),
-          ],
-          map: {
-            tiles: [
-              createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'mallice', attachments: [] } as any],
-              }),
-            ],
-            playerCount: 6,
-          },
-        });
-        const action: UseLegendaryAbilityAction = {
-          type: 'use_legendary_ability',
-          playerId: 'player1',
-          planetId: 'mallice',
-          targets: {
-            unitProduction: [{ type: 'infantry', count: 3 }],
-          },
-          timestamp: Date.now(),
-        };
-
-        const result = handleUseLegendaryAbility(state, action);
-
-        expect(result.success).toBe(false);
-        expect(result.error).toBe('Can only produce up to 2 units');
-      });
-
-      it('should successfully produce 2 infantry on Mallice', () => {
-        const state = createMockGameState({
-          players: [
-            createMockPlayer({
-              planets: [{ planetId: 'mallice', exhausted: false, attachments: [] }],
-            }),
-          ],
-          map: {
-            tiles: [
-              createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'mallice', attachments: [] } as any],
-                units: [],
-              }),
-            ],
-            playerCount: 6,
-          },
-        });
-        const action: UseLegendaryAbilityAction = {
-          type: 'use_legendary_ability',
-          playerId: 'player1',
-          planetId: 'mallice',
-          targets: {
-            unitProduction: [{ type: 'infantry', count: 2 }],
-          },
+          targets: { choice: 'gain_tg' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(result.triggeredEvents).toContain('legendary_ability_used');
-        expect(state.map.tiles[0].units).toHaveLength(2);
-        expect(state.map.tiles[0].units[0].type).toBe('infantry');
-        expect(state.map.tiles[0].units[0].ownerId).toBe('player1');
-        expect(state.map.tiles[0].units[0].planetId).toBe('mallice'); // Ground unit on planet
+        expect((result.data as any)?.effect.effect).toBe('gained_trade_goods');
+        expect((result.data as any)?.effect.tradeGoodsGained).toBe(2);
+        expect(state.players[0].tradeGoods).toBe(7);
         expect(state.players[0].planets[0].exhausted).toBe(true);
       });
 
-      it('should successfully produce mixed unit types', () => {
+      it('should convert all commodities to trade goods when choice is convert', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
               planets: [{ planetId: 'mallice', exhausted: false, attachments: [] }],
+              tradeGoods: 2,
+              commodities: 4,
             }),
           ],
-          map: {
-            tiles: [
-              createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'mallice', attachments: [] } as any],
-                units: [],
-              }),
-            ],
-            playerCount: 6,
-          },
         });
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
           planetId: 'mallice',
-          targets: {
-            unitProduction: [
-              { type: 'infantry', count: 1 },
-              { type: 'mech', count: 1 },
-            ],
-          },
+          targets: { choice: 'convert' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(state.map.tiles[0].units).toHaveLength(2);
-        const unitTypes = state.map.tiles[0].units.map((u) => u.type);
-        expect(unitTypes).toContain('infantry');
-        expect(unitTypes).toContain('mech');
+        expect((result.data as any)?.effect.effect).toBe('converted_commodities');
+        expect((result.data as any)?.effect.commoditiesConverted).toBe(4);
+        expect(state.players[0].tradeGoods).toBe(6);
+        expect(state.players[0].commodities).toBe(0);
       });
 
-      it('should place space units without planetId', () => {
+      it('should default to gain 2 TG if no choice specified', () => {
         const state = createMockGameState({
           players: [
             createMockPlayer({
               planets: [{ planetId: 'mallice', exhausted: false, attachments: [] }],
+              tradeGoods: 0,
+            }),
+          ],
+        });
+        const action: UseLegendaryAbilityAction = {
+          type: 'use_legendary_ability',
+          playerId: 'player1',
+          planetId: 'mallice',
+          timestamp: Date.now(),
+        };
+
+        const result = handleUseLegendaryAbility(state, action);
+
+        expect(result.success).toBe(true);
+        expect(state.players[0].tradeGoods).toBe(2);
+      });
+    });
+
+    describe('Mirage ability (place fighters)', () => {
+      it('should fail if no target system specified', () => {
+        const state = createMockGameState({
+          players: [
+            createMockPlayer({
+              planets: [{ planetId: 'mirage', exhausted: false, attachments: [] }],
+            }),
+          ],
+        });
+        const action: UseLegendaryAbilityAction = {
+          type: 'use_legendary_ability',
+          playerId: 'player1',
+          planetId: 'mirage',
+          timestamp: Date.now(),
+        };
+
+        const result = handleUseLegendaryAbility(state, action);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('Must specify a target system');
+      });
+
+      it('should fail if player has no ships in target system', () => {
+        const state = createMockGameState({
+          players: [
+            createMockPlayer({
+              planets: [{ planetId: 'mirage', exhausted: false, attachments: [] }],
             }),
           ],
           map: {
             tiles: [
               createMockTile({ q: 0, r: 0 }, {
-                planets: [{ planetId: 'mallice', attachments: [] } as any],
-                units: [],
+                id: 'system1',
+                planets: [{ planetId: 'mirage', attachments: [], units: [] } as any],
+                units: [], // No ships
               }),
             ],
             playerCount: 6,
@@ -657,19 +599,89 @@ describe('Legendary Planet Handlers', () => {
         const action: UseLegendaryAbilityAction = {
           type: 'use_legendary_ability',
           playerId: 'player1',
-          planetId: 'mallice',
-          targets: {
-            unitProduction: [{ type: 'fighter', count: 2 }],
+          planetId: 'mirage',
+          targets: { systemId: 'system1' },
+          timestamp: Date.now(),
+        };
+
+        const result = handleUseLegendaryAbility(state, action);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe('You have no ships in this system');
+      });
+
+      it('should successfully place 2 fighters in system with ships', () => {
+        const state = createMockGameState({
+          players: [
+            createMockPlayer({
+              planets: [{ planetId: 'mirage', exhausted: false, attachments: [] }],
+            }),
+          ],
+          map: {
+            tiles: [
+              createMockTile({ q: 0, r: 0 }, {
+                id: 'system1',
+                planets: [{ planetId: 'mirage', attachments: [], units: [] } as any],
+                units: [{ id: 'carrier1', type: 'carrier', ownerId: 'player1', damaged: false }],
+              }),
+            ],
+            playerCount: 6,
           },
+        });
+        const action: UseLegendaryAbilityAction = {
+          type: 'use_legendary_ability',
+          playerId: 'player1',
+          planetId: 'mirage',
+          targets: { systemId: 'system1' },
           timestamp: Date.now(),
         };
 
         const result = handleUseLegendaryAbility(state, action);
 
         expect(result.success).toBe(true);
-        expect(state.map.tiles[0].units).toHaveLength(2);
-        expect(state.map.tiles[0].units[0].type).toBe('fighter');
-        expect(state.map.tiles[0].units[0].planetId).toBeUndefined(); // Space units not on planet
+        expect((result.data as any)?.effect.unitsPlaced).toBe(2);
+        expect((result.data as any)?.effect.unitType).toBe('fighter');
+        // Original carrier + 2 new fighters
+        expect(state.map.tiles[0].units).toHaveLength(3);
+        expect(state.map.tiles[0].units.filter(u => u.type === 'fighter')).toHaveLength(2);
+        expect(state.players[0].planets[0].exhausted).toBe(true);
+      });
+
+      it('should allow placing in different system than Mirage', () => {
+        const state = createMockGameState({
+          players: [
+            createMockPlayer({
+              planets: [{ planetId: 'mirage', exhausted: false, attachments: [] }],
+            }),
+          ],
+          map: {
+            tiles: [
+              createMockTile({ q: 0, r: 0 }, {
+                id: 'mirage_system',
+                planets: [{ planetId: 'mirage', attachments: [], units: [] } as any],
+                units: [],
+              }),
+              createMockTile({ q: 1, r: 0 }, {
+                id: 'other_system',
+                planets: [],
+                units: [{ id: 'dread1', type: 'dreadnought', ownerId: 'player1', damaged: false }],
+              }),
+            ],
+            playerCount: 6,
+          },
+        });
+        const action: UseLegendaryAbilityAction = {
+          type: 'use_legendary_ability',
+          playerId: 'player1',
+          planetId: 'mirage',
+          targets: { systemId: 'other_system' },
+          timestamp: Date.now(),
+        };
+
+        const result = handleUseLegendaryAbility(state, action);
+
+        expect(result.success).toBe(true);
+        expect(state.map.tiles[1].units.filter(u => u.type === 'fighter')).toHaveLength(2);
       });
     });
   });
@@ -707,6 +719,7 @@ describe('Legendary Planet Handlers', () => {
             planets: [
               { planetId: 'primor', exhausted: false, attachments: [] },
               { planetId: 'hopes_end', exhausted: true, attachments: [] },
+              { planetId: 'mirage', exhausted: false, attachments: [] },
               { planetId: 'abyz', exhausted: false, attachments: [] },
             ],
           }),
@@ -715,9 +728,10 @@ describe('Legendary Planet Handlers', () => {
 
       const result = getPlayerLegendaryPlanets(state, 'player1');
 
-      expect(result).toHaveLength(2);
-      expect(result).toContainEqual({ planetId: 'primor', name: 'Primor', exhausted: false });
-      expect(result).toContainEqual({ planetId: 'hopes_end', name: "Hope's End", exhausted: true });
+      expect(result).toHaveLength(3);
+      expect(result).toContainEqual({ planetId: 'primor', name: 'Primor', abilityName: 'The Atrament', exhausted: false });
+      expect(result).toContainEqual({ planetId: 'hopes_end', name: "Hope's End", abilityName: 'Imperial Arms Vault', exhausted: true });
+      expect(result).toContainEqual({ planetId: 'mirage', name: 'Mirage', abilityName: 'Flight Academy', exhausted: false });
     });
 
     it('should correctly report exhausted status', () => {
@@ -735,6 +749,7 @@ describe('Legendary Planet Handlers', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].exhausted).toBe(true);
+      expect(result[0].abilityName).toBe('Exterrix Headquarters');
     });
   });
 
@@ -772,7 +787,6 @@ describe('Legendary Planet Handlers', () => {
       });
 
       // This function checks for Shard of the Throne transfer
-      // It should detect when someone else has the relic and is not the new controller
       expect(() => {
         checkLegendaryPlanetControl(state, 'primor', 'player2', 'player1');
       }).not.toThrow();

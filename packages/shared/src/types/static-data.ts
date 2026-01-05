@@ -229,6 +229,18 @@ export interface SystemData {
   wormhole?: WormholeType;
   anomaly?: AnomalyType;
   expansion: Expansion;
+  /**
+   * For hyperlane tiles: defines which edges are connected on the A side.
+   * Each connection is a pair of edge indices (0-5, clockwise from top).
+   * Edge 0 = top, 1 = top-right, 2 = bottom-right, 3 = bottom, 4 = bottom-left, 5 = top-left
+   * Connections are stored at rotation 0; actual connections depend on tile rotation.
+   */
+  hyperlaneConnections?: [number, number][];
+  /**
+   * For hyperlane tiles: defines which edges are connected on the B side.
+   * Used when the map configuration specifies the B side of the tile.
+   */
+  hyperlaneConnectionsB?: [number, number][];
 }
 
 export interface PlanetData {

@@ -31,6 +31,7 @@ import {
   canUseSustainDamage,
 } from '../utils/combat.js';
 import { checkTimingTrigger } from './timing-windows.js';
+import { checkAbilityTriggers } from '../abilities/ability-triggers.js';
 
 /**
  * Initialize a new combat instance
@@ -520,7 +521,34 @@ function executeRetreat(state: GameState): HandlerResult {
 }
 
 /**
+ * Determine the winner of combat based on remaining units
+ * Returns the player ID of the winner, or null if it's a draw
+ */
+export function determineCombatWinner(
+  state: GameState,
+  combat: CombatInstance
+): string | null {
+  // Count remaining units for each side
+  const attackerHasUnits = combat.attackerUnits.length > 0;
+  const defenderHasUnits = combat.defenderUnits.length > 0;
+
+  if (attackerHasUnits && !defenderHasUnits) {
+    return combat.attackerId;
+  } else if (!attackerHasUnits && defenderHasUnits) {
+    return combat.defenderId;
+  } else if (!attackerHasUnits && !defenderHasUnits) {
+    // Both sides annihilated - no winner (draw)
+    return null;
+  } else {
+    // Both sides have units - shouldn't happen at combat end
+    // This could occur if retreat was announced
+    return null;
+  }
+}
+
+/**
  * Complete combat and clean up
+ * Fires combat_win and combat_loss triggers for faction abilities (e.g., Nekro Galactic Threat)
  */
 export function completeCombat(
   state: GameState,
@@ -531,12 +559,45 @@ export function completeCombat(
     return { success: false, error: 'No active combat' };
   }
 
+  // If winnerId wasn't passed, determine it from remaining units
+  const actualWinnerId = winnerId ?? determineCombatWinner(state, combat);
+  const loserId = actualWinnerId
+    ? (actualWinnerId === combat.attackerId ? combat.defenderId : combat.attackerId)
+    : null;
+
   combat.state = 'combat_complete';
+
+  // Fire combat_win trigger for winner (e.g., Nekro's Galactic Threat)
+  if (actualWinnerId && loserId) {
+    const winTriggers = checkAbilityTriggers(state, 'combat_win', {
+      playerId: actualWinnerId,
+      targetPlayerId: loserId,
+      systemId: combat.systemId,
+      combatType: combat.type,
+    });
+
+    // Fire combat_loss trigger for loser (if any abilities use it)
+    const lossTriggers = checkAbilityTriggers(state, 'combat_loss', {
+      playerId: loserId,
+      targetPlayerId: actualWinnerId,
+      systemId: combat.systemId,
+      combatType: combat.type,
+    });
+
+    // TODO: Process triggered abilities (Nekro tech copy, etc.)
+    // For now, log that triggers were detected
+    if (winTriggers.length > 0) {
+      console.log('Combat win triggers:', winTriggers.map(t => t.abilityName));
+    }
+    if (lossTriggers.length > 0) {
+      console.log('Combat loss triggers:', lossTriggers.map(t => t.abilityName));
+    }
+  }
 
   return {
     success: true,
-    triggeredEvents: ['combat_ended'],
-    data: { winnerId },
+    triggeredEvents: ['combat_ended', ...(actualWinnerId ? ['combat_win'] : [])],
+    data: { winnerId: actualWinnerId, loserId },
   };
 }
 

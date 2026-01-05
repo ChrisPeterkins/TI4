@@ -240,8 +240,13 @@ function validateOffer(
     }
   }
 
-  // Validate action cards
+  // Validate action cards (only Hacan can trade via Arbiters ability)
   if (offer.actionCards && offer.actionCards.length > 0) {
+    // Only Hacan can trade action cards (Arbiters faction ability)
+    if (player.faction !== 'hacan') {
+      return { valid: false, error: 'Only the Emirates of Hacan can trade action cards' };
+    }
+
     for (const cardId of offer.actionCards) {
       if (!player.actionCards.includes(cardId)) {
         return { valid: false, error: 'Action card not in hand' };

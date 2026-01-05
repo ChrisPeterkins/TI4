@@ -7,7 +7,7 @@
 
 import type { GameState, HexCoord, MapTile } from '@ti4/shared';
 import type { MovementModifiers } from './ability-types.js';
-import { factions } from '@ti4/game-data';
+import { factions, systems } from '@ti4/game-data';
 
 /**
  * Default movement modifiers
@@ -98,6 +98,20 @@ export function getMovementModifiers(
 }
 
 /**
+ * Get the effective wormhole type for a system, accounting for Ion Storm token
+ */
+function getEffectiveWormhole(
+  state: GameState,
+  system: MapTile
+): string | null {
+  // Check if Ion Storm token is in this system
+  if (state.ionStormToken && state.ionStormToken.systemId === system.id) {
+    return state.ionStormToken.side; // 'alpha' or 'beta'
+  }
+  return system.wormhole;
+}
+
+/**
  * Check if two systems are adjacent, accounting for faction abilities
  */
 export function areSystemsAdjacent(
@@ -113,10 +127,19 @@ export function areSystemsAdjacent(
     return true;
   }
 
+  // Check for hyperlane adjacency
+  if (areConnectedThroughHyperlane(state, fromSystem, toSystem)) {
+    return true;
+  }
+
+  // Get effective wormholes (accounting for Ion Storm token)
+  const fromWormhole = getEffectiveWormhole(state, fromSystem);
+  const toWormhole = getEffectiveWormhole(state, toSystem);
+
   // Check for wormhole adjacency
-  if (fromSystem.wormhole && toSystem.wormhole) {
+  if (fromWormhole && toWormhole) {
     // Same type wormholes are adjacent (alpha to alpha, beta to beta)
-    if (fromSystem.wormhole === toSystem.wormhole) {
+    if (fromWormhole === toWormhole) {
       return true;
     }
 
@@ -124,8 +147,8 @@ export function areSystemsAdjacent(
     if (player?.faction === 'creuss') {
       const wormholeTypes = ['alpha', 'beta'];
       if (
-        wormholeTypes.includes(fromSystem.wormhole) &&
-        wormholeTypes.includes(toSystem.wormhole)
+        wormholeTypes.includes(fromWormhole) &&
+        wormholeTypes.includes(toWormhole)
       ) {
         return true;
       }
@@ -139,10 +162,10 @@ export function areSystemsAdjacent(
     const hasFlagshipInTo = hasFlagshipInSystem(state, playerId, toSystem);
 
     // Flagship creates delta wormhole - connects to all other wormholes
-    if (hasFlagshipInFrom && toSystem.wormhole) {
+    if (hasFlagshipInFrom && toWormhole) {
       return true;
     }
-    if (hasFlagshipInTo && fromSystem.wormhole) {
+    if (hasFlagshipInTo && fromWormhole) {
       return true;
     }
   }
@@ -200,6 +223,122 @@ function isHexAdjacent(pos1: HexCoord, pos2: HexCoord): boolean {
   const ds = Math.abs((-pos1.q - pos1.r) - (-pos2.q - pos2.r));
 
   return Math.max(dq, dr, ds) === 1;
+}
+
+/**
+ * Hex directions for determining which edge connects to a neighbor
+ * Edge indices: 0=top, 1=top-right, 2=bottom-right, 3=bottom, 4=bottom-left, 5=top-left
+ * These are the axial direction vectors for each edge
+ */
+const HEX_EDGE_DIRECTIONS: HexCoord[] = [
+  { q: 0, r: -1 },  // Edge 0: top (north)
+  { q: 1, r: -1 },  // Edge 1: top-right (northeast)
+  { q: 1, r: 0 },   // Edge 2: bottom-right (east)
+  { q: 0, r: 1 },   // Edge 3: bottom (south)
+  { q: -1, r: 1 },  // Edge 4: bottom-left (southwest)
+  { q: -1, r: 0 },  // Edge 5: top-left (west)
+];
+
+/**
+ * Get the edge index (0-5) that connects a hex to a neighbor hex
+ * Returns -1 if not adjacent
+ */
+function getConnectingEdge(from: HexCoord, to: HexCoord): number {
+  const dq = to.q - from.q;
+  const dr = to.r - from.r;
+
+  for (let i = 0; i < 6; i++) {
+    if (HEX_EDGE_DIRECTIONS[i].q === dq && HEX_EDGE_DIRECTIONS[i].r === dr) {
+      return i;
+    }
+  }
+  return -1; // Not adjacent
+}
+
+/**
+ * Get the opposite edge index (the edge on the neighbor that faces back)
+ */
+function getOppositeEdge(edge: number): number {
+  return (edge + 3) % 6;
+}
+
+/**
+ * Apply tile rotation to an edge index
+ * Rotation is clockwise, 0-5
+ */
+function applyRotationToEdge(edge: number, rotation: number): number {
+  return (edge + rotation) % 6;
+}
+
+/**
+ * Remove tile rotation from an edge index (to compare against base connection data)
+ * Rotation is clockwise, so we subtract to get the base edge
+ */
+function removeRotationFromEdge(edge: number, rotation: number): number {
+  return (edge - rotation + 6) % 6;
+}
+
+/**
+ * Check if two systems are connected through a hyperlane tile
+ * Hyperlane tiles create adjacency between systems on opposite sides
+ */
+function areConnectedThroughHyperlane(
+  state: GameState,
+  fromSystem: MapTile,
+  toSystem: MapTile
+): boolean {
+  // Find all hyperlane tiles on the map
+  const hyperlaneTiles = state.map.tiles.filter(tile => {
+    const systemData = systems[tile.systemId];
+    return systemData && systemData.type === 'hyperlane';
+  });
+
+  for (const hyperlaneTile of hyperlaneTiles) {
+    // Check if both systems are adjacent to this hyperlane tile
+    const fromEdge = getConnectingEdge(hyperlaneTile.position, fromSystem.position);
+    const toEdge = getConnectingEdge(hyperlaneTile.position, toSystem.position);
+
+    // Both must be adjacent to the hyperlane
+    if (fromEdge === -1 || toEdge === -1) {
+      continue;
+    }
+
+    // Get the hyperlane connection data
+    const systemData = systems[hyperlaneTile.systemId];
+    if (!systemData) {
+      continue;
+    }
+
+    // Select the correct connection pattern based on which side is face-up
+    const side = hyperlaneTile.hyperlaneSide ?? 'A';
+    const connections = side === 'B' && systemData.hyperlaneConnectionsB
+      ? systemData.hyperlaneConnectionsB
+      : systemData.hyperlaneConnections;
+
+    if (!connections) {
+      continue;
+    }
+
+    // Get tile rotation (default 0 if not specified)
+    const rotation = hyperlaneTile.rotation ?? 0;
+
+    // Convert the actual edges to base edges (removing rotation)
+    const baseFromEdge = removeRotationFromEdge(fromEdge, rotation);
+    const baseToEdge = removeRotationFromEdge(toEdge, rotation);
+
+    // Check if any hyperlane connection links these edges
+    for (const [edge1, edge2] of connections) {
+      // Check if the connection matches in either direction
+      if (
+        (edge1 === baseFromEdge && edge2 === baseToEdge) ||
+        (edge2 === baseFromEdge && edge1 === baseToEdge)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**

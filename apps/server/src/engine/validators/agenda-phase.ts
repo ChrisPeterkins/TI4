@@ -4,6 +4,7 @@ import type {
   CastVoteAction,
   SpeakerTiebreakAction,
 } from '@ti4/shared';
+import { getBaseNoteId } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import {
   getValidOutcomes,
@@ -87,6 +88,21 @@ export function validateCastVote(
   // Player must not have already voted on this agenda
   if (state.agendaPhase.votingComplete.includes(action.playerId)) {
     return { valid: false, error: 'Already voted on this agenda' };
+  }
+
+  // Check for Political Secret - original owner cannot vote when their Political Secret is in play
+  for (const otherPlayer of state.players) {
+    if (otherPlayer.id === player.id) continue;
+
+    for (const noteInPlay of otherPlayer.promissoryNotesInPlay) {
+      if (getBaseNoteId(noteInPlay.noteId) === 'political_secret' &&
+          noteInPlay.originalOwnerId === player.id) {
+        return {
+          valid: false,
+          error: 'Political Secret prevents you from voting on this agenda',
+        };
+      }
+    }
   }
 
   // If not abstaining, validate outcome and planets

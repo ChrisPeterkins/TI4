@@ -605,6 +605,14 @@ export const factions: Record<string, FactionData> = {
         id: 'technological_singularity',
         name: 'Technological Singularity',
         description: 'Once per combat, after 1 of your opponent\'s units is destroyed, you may gain 1 technology that is owned by that opponent.',
+        implementation: {
+          timing: { type: 'after', trigger: 'combat_win' },
+          effectType: 'tech_gain',
+          handlerId: 'nekro_tech_singularity',
+          isOptional: true,
+          isPassive: false,
+          requirements: [],
+        },
       },
       {
         id: 'propagation',
