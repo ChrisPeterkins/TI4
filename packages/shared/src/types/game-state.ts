@@ -406,6 +406,13 @@ export interface PlayerState {
   reinforcements?: ReinforcementPool;
   /** Naalu's 0 initiative token - always acts first in action phase */
   hasZeroToken?: boolean;
+  /** Yssaril Scheming - must discard 1 action card after drawing */
+  pendingSchemingDiscard?: boolean;
+  /** Nekro Valefar Assimilator tokens - track which faction tech each token is on */
+  assimilatorTokens?: {
+    x?: { targetTechId: string; targetPlayerId: string };
+    y?: { targetTechId: string; targetPlayerId: string };
+  };
 }
 
 /** Track available reinforcements per unit type */
@@ -564,6 +571,13 @@ export interface CombatInstance {
   /** Temporary combat modifiers from action cards (cleared after each round) */
   temporaryModifiers?: {
     [playerId: string]: CombatModifiers;
+  };
+  /** Nekro Technological Singularity - has been used this combat */
+  technologicalSingularityUsed?: boolean;
+  /** Nekro pending tech gain choice - player can select tech from opponent */
+  pendingTechGain?: {
+    nekroPlayerId: string;
+    opponentPlayerId: string;
   };
 }
 
@@ -738,6 +752,8 @@ export interface InvasionTracking {
   pendingBombardmentHits: number;
   /** Pending space cannon hits to assign */
   pendingSpaceCannonHits: number;
+  /** Map of planetId to fighter IDs committed as ground forces (Naalu Matriarch) */
+  fightersAsGroundForces?: Record<string, string[]>;
 }
 
 // Strategic Action Tracking

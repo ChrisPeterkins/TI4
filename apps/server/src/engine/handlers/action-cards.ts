@@ -122,19 +122,33 @@ export function handlePlayActionCard(
 /**
  * Draw action cards for a player
  * Called during Status Phase or from other effects
+ *
+ * Yssaril SCHEMING: When you draw 1 or more action cards, draw 1 additional card.
+ * Then, choose and discard 1 action card from your hand.
  */
 export function handleDrawActionCards(
   state: GameState,
   playerId: string,
-  count: number
+  count: number,
+  options?: { skipScheming?: boolean }
 ): HandlerResult {
   const player = state.players.find(p => p.id === playerId);
   if (!player) {
     return { success: false, error: 'Player not found' };
   }
 
+  // Yssaril SCHEMING: Draw 1 additional card when drawing action cards
+  // Note: Does NOT trigger from Mageon Implants (looking) or trading
+  let actualCount = count;
+  let schemingTriggered = false;
+
+  if (player.faction === 'yssaril' && count > 0 && !options?.skipScheming) {
+    actualCount = count + 1;
+    schemingTriggered = true;
+  }
+
   // Check if deck needs reshuffling
-  if (state.actionCardDeck.length < count && state.actionCardDiscard.length > 0) {
+  if (state.actionCardDeck.length < actualCount && state.actionCardDiscard.length > 0) {
     // Shuffle discard into deck
     const shuffled = shuffleDeck([...state.actionCardDiscard]);
     state.actionCardDeck = [...state.actionCardDeck, ...shuffled];
@@ -142,19 +156,39 @@ export function handleDrawActionCards(
   }
 
   // Draw cards
-  const { drawn, remaining } = drawCards(state.actionCardDeck, count);
+  const { drawn, remaining } = drawCards(state.actionCardDeck, actualCount);
   state.actionCardDeck = remaining;
 
   // Add to player's hand
   player.actionCards = [...player.actionCards, ...drawn];
 
+  const triggeredEvents: string[] = ['action_cards_drawn'];
+
+  // Yssaril Scheming: Must discard 1 card after drawing
+  // For bots, auto-discard the worst card. For humans, set pending discard.
+  if (schemingTriggered && player.actionCards.length > 0) {
+    triggeredEvents.push('scheming_triggered');
+
+    if (player.isBot) {
+      // Bot auto-discards the first card (simplest approach)
+      const discardedCard = player.actionCards[0];
+      player.actionCards = player.actionCards.slice(1);
+      state.actionCardDiscard.push(discardedCard);
+    } else {
+      // Human player needs to choose - track pending discard
+      // This would be handled by UI prompting for discard
+      player.pendingSchemingDiscard = true;
+    }
+  }
+
   return {
     success: true,
-    triggeredEvents: ['action_cards_drawn'],
+    triggeredEvents,
     data: {
       playerId,
       drawnCount: drawn.length,
       drawnCards: drawn, // Only visible to the drawing player
+      schemingTriggered,
     },
   };
 }

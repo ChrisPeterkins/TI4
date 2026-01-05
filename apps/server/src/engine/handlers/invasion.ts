@@ -111,13 +111,38 @@ export function getInvadablePlanets(tile: MapTile, playerId: string): PlanetInst
 }
 
 /**
- * Check if player has ground forces in space (on carriers) that can invade
+ * Check if player has ground forces in space (on carriers) that can invade.
+ * For Naalu with Matriarch, fighters also count.
  */
-export function hasGroundForcesToLand(tile: MapTile, playerId: string): boolean {
+export function hasGroundForcesToLand(
+  tile: MapTile,
+  playerId: string,
+  state?: GameState
+): boolean {
   // Ground forces in space (being carried)
-  return tile.units.some(
+  const hasGroundUnits = tile.units.some(
     u => u.ownerId === playerId && isGroundUnit(u.type)
   );
+
+  if (hasGroundUnits) return true;
+
+  // Naalu Matriarch: Fighters can be committed as ground forces
+  if (state) {
+    const player = state.players.find(p => p.id === playerId);
+    if (player?.faction === 'naalu') {
+      // Check for Matriarch flagship in system
+      const hasMatriarch = tile.units.some(
+        u => u.ownerId === playerId && u.type === 'flagship'
+      );
+      if (hasMatriarch) {
+        return tile.units.some(
+          u => u.ownerId === playerId && u.type === 'fighter'
+        );
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -402,6 +427,39 @@ export function handleAssignBombardmentHits(
 }
 
 /**
+ * Check if Naalu's Matriarch flagship is present in the system.
+ */
+function hasMatriarchInSystem(state: GameState, tile: MapTile, playerId: string): boolean {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player || player.faction !== 'naalu') return false;
+
+  return tile.units.some(
+    u => u.ownerId === playerId && u.type === 'flagship'
+  );
+}
+
+/**
+ * Check if a unit can be committed as a ground force.
+ */
+function canCommitAsGroundForce(
+  state: GameState,
+  tile: MapTile,
+  playerId: string,
+  unitType: string
+): boolean {
+  if (isGroundUnit(unitType as import('@ti4/shared').UnitType)) {
+    return true;
+  }
+
+  // Naalu Matriarch: Fighters can be committed as ground forces
+  if (unitType === 'fighter' && hasMatriarchInSystem(state, tile, playerId)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Handle commit ground forces action
  */
 export function handleCommitGroundForces(
@@ -437,7 +495,7 @@ export function handleCommitGroundForces(
       return { success: false, error: 'Cannot commit units you do not own' };
     }
 
-    if (!isGroundUnit(unit.type)) {
+    if (!canCommitAsGroundForce(state, tile, action.playerId, unit.type)) {
       return { success: false, error: 'Only ground forces can be committed' };
     }
 
@@ -450,6 +508,11 @@ export function handleCommitGroundForces(
     if (!planet) {
       return { success: false, error: `Planet ${assignment.planetId} not found` };
     }
+  }
+
+  // Initialize fighters tracking if needed
+  if (!state.invasionPhase.fightersAsGroundForces) {
+    state.invasionPhase.fightersAsGroundForces = {};
   }
 
   // Move units from space to planets
@@ -469,6 +532,15 @@ export function handleCommitGroundForces(
         state.invasionPhase.groundForcesCommitted[assignment.planetId] = [];
       }
       state.invasionPhase.groundForcesCommitted[assignment.planetId].push(unit.id);
+
+      // Track fighters separately (Naalu Matriarch)
+      if (unit.type === 'fighter') {
+        if (!state.invasionPhase.fightersAsGroundForces[assignment.planetId]) {
+          state.invasionPhase.fightersAsGroundForces[assignment.planetId] = [];
+        }
+        state.invasionPhase.fightersAsGroundForces[assignment.planetId].push(unit.id);
+        logAbilityTriggered(state, action.playerId, 'Matriarch');
+      }
     }
   }
 
@@ -712,9 +784,19 @@ export function initializeGroundCombat(state: GameState): HandlerResult {
   const attackerId = state.activePlayerId;
   const defenderId = planet.controlledBy;
 
-  // Get ground forces on the planet
+  // Get fighters committed as ground forces (Naalu Matriarch)
+  const fightersAsGroundForces = state.invasionPhase.fightersAsGroundForces?.[currentPlanetId] || [];
+
+  // Get ground forces on the planet (including fighters for Naalu)
   const attackerUnits = planet.units
-    .filter(u => u.ownerId === attackerId && isGroundUnit(u.type))
+    .filter(u => {
+      if (u.ownerId !== attackerId) return false;
+      // Include normal ground units
+      if (isGroundUnit(u.type)) return true;
+      // Include fighters committed as ground forces
+      if (u.type === 'fighter' && fightersAsGroundForces.includes(u.id)) return true;
+      return false;
+    })
     .map(u => u.id);
 
   const defenderUnits = defenderId
@@ -723,8 +805,17 @@ export function initializeGroundCombat(state: GameState): HandlerResult {
         .map(u => u.id)
     : [];
 
-  // If no defender ground forces, attacker wins immediately
+  // If no defender ground forces, check if attacker wins
   if (defenderUnits.length === 0) {
+    // Naalu Matriarch: Fighters alone cannot win - results in draw
+    const hasRealGroundForces = planet.units.some(
+      u => u.ownerId === attackerId && isGroundUnit(u.type)
+    );
+    if (!hasRealGroundForces && fightersAsGroundForces.length > 0) {
+      // Only fighters - return them to space and don't take control
+      returnFightersToSpace(state, tile, planet, attackerId);
+      return advanceToNextPlanet(state);
+    }
     return establishControl(state, tile, planet, attackerId);
   }
 
@@ -916,7 +1007,53 @@ export function handleGroundCombatAssignHits(
 }
 
 /**
+ * Check if a unit is participating in ground combat.
+ * Includes normal ground units AND fighters committed as ground forces (Naalu Matriarch).
+ */
+function isParticipatingInGroundCombat(
+  state: GameState,
+  unit: UnitInstance,
+  planetId: string
+): boolean {
+  // Normal ground units always participate
+  if (isGroundUnit(unit.type)) {
+    return true;
+  }
+
+  // Check if this fighter is committed as a ground force (Naalu Matriarch)
+  if (unit.type === 'fighter' && state.invasionPhase?.fightersAsGroundForces) {
+    const fighters = state.invasionPhase.fightersAsGroundForces[planetId] || [];
+    return fighters.includes(unit.id);
+  }
+
+  return false;
+}
+
+/**
+ * Check if attacker has only fighters-as-ground-forces remaining (no real ground units).
+ * Per TI4 rules, fighters as ground forces CANNOT win alone - results in a draw.
+ */
+function attackerHasOnlyFighters(
+  state: GameState,
+  planet: PlanetInstance,
+  attackerId: string
+): boolean {
+  if (!state.invasionPhase?.fightersAsGroundForces) {
+    return false;
+  }
+
+  const fighterIds = state.invasionPhase.fightersAsGroundForces[planet.planetId] || [];
+  const attackerUnits = planet.units.filter(
+    u => u.ownerId === attackerId && isParticipatingInGroundCombat(state, u, planet.planetId)
+  );
+
+  // If all attacker units are fighters, return true
+  return attackerUnits.length > 0 && attackerUnits.every(u => fighterIds.includes(u.id));
+}
+
+/**
  * Check ground combat end - handles defender winning on draw
+ * Naalu Matriarch: Fighters as ground forces CANNOT win alone (results in draw)
  */
 export function checkGroundCombatEnd(
   state: GameState,
@@ -936,8 +1073,9 @@ export function checkGroundCombatEnd(
     return { ended: false, winnerId: null };
   }
 
+  // Count participating units (ground units + fighters as ground forces)
   const attackerUnits = planet.units.filter(
-    u => u.ownerId === combat.attackerId && isGroundUnit(u.type)
+    u => u.ownerId === combat.attackerId && isParticipatingInGroundCombat(state, u, planet.planetId)
   );
   const defenderUnits = planet.units.filter(
     u => u.ownerId === combat.defenderId && isGroundUnit(u.type)
@@ -953,10 +1091,44 @@ export function checkGroundCombatEnd(
   }
 
   if (defenderUnits.length === 0) {
+    // Naalu Matriarch: Fighters as ground forces CANNOT win alone
+    // If only fighters remain, it's a draw (defender wins)
+    if (attackerHasOnlyFighters(state, planet, combat.attackerId)) {
+      return { ended: true, winnerId: combat.defenderId };
+    }
     return { ended: true, winnerId: combat.attackerId };
   }
 
   return { ended: false, winnerId: null };
+}
+
+/**
+ * Return fighters acting as ground forces to space after combat.
+ * Naalu Matriarch: "When combat ends, return those units to the space area."
+ */
+function returnFightersToSpace(
+  state: GameState,
+  tile: MapTile,
+  planet: PlanetInstance,
+  attackerId: string
+): void {
+  if (!state.invasionPhase?.fightersAsGroundForces) return;
+
+  const fighterIds = state.invasionPhase.fightersAsGroundForces[planet.planetId] || [];
+  if (fighterIds.length === 0) return;
+
+  // Move surviving fighters back to space
+  for (const fighterId of fighterIds) {
+    const unitIndex = planet.units.findIndex(u => u.id === fighterId);
+    if (unitIndex !== -1) {
+      const [fighter] = planet.units.splice(unitIndex, 1);
+      fighter.planetId = undefined;
+      tile.units.push(fighter);
+    }
+  }
+
+  // Clear the tracking for this planet
+  delete state.invasionPhase.fightersAsGroundForces[planet.planetId];
 }
 
 /**
@@ -976,6 +1148,9 @@ export function resolveGroundCombat(
   if (!planet) {
     return { success: false, error: 'Planet not found' };
   }
+
+  // Return fighters to space before resolving combat (Naalu Matriarch)
+  returnFightersToSpace(state, tile, planet, combat.attackerId);
 
   // Clear active combat
   state.activeCombat = null;

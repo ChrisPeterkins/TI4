@@ -7,11 +7,49 @@ import type {
   AssignBombardmentHitsAction,
   AssignSpaceCannonHitsAction,
   SkipInvasionAction,
+  MapTile,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { findTileAtPosition } from '../utils/hex.js';
 import { isGroundUnit, getUnitStats } from '../utils/units.js';
 import { getBombardmentUnits, canUnitSustainDamage } from '../utils/combat.js';
+
+/**
+ * Check if Naalu's Matriarch flagship is present in the system.
+ * The Matriarch allows fighters to be committed as ground forces during invasion.
+ */
+function hasMatriarchInSystem(state: GameState, tile: MapTile, playerId: string): boolean {
+  const player = state.players.find(p => p.id === playerId);
+  if (!player || player.faction !== 'naalu') return false;
+
+  // Check for Matriarch flagship in the system
+  return tile.units.some(
+    u => u.ownerId === playerId && u.type === 'flagship'
+  );
+}
+
+/**
+ * Check if a unit can be committed as a ground force.
+ * Ground units (infantry, mech) can always be committed.
+ * Fighters can be committed if Naalu's Matriarch is present.
+ */
+function canCommitAsGroundForce(
+  state: GameState,
+  tile: MapTile,
+  playerId: string,
+  unitType: string
+): boolean {
+  if (isGroundUnit(unitType as import('@ti4/shared').UnitType)) {
+    return true;
+  }
+
+  // Naalu Matriarch: Fighters can be committed as ground forces
+  if (unitType === 'fighter' && hasMatriarchInSystem(state, tile, playerId)) {
+    return true;
+  }
+
+  return false;
+}
 
 // =============================================================================
 // SELECT INVASION TARGETS VALIDATOR
@@ -83,9 +121,10 @@ export function validateSelectInvasionTargets(
   }
 
   // If targeting planets, must have ground forces to land
+  // Naalu with Matriarch can use fighters as ground forces
   if (action.targetPlanets.length > 0) {
     const hasGroundForces = tile.units.some(
-      u => u.ownerId === action.playerId && isGroundUnit(u.type)
+      u => u.ownerId === action.playerId && canCommitAsGroundForce(state, tile, action.playerId, u.type)
     );
     if (!hasGroundForces) {
       return { valid: false, error: 'No ground forces available to land' };
@@ -156,8 +195,8 @@ export function validateCommitGroundForces(
       return { valid: false, error: 'Cannot commit units you do not own' };
     }
 
-    // Unit must be a ground unit
-    if (!isGroundUnit(unit.type)) {
+    // Unit must be a ground unit (or fighter with Naalu Matriarch)
+    if (!canCommitAsGroundForce(state, tile, action.playerId, unit.type)) {
       return { valid: false, error: 'Only ground forces can be committed to planets' };
     }
 

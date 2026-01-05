@@ -7,6 +7,7 @@ import type {
   DiceRoll,
   HexCoord,
   TimingTrigger,
+  PlayerState,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { findTileAtPosition } from '../utils/hex.js';
@@ -33,6 +34,178 @@ import {
 } from '../utils/combat.js';
 import { checkTimingTrigger } from './timing-windows.js';
 import { checkAbilityTriggers } from '../abilities/ability-triggers.js';
+
+/**
+ * NEKRO TECHNOLOGICAL SINGULARITY
+ * "Once per combat, after 1 of your opponent's units is destroyed,
+ * you may gain 1 technology that is owned by that player."
+ *
+ * Check if Nekro can trigger this ability and set up pending tech gain.
+ */
+function checkTechnologicalSingularity(
+  state: GameState,
+  combat: CombatInstance,
+  destroyedUnitOwnerId: string
+): void {
+  // Skip if already used this combat
+  if (combat.technologicalSingularityUsed) return;
+
+  // Find if either combatant is Nekro
+  const nekroPlayer = state.players.find(
+    p => p.faction === 'nekro' &&
+         (p.id === combat.attackerId || p.id === combat.defenderId)
+  );
+
+  if (!nekroPlayer) return;
+
+  // Nekro can only gain tech from the opponent, not from their own destroyed units
+  if (destroyedUnitOwnerId === nekroPlayer.id) return;
+
+  // The opponent must be in this combat
+  if (destroyedUnitOwnerId !== combat.attackerId &&
+      destroyedUnitOwnerId !== combat.defenderId) return;
+
+  // Check if opponent has any technologies to copy
+  const opponent = state.players.find(p => p.id === destroyedUnitOwnerId);
+  if (!opponent || opponent.technologies.length === 0) return;
+
+  // Set up pending tech gain - Nekro gets to choose
+  combat.pendingTechGain = {
+    nekroPlayerId: nekroPlayer.id,
+    opponentPlayerId: destroyedUnitOwnerId,
+  };
+
+  logAbilityTriggered(state, nekroPlayer.id, 'Technological Singularity');
+}
+
+/**
+ * Handle Nekro gaining a technology via Technological Singularity.
+ * Called when Nekro selects which tech to gain from their opponent.
+ */
+export function handleTechnologicalSingularityGain(
+  state: GameState,
+  nekroPlayerId: string,
+  techId: string,
+  useAssimilator?: 'x' | 'y'
+): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: false, error: 'No active combat' };
+  }
+
+  if (!combat.pendingTechGain) {
+    return { success: false, error: 'No pending tech gain' };
+  }
+
+  if (combat.pendingTechGain.nekroPlayerId !== nekroPlayerId) {
+    return { success: false, error: 'Not your tech gain choice' };
+  }
+
+  const nekroPlayer = state.players.find(p => p.id === nekroPlayerId);
+  if (!nekroPlayer) {
+    return { success: false, error: 'Player not found' };
+  }
+
+  const opponentPlayerId = combat.pendingTechGain.opponentPlayerId;
+  const opponent = state.players.find(p => p.id === opponentPlayerId);
+  if (!opponent) {
+    return { success: false, error: 'Opponent not found' };
+  }
+
+  // Validate opponent has this tech
+  if (!opponent.technologies.includes(techId)) {
+    return { success: false, error: 'Opponent does not have this technology' };
+  }
+
+  // Import dynamically to avoid circular dependency
+  const { technologies } = require('@ti4/game-data');
+  const techData = technologies[techId];
+
+  if (!techData) {
+    return { success: false, error: 'Unknown technology' };
+  }
+
+  // If using assimilator, must be a faction tech
+  if (useAssimilator) {
+    if (!techData.factionId) {
+      return { success: false, error: 'Valefar Assimilator can only target faction technologies' };
+    }
+
+    // Use the assimilator handler
+    const { placeAssimilatorToken } = require('./technology.js');
+    const result = placeAssimilatorToken(
+      state,
+      nekroPlayerId,
+      techId,
+      opponentPlayerId,
+      useAssimilator
+    );
+
+    if (!result.success) {
+      return result;
+    }
+  } else {
+    // Direct tech gain - check if Nekro already has it
+    if (nekroPlayer.technologies.includes(techId)) {
+      return { success: false, error: 'Nekro already has this technology' };
+    }
+
+    // Can't gain faction techs directly (must use assimilator)
+    if (techData.factionId && techData.factionId !== 'nekro') {
+      return {
+        success: false,
+        error: 'Cannot gain faction technologies directly - use Valefar Assimilator',
+      };
+    }
+
+    // Add the technology
+    nekroPlayer.technologies.push(techId);
+  }
+
+  // Mark ability as used for this combat
+  combat.technologicalSingularityUsed = true;
+  combat.pendingTechGain = undefined;
+
+  return {
+    success: true,
+    triggeredEvents: ['technological_singularity_resolved'],
+    data: {
+      nekroPlayerId,
+      techId,
+      techName: techData.name,
+      usedAssimilator: useAssimilator,
+    },
+  };
+}
+
+/**
+ * Skip Technological Singularity - Nekro declines to gain a tech.
+ */
+export function handleSkipTechnologicalSingularity(
+  state: GameState,
+  nekroPlayerId: string
+): HandlerResult {
+  const combat = state.activeCombat;
+  if (!combat) {
+    return { success: false, error: 'No active combat' };
+  }
+
+  if (!combat.pendingTechGain) {
+    return { success: false, error: 'No pending tech gain' };
+  }
+
+  if (combat.pendingTechGain.nekroPlayerId !== nekroPlayerId) {
+    return { success: false, error: 'Not your tech gain choice' };
+  }
+
+  // Clear the pending choice
+  combat.pendingTechGain = undefined;
+
+  return {
+    success: true,
+    triggeredEvents: ['technological_singularity_skipped'],
+  };
+}
 
 /**
  * Initialize a new combat instance
@@ -332,6 +505,9 @@ export function handleAssignHits(
         if (index !== -1) combat.defenderUnits.splice(index, 1);
       }
       assignedHits++;
+
+      // NEKRO TECHNOLOGICAL SINGULARITY: After opponent's unit destroyed, gain tech
+      checkTechnologicalSingularity(state, combat, action.playerId);
     }
   }
 
