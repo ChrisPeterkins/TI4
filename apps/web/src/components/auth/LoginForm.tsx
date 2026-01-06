@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ThemedBackground from '@/components/ui/ThemedBackground';
+import ThemedPanel from '@/components/ui/ThemedPanel';
+import { PowerCoreButton } from '@/components/ui/ThemedButton';
 
 export function LoginForm() {
   const router = useRouter();
@@ -38,61 +41,98 @@ export function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <form onSubmit={handleSubmit} className="bg-gray-900 rounded-lg p-8 shadow-xl">
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">
-          Sign In to TI4 Online
-        </h1>
+    <ThemedBackground>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <ThemedPanel glow className="p-8">
+            <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-white via-cyan-400 to-white bg-clip-text text-transparent">
+              Sign In
+            </h1>
+            <p className="text-center text-slate-400 mb-8">
+              Welcome back to TI4 Online
+            </p>
 
-        {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-2 rounded mb-4">
-            {error}
-          </div>
-        )}
+            <form onSubmit={handleSubmit}>
+              {error && (
+                <ThemedPanel variant="error" className="mb-6 p-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-rose-400">⚠</span>
+                    <span className="text-rose-300">{error}</span>
+                  </div>
+                </ThemedPanel>
+              )}
 
-        <div className="mb-4">
-          <label htmlFor="email" className="block text-gray-300 mb-2">
-            Email
-          </label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500"
-            required
-          />
+              <div className="mb-5">
+                <label htmlFor="email" className="block text-cyan-200 mb-2 text-sm font-medium">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="
+                    w-full px-4 py-3
+                    bg-cyan-950/30
+                    border border-cyan-400/30
+                    rounded-lg
+                    text-white
+                    placeholder-slate-500
+                    focus:outline-none focus:border-cyan-400/60 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]
+                    transition-all duration-300
+                  "
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
+
+              <div className="mb-6">
+                <label htmlFor="password" className="block text-cyan-200 mb-2 text-sm font-medium">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="
+                    w-full px-4 py-3
+                    bg-cyan-950/30
+                    border border-cyan-400/30
+                    rounded-lg
+                    text-white
+                    placeholder-slate-500
+                    focus:outline-none focus:border-cyan-400/60 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]
+                    transition-all duration-300
+                  "
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <PowerCoreButton
+                type="submit"
+                disabled={isLoading}
+                color="cyan"
+                size="lg"
+                fullWidth
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </PowerCoreButton>
+
+              <p className="mt-6 text-center text-slate-400">
+                Don&apos;t have an account?{' '}
+                <Link
+                  href="/register"
+                  className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                >
+                  Register
+                </Link>
+              </p>
+            </form>
+          </ThemedPanel>
         </div>
-
-        <div className="mb-6">
-          <label htmlFor="password" className="block text-gray-300 mb-2">
-            Password
-          </label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:outline-none focus:border-blue-500"
-            required
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white font-semibold rounded transition-colors"
-        >
-          {isLoading ? 'Signing in...' : 'Sign In'}
-        </button>
-
-        <p className="mt-4 text-center text-gray-400">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="text-blue-400 hover:text-blue-300">
-            Register
-          </Link>
-        </p>
-      </form>
-    </div>
+      </div>
+    </ThemedBackground>
   );
 }

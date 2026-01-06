@@ -4,9 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocket } from '@/hooks/useSocket';
 import { useLobbyStore } from '@/stores/lobby-store';
+import { useTheme } from '@/contexts/ThemeContext';
 import CreateLobbyModal from '@/components/lobby/CreateLobbyModal';
 import LobbyList from '@/components/lobby/LobbyList';
 import MyLobbies from '@/components/lobby/MyLobbies';
+import ThemedBackground from '@/components/ui/ThemedBackground';
+import ThemedPanel, { ThemedCard, ThemedBadge } from '@/components/ui/ThemedPanel';
+import { PowerCoreButton, HexButton, GlassButton } from '@/components/ui/ThemedButton';
 
 interface PublicLobby {
   id: string;
@@ -24,6 +28,7 @@ interface PublicLobby {
 
 export default function LobbyPage() {
   const router = useRouter();
+  const { theme } = useTheme();
   const { isConnected, isLoading: socketLoading, connectionError } = useSocket();
   const { lobbyId, isLoading: lobbyLoading, error: lobbyError, joinLobby } = useLobbyStore();
 
@@ -83,98 +88,124 @@ export default function LobbyPage() {
 
   if (socketLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white text-lg">Connecting...</div>
-      </div>
+      <ThemedBackground>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className={`text-xl ${theme.colors.textPrimary} mb-4`}>Connecting...</div>
+            <div className="animate-spin w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mx-auto" />
+          </div>
+        </div>
+      </ThemedBackground>
     );
   }
 
   if (connectionError) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-500 text-lg mb-4">Connection Error</div>
-          <div className="text-gray-400">{connectionError}</div>
+      <ThemedBackground>
+        <div className="min-h-screen flex items-center justify-center">
+          <ThemedPanel variant="error" glow className="p-8 text-center max-w-md">
+            <div className="text-xl text-rose-400 mb-4">Connection Error</div>
+            <div className={theme.colors.textMuted}>{connectionError}</div>
+          </ThemedPanel>
         </div>
-      </div>
+      </ThemedBackground>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Game Lobby</h1>
+    <ThemedBackground>
+      <div className="min-h-screen p-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className={`text-4xl font-bold mb-8 bg-gradient-to-r from-white via-cyan-400 to-white bg-clip-text text-transparent`}>
+            Game Lobby
+          </h1>
 
-        {/* Connection Status */}
-        <div className="mb-6 flex items-center gap-2">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              isConnected ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          />
-          <span className="text-gray-400">
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-
-        {/* Error Display */}
-        {lobbyError && (
-          <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg">
-            {lobbyError}
-          </div>
-        )}
-
-        {/* My Lobbies */}
-        <MyLobbies />
-
-        {/* Join by Code */}
-        <div className="mb-8 p-6 bg-gray-800 rounded-lg">
-          <h2 className="text-xl font-semibold mb-4">Join by Code</h2>
-          <div className="flex gap-4">
-            <input
-              type="text"
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
-              placeholder="Enter 6-character code"
-              className="flex-1 px-4 py-2 bg-gray-700 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none uppercase"
-              maxLength={6}
+          {/* Connection Status */}
+          <div className="mb-6 flex items-center gap-3">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                isConnected
+                  ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]'
+                  : 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.6)]'
+              }`}
             />
-            <button
-              onClick={handleJoinByCode}
-              disabled={joinCode.length !== 6 || lobbyLoading}
-              className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {lobbyLoading ? 'Joining...' : 'Join'}
-            </button>
+            <span className={theme.colors.textMuted}>
+              {isConnected ? 'Connected to server' : 'Disconnected'}
+            </span>
           </div>
-        </div>
 
-        {/* Create Lobby Button */}
-        <div className="mb-8">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            disabled={!isConnected || lobbyLoading}
-            className="w-full py-4 bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 text-lg font-semibold"
-          >
-            Create New Lobby
-          </button>
-        </div>
+          {/* Error Display */}
+          {lobbyError && (
+            <ThemedPanel variant="error" glow className="mb-6 p-4">
+              <div className="flex items-center gap-2">
+                <span className="text-rose-400">⚠</span>
+                <span>{lobbyError}</span>
+              </div>
+            </ThemedPanel>
+          )}
 
-        {/* Public Lobbies */}
-        <div className="bg-gray-800 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Public Lobbies</h2>
-          <LobbyList
-            lobbies={lobbies}
-            isLoading={isLoadingLobbies}
-            onJoin={handleJoinLobby}
-          />
-        </div>
+          {/* My Lobbies */}
+          <MyLobbies />
 
-        {/* Create Lobby Modal */}
-        {showCreateModal && (
-          <CreateLobbyModal onClose={() => setShowCreateModal(false)} />
-        )}
+          {/* Join by Code */}
+          <ThemedCard title="Join by Code" className="mb-8">
+            <div className="flex gap-4">
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase().slice(0, 6))}
+                placeholder="Enter 6-character code"
+                className={`
+                  flex-1 px-4 py-3
+                  bg-cyan-950/30
+                  border border-cyan-400/30
+                  rounded-lg
+                  text-white
+                  placeholder-slate-500
+                  focus:outline-none focus:border-cyan-400/60 focus:shadow-[0_0_15px_rgba(34,211,238,0.2)]
+                  uppercase font-mono text-lg tracking-wider
+                  transition-all duration-300
+                `}
+                maxLength={6}
+              />
+              <HexButton
+                onClick={handleJoinByCode}
+                disabled={joinCode.length !== 6 || lobbyLoading}
+                color="cyan"
+              >
+                {lobbyLoading ? 'Joining...' : 'Join'}
+              </HexButton>
+            </div>
+          </ThemedCard>
+
+          {/* Create Lobby Button */}
+          <div className="mb-8">
+            <PowerCoreButton
+              onClick={() => setShowCreateModal(true)}
+              disabled={!isConnected || lobbyLoading}
+              color="emerald"
+              size="lg"
+              fullWidth
+            >
+              Create New Lobby
+            </PowerCoreButton>
+          </div>
+
+          {/* Public Lobbies */}
+          <ThemedCard title="Public Lobbies">
+            <LobbyList
+              lobbies={lobbies}
+              isLoading={isLoadingLobbies}
+              onJoin={handleJoinLobby}
+            />
+          </ThemedCard>
+
+          {/* Create Lobby Modal */}
+          {showCreateModal && (
+            <CreateLobbyModal onClose={() => setShowCreateModal(false)} />
+          )}
+        </div>
       </div>
-    </div>
+    </ThemedBackground>
   );
 }

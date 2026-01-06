@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/auth";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ToastContainer } from "@/components/ui/Toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import "./globals.css";
@@ -31,9 +32,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SessionProvider>
-          {children}
-          <ToastContainer />
-          <ConfirmDialog />
+          <ThemeProvider>
+            {children}
+            <ToastContainer />
+            <ConfirmDialog />
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>

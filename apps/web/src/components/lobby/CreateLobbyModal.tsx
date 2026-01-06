@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useLobbyStore } from '@/stores/lobby-store';
+import ThemedPanel from '@/components/ui/ThemedPanel';
+import { PowerCoreButton, GlassButton } from '@/components/ui/ThemedButton';
 import type { LobbySettings } from '@ti4/shared';
 
 interface CreateLobbyModalProps {
@@ -21,7 +23,7 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
   const [settings, setSettings] = useState<LobbySettings>({
     playerCount: 6,
     victoryPoints: 10,
-    expansions: ['base', 'pok'], // 'base' is always required
+    expansions: ['base', 'pok'],
     miltyDraft: false,
     privateGame: false,
   });
@@ -30,27 +32,28 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
     e.preventDefault();
     try {
       await createLobby(settings);
-      // Router redirect will happen via the lobby page effect
     } catch (err) {
       console.error('Failed to create lobby:', err);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6">Create New Lobby</h2>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+      <ThemedPanel glow className="w-full max-w-md p-6">
+        <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-cyan-400 to-white bg-clip-text text-transparent">
+          Create New Lobby
+        </h2>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-900/50 border border-red-500 rounded-lg text-sm">
-            {error}
-          </div>
+          <ThemedPanel variant="error" className="mb-4 p-3">
+            <span className="text-rose-300 text-sm">{error}</span>
+          </ThemedPanel>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Player Count */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium mb-2 text-cyan-300">
               Number of Players
             </label>
             <div className="flex gap-2">
@@ -59,10 +62,10 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
                   key={count}
                   type="button"
                   onClick={() => setSettings((s) => ({ ...s, playerCount: count }))}
-                  className={`flex-1 py-2 rounded-lg border ${
+                  className={`flex-1 py-2 rounded-lg border transition-all ${
                     settings.playerCount === count
-                      ? 'bg-blue-600 border-blue-500'
-                      : 'bg-gray-700 border-gray-600 hover:border-gray-500'
+                      ? 'bg-cyan-600/40 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                      : 'bg-cyan-950/30 border-cyan-400/20 text-slate-400 hover:border-cyan-400/40'
                   }`}
                 >
                   {count}
@@ -73,7 +76,7 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
 
           {/* Victory Points */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium mb-2 text-cyan-300">
               Victory Points
             </label>
             <div className="flex gap-2">
@@ -82,10 +85,10 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
                   key={vp}
                   type="button"
                   onClick={() => setSettings((s) => ({ ...s, victoryPoints: vp }))}
-                  className={`flex-1 py-2 rounded-lg border ${
+                  className={`flex-1 py-2 rounded-lg border transition-all ${
                     settings.victoryPoints === vp
-                      ? 'bg-blue-600 border-blue-500'
-                      : 'bg-gray-700 border-gray-600 hover:border-gray-500'
+                      ? 'bg-cyan-600/40 border-cyan-400 text-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                      : 'bg-cyan-950/30 border-cyan-400/20 text-slate-400 hover:border-cyan-400/40'
                   }`}
                 >
                   {vp} VP
@@ -96,14 +99,18 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
 
           {/* Expansions */}
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium mb-2 text-cyan-300">
               Expansions
             </label>
             <div className="space-y-2">
               {EXPANSIONS.map((exp) => (
                 <label
                   key={exp.id}
-                  className="flex items-center gap-3 p-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600"
+                  className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border ${
+                    settings.expansions.includes(exp.id)
+                      ? 'bg-cyan-600/20 border-cyan-400/40'
+                      : 'bg-cyan-950/20 border-cyan-400/10 hover:border-cyan-400/30'
+                  }`}
                 >
                   <input
                     type="checkbox"
@@ -116,45 +123,57 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
                           : s.expansions.filter((id) => id !== exp.id),
                       }));
                     }}
-                    className="w-4 h-4 rounded border-gray-600"
+                    className="w-4 h-4 rounded border-cyan-400/40 bg-cyan-950/50 text-cyan-500 focus:ring-cyan-400/50"
                   />
-                  <span>{exp.name}</span>
+                  <span className="text-slate-300">{exp.name}</span>
                 </label>
               ))}
             </div>
           </div>
 
           {/* Milty Draft */}
-          <label className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600">
+          <label
+            className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-all border ${
+              settings.miltyDraft
+                ? 'bg-amber-600/20 border-amber-400/40'
+                : 'bg-cyan-950/20 border-cyan-400/10 hover:border-cyan-400/30'
+            }`}
+          >
             <input
               type="checkbox"
               checked={settings.miltyDraft}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, miltyDraft: e.target.checked }))
               }
-              className="w-4 h-4 rounded border-gray-600"
+              className="w-4 h-4 rounded border-cyan-400/40 bg-cyan-950/50 text-amber-500 focus:ring-amber-400/50"
             />
             <div>
-              <div className="font-medium">Milty Draft</div>
-              <div className="text-sm text-gray-400">
+              <div className="font-medium text-white">Milty Draft</div>
+              <div className="text-sm text-slate-400">
                 Draft factions and map positions
               </div>
             </div>
           </label>
 
           {/* Private Game */}
-          <label className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600">
+          <label
+            className={`flex items-center gap-3 p-4 rounded-lg cursor-pointer transition-all border ${
+              settings.privateGame
+                ? 'bg-purple-600/20 border-purple-400/40'
+                : 'bg-cyan-950/20 border-cyan-400/10 hover:border-cyan-400/30'
+            }`}
+          >
             <input
               type="checkbox"
               checked={settings.privateGame}
               onChange={(e) =>
                 setSettings((s) => ({ ...s, privateGame: e.target.checked }))
               }
-              className="w-4 h-4 rounded border-gray-600"
+              className="w-4 h-4 rounded border-cyan-400/40 bg-cyan-950/50 text-purple-500 focus:ring-purple-400/50"
             />
             <div>
-              <div className="font-medium">Private Game</div>
-              <div className="text-sm text-gray-400">
+              <div className="font-medium text-white">Private Game</div>
+              <div className="text-sm text-slate-400">
                 Only accessible via code
               </div>
             </div>
@@ -162,23 +181,24 @@ export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button
-              type="button"
+            <GlassButton
               onClick={onClose}
-              className="flex-1 py-3 bg-gray-700 rounded-lg hover:bg-gray-600"
+              color="cyan"
+              fullWidth
             >
               Cancel
-            </button>
-            <button
+            </GlassButton>
+            <PowerCoreButton
               type="submit"
               disabled={isLoading}
-              className="flex-1 py-3 bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+              color="emerald"
+              fullWidth
             >
               {isLoading ? 'Creating...' : 'Create Lobby'}
-            </button>
+            </PowerCoreButton>
           </div>
         </form>
-      </div>
+      </ThemedPanel>
     </div>
   );
 }

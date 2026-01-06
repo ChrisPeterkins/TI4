@@ -58,19 +58,97 @@ export default function LobbyRoomPage() {
     }
   }, [draftState?.phase, isGameStarting, draftCompleteTime]);
 
-  // Timeout for draft complete state (15 seconds)
+  // Poll for game creation when draft completes (in case game_starting event was missed)
   useEffect(() => {
-    if (draftCompleteTime && !isGameStarting) {
-      const timer = setTimeout(() => {
-        setDraftCompleteTimeout(true);
-      }, 15000);
-      return () => clearTimeout(timer);
-    }
-  }, [draftCompleteTime, isGameStarting]);
+    if (draftCompleteTime && !isGameStarting && lobbyId) {
+      let isCancelled = false;
+      let attempts = 0;
+      const maxAttempts = 30; // 30 attempts over 15 seconds
+      const pollInterval = 500;
 
-  // Countdown timer with visual decrement
+      const checkForGame = async () => {
+        if (isCancelled) return;
+
+        try {
+          const response = await fetch(`/api/lobbies/${lobbyId}/game`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.gameId) {
+              // Game was created! Redirect directly
+              router.push(`/game/${data.gameId}`);
+              return;
+            }
+          }
+        } catch {
+          // Ignore errors, will retry
+        }
+
+        attempts++;
+        if (attempts < maxAttempts && !isCancelled) {
+          setTimeout(checkForGame, pollInterval);
+        } else if (!isCancelled) {
+          setDraftCompleteTimeout(true);
+        }
+      };
+
+      // Start polling after a short delay (give socket event a chance)
+      const startTimer = setTimeout(checkForGame, 1000);
+
+      return () => {
+        isCancelled = true;
+        clearTimeout(startTimer);
+      };
+    }
+  }, [draftCompleteTime, isGameStarting, lobbyId, router]);
+
+  // Track game verification state
+  const [gameVerified, setGameVerified] = useState(false);
+  const [verificationFailed, setVerificationFailed] = useState(false);
+
+  // Verify game exists before allowing redirect
   useEffect(() => {
-    if (isGameStarting && gameId && countdown) {
+    if (isGameStarting && gameId && !gameVerified && !verificationFailed) {
+      // Poll to verify game was created (with retries)
+      let attempts = 0;
+      const maxAttempts = 5;
+      const pollInterval = 500; // 500ms between attempts
+
+      const verifyGame = async () => {
+        try {
+          const response = await fetch(`/api/games/${gameId}/exists`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.exists) {
+              setGameVerified(true);
+              return true;
+            }
+          }
+        } catch {
+          // Ignore fetch errors, will retry
+        }
+        return false;
+      };
+
+      const pollForGame = async () => {
+        const exists = await verifyGame();
+        if (exists) return;
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(pollForGame, pollInterval);
+        } else {
+          // Game didn't get created after max attempts
+          setVerificationFailed(true);
+        }
+      };
+
+      pollForGame();
+    }
+  }, [isGameStarting, gameId, gameVerified, verificationFailed]);
+
+  // Countdown timer with visual decrement (only after game is verified)
+  useEffect(() => {
+    if (isGameStarting && gameId && countdown && gameVerified) {
       // Initialize display countdown
       setDisplayCountdown(countdown);
 
@@ -95,7 +173,7 @@ export default function LobbyRoomPage() {
         clearTimeout(redirectTimer);
       };
     }
-  }, [isGameStarting, gameId, countdown, router]);
+  }, [isGameStarting, gameId, countdown, router, gameVerified]);
 
   // Handle leaving lobby
   const handleLeaveLobby = () => {
@@ -125,6 +203,43 @@ export default function LobbyRoomPage() {
 
   // Game starting countdown
   if (isGameStarting) {
+    // Verification failed - show error
+    if (verificationFailed) {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-red-400 mb-4">
+              Failed to Create Game
+            </div>
+            <div className="text-xl text-gray-300 mb-6">
+              The game could not be created. Please try again.
+            </div>
+            <button
+              onClick={() => router.push('/lobby')}
+              className="px-6 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 text-white"
+            >
+              Back to Lobby List
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Verifying game exists
+    if (!gameVerified) {
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-4xl font-bold text-yellow-400 mb-4">
+              Creating Game...
+            </div>
+            <div className="animate-spin w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full mx-auto"></div>
+          </div>
+        </div>
+      );
+    }
+
+    // Game verified, show countdown
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">

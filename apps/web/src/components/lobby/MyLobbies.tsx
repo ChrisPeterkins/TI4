@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ThemedCard, ThemedBadge } from '@/components/ui/ThemedPanel';
+import { PulseButton } from '@/components/ui/ThemedButton';
 
 interface MyLobby {
   id: string;
@@ -19,6 +21,7 @@ interface MyLobby {
 }
 
 export default function MyLobbies() {
+  const router = useRouter();
   const [lobbies, setLobbies] = useState<MyLobby[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,50 +45,53 @@ export default function MyLobbies() {
 
   if (isLoading) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-4">My Lobbies</h2>
-        <div className="text-gray-400">Loading...</div>
-      </div>
+      <ThemedCard title="My Lobbies" className="mb-8">
+        <div className="text-slate-400 text-center py-4">Loading...</div>
+      </ThemedCard>
     );
   }
 
   if (lobbies.length === 0) {
-    return null; // Don't show section if no lobbies
+    return null;
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6 mb-6">
-      <h2 className="text-xl font-semibold mb-4">My Lobbies</h2>
+    <ThemedCard title="My Lobbies" className="mb-8">
       <div className="space-y-3">
         {lobbies.map((lobby) => (
-          <Link
+          <div
             key={lobby.id}
-            href={`/lobby/${lobby.id}`}
-            className="block p-4 bg-gray-700/50 rounded-lg border border-blue-500/50 hover:border-blue-400 transition-colors"
+            className="p-4 rounded-lg bg-cyan-950/20 border border-cyan-400/20 hover:border-cyan-400/40 transition-all duration-300"
           >
             <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-blue-400">{lobby.code}</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="font-mono text-lg text-cyan-400 tracking-wider">
+                    {lobby.code}
+                  </span>
                   {lobby.isHost && (
-                    <span className="px-2 py-0.5 bg-yellow-600 text-xs rounded-full">
-                      Host
-                    </span>
+                    <ThemedBadge color="amber">Host</ThemedBadge>
                   )}
                 </div>
-                <div className="text-sm text-gray-400 mt-1">
-                  {lobby.playerCount}/{lobby.maxPlayers} players
-                  {' • '}
-                  {lobby.settings.victoryPoints} VP
+                <div className="text-sm text-slate-400">
+                  <span className="text-cyan-300">{lobby.playerCount}</span>
+                  <span className="text-slate-500">/{lobby.maxPlayers}</span>
+                  {' players • '}
+                  <span className="text-cyan-300">{lobby.settings.victoryPoints}</span>
+                  {' VP'}
                 </div>
               </div>
-              <div className="text-blue-400 text-sm">
-                Rejoin →
-              </div>
+              <PulseButton
+                onClick={() => router.push(`/lobby/${lobby.id}`)}
+                color="cyan"
+                size="sm"
+              >
+                Rejoin
+              </PulseButton>
             </div>
-          </Link>
+          </div>
         ))}
       </div>
-    </div>
+    </ThemedCard>
   );
 }

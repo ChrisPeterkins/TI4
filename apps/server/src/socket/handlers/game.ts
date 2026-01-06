@@ -15,14 +15,63 @@ type TI4Socket = Socket<ClientToServerEvents, ServerToClientEvents>;
 // Track which game each socket is in
 const socketGameMap = new Map<string, string>();
 
-// Cache of active game machines
-const gameMachines = new Map<string, GameMachine>();
+// Cache of active game machines with last access time
+interface CachedGameMachine {
+  machine: GameMachine;
+  lastAccess: number;
+}
+const gameMachines = new Map<string, CachedGameMachine>();
 
-// Cache of bot player IDs per game
-const gameBotPlayers = new Map<string, Set<string>>();
+// Cache of bot player IDs per game with last access time
+interface CachedBotPlayers {
+  botIds: Set<string>;
+  lastAccess: number;
+}
+const gameBotPlayers = new Map<string, CachedBotPlayers>();
 
 // Track pending bot actions to prevent duplicates
 const pendingBotActions = new Set<string>();
+
+// Cache configuration
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Clean up stale cache entries
+ */
+function cleanupCaches(): void {
+  const now = Date.now();
+  let machinesRemoved = 0;
+  let botsRemoved = 0;
+
+  // Clean up game machines
+  for (const [gameId, cached] of gameMachines.entries()) {
+    if (now - cached.lastAccess > CACHE_TTL_MS) {
+      gameMachines.delete(gameId);
+      machinesRemoved++;
+    }
+  }
+
+  // Clean up bot player caches
+  for (const [gameId, cached] of gameBotPlayers.entries()) {
+    if (now - cached.lastAccess > CACHE_TTL_MS) {
+      gameBotPlayers.delete(gameId);
+      botsRemoved++;
+    }
+  }
+
+  if (machinesRemoved > 0 || botsRemoved > 0) {
+    console.log(`Cache cleanup: removed ${machinesRemoved} game machines, ${botsRemoved} bot caches`);
+  }
+}
+
+// Start cache cleanup interval
+const cacheCleanupInterval = setInterval(cleanupCaches, CACHE_CLEANUP_INTERVAL_MS);
+
+// Prevent interval from keeping process alive
+if (cacheCleanupInterval.unref) {
+  cacheCleanupInterval.unref();
+}
 
 /**
  * Get game room name
@@ -35,10 +84,14 @@ function getGameRoom(gameId: string): string {
  * Get or create a GameMachine for a game
  */
 async function getGameMachine(gameId: string): Promise<GameMachine | null> {
+  const now = Date.now();
+
   // Check cache first
-  let machine = gameMachines.get(gameId);
-  if (machine) {
-    return machine;
+  const cached = gameMachines.get(gameId);
+  if (cached) {
+    // Update access time
+    cached.lastAccess = now;
+    return cached.machine;
   }
 
   // Load game state from database
@@ -48,8 +101,8 @@ async function getGameMachine(gameId: string): Promise<GameMachine | null> {
   }
 
   // Create new machine with loaded state
-  machine = new GameMachine(gameState);
-  gameMachines.set(gameId, machine);
+  const machine = new GameMachine(gameState);
+  gameMachines.set(gameId, { machine, lastAccess: now });
 
   return machine;
 }
@@ -58,10 +111,14 @@ async function getGameMachine(gameId: string): Promise<GameMachine | null> {
  * Get or load bot player IDs for a game
  */
 async function getBotPlayerIds(gameId: string): Promise<Set<string>> {
+  const now = Date.now();
+
   // Check cache first
-  let botIds = gameBotPlayers.get(gameId);
-  if (botIds) {
-    return botIds;
+  const cached = gameBotPlayers.get(gameId);
+  if (cached) {
+    // Update access time
+    cached.lastAccess = now;
+    return cached.botIds;
   }
 
   // Load from database
@@ -71,13 +128,13 @@ async function getBotPlayerIds(gameId: string): Promise<Set<string>> {
   }
 
   // Find bot players
-  botIds = new Set(
+  const botIds = new Set(
     game.players
       .filter(p => p.isBot)
       .map(p => p.playerId)
   );
 
-  gameBotPlayers.set(gameId, botIds);
+  gameBotPlayers.set(gameId, { botIds, lastAccess: now });
   return botIds;
 }
 

@@ -1,11 +1,22 @@
 'use client';
 
 import { useLobbyStore } from '@/stores/lobby-store';
+import { useTheme } from '@/contexts/ThemeContext';
 import type { LobbySettings, LobbyPlayer } from '@ti4/shared';
 import PlayerSlot from './PlayerSlot';
 import FactionSelect from './FactionSelect';
 import ColorSelect from './ColorSelect';
 import GalacticEventsSelect from './GalacticEventsSelect';
+import ThemedBackground from '@/components/ui/ThemedBackground';
+import ThemedPanel, { ThemedCard, ThemedBadge } from '@/components/ui/ThemedPanel';
+import {
+  PowerCoreButton,
+  GlassButton,
+  HoloBorderButton,
+  ShieldButton,
+  PulseButton,
+  CommandButton,
+} from '@/components/ui/ThemedButton';
 
 interface LobbyRoomProps {
   lobbyId: string;
@@ -23,6 +34,7 @@ export default function LobbyRoom({
   currentUserId,
   onLeave,
 }: LobbyRoomProps) {
+  const { theme } = useTheme();
   const {
     selectFaction,
     selectColor,
@@ -37,7 +49,6 @@ export default function LobbyRoom({
 
   const currentPlayer = players.find((p) => p.userId === currentUserId);
   const isHost = currentPlayer?.isHost ?? false;
-  // For Milty Draft, only require color selection; for normal games, require both faction and color
   const allReady = players.length >= 3 && players.every((p) => {
     if (settings.miltyDraft) {
       return p.ready && p.color;
@@ -68,7 +79,6 @@ export default function LobbyRoom({
     }
   };
 
-  // Get taken factions and colors
   const takenFactions = players
     .filter((p) => p.userId !== currentUserId && p.faction)
     .map((p) => p.faction!);
@@ -77,242 +87,245 @@ export default function LobbyRoom({
     .map((p) => p.color!);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">Game Lobby</h1>
-            <div className="mt-2 flex items-center gap-4">
-              <div className="text-lg font-mono bg-gray-800 px-4 py-2 rounded-lg">
-                Code: <span className="text-blue-400 font-bold">{code}</span>
+    <ThemedBackground>
+      <div className="min-h-screen p-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-white via-cyan-400 to-white bg-clip-text text-transparent">
+                Game Lobby
+              </h1>
+              <div className="flex items-center gap-4">
+                <ThemedPanel className="px-5 py-3 flex items-center gap-3" glow>
+                  <span className="text-slate-400">Code:</span>
+                  <span className="text-xl font-mono font-bold text-cyan-400">
+                    {code}
+                  </span>
+                </ThemedPanel>
+                <GlassButton
+                  color="cyan"
+                  size="sm"
+                  onClick={() => navigator.clipboard.writeText(code)}
+                >
+                  Copy
+                </GlassButton>
               </div>
-              <button
-                onClick={() => navigator.clipboard.writeText(code)}
-                className="text-gray-400 hover:text-white text-sm"
-              >
-                Copy
-              </button>
             </div>
+            <HoloBorderButton color="rose" onClick={onLeave}>
+              Leave Lobby
+            </HoloBorderButton>
           </div>
-          <button
-            onClick={onLeave}
-            className="px-4 py-2 bg-red-600 rounded-lg hover:bg-red-700"
-          >
-            Leave Lobby
-          </button>
-        </div>
 
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-900/50 border border-red-500 rounded-lg">
-            {error}
-          </div>
-        )}
+          {/* Error Display */}
+          {error && (
+            <ThemedPanel variant="error" glow className="mb-6 p-4">
+              <div className="flex items-center gap-2">
+                <span className="text-rose-400">Warning</span>
+                <span className="text-rose-300">{error}</span>
+              </div>
+            </ThemedPanel>
+          )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Players List */}
-          <div className="lg:col-span-2">
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">
-                Players ({players.length}/{settings.playerCount})
-              </h2>
-              <div className="space-y-3">
-                {/* Filled slots */}
-                {players.map((player) => (
-                  <PlayerSlot
-                    key={player.id}
-                    player={player}
-                    isCurrentUser={player.userId === currentUserId}
-                    isHost={isHost}
-                    onRemoveBot={removeBot}
-                  />
-                ))}
-                {/* Empty slots */}
-                {Array.from({ length: settings.playerCount - players.length }).map(
-                  (_, i) => (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Players List */}
+            <div className="lg:col-span-2">
+              <ThemedCard title={`Players (${players.length}/${settings.playerCount})`}>
+                <div className="space-y-3">
+                  {players.map((player) => (
                     <PlayerSlot
-                      key={`empty-${i}`}
-                      player={null}
-                      isCurrentUser={false}
+                      key={player.id}
+                      player={player}
+                      isCurrentUser={player.userId === currentUserId}
                       isHost={isHost}
-                      onAddBot={() => addBot()}
+                      onRemoveBot={removeBot}
                     />
-                  )
-                )}
-              </div>
+                  ))}
+                  {Array.from({ length: settings.playerCount - players.length }).map(
+                    (_, i) => (
+                      <PlayerSlot
+                        key={`empty-${i}`}
+                        player={null}
+                        isCurrentUser={false}
+                        isHost={isHost}
+                        onAddBot={() => addBot()}
+                      />
+                    )
+                  )}
+                </div>
+              </ThemedCard>
             </div>
-          </div>
 
-          {/* Sidebar - Settings & Actions */}
-          <div className="space-y-6">
-            {/* Game Settings */}
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold mb-4">Game Settings</h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Players</span>
-                  <span>{settings.playerCount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Victory Points</span>
-                  <span>{settings.victoryPoints}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Milty Draft</span>
-                  <span>{settings.miltyDraft ? 'Yes' : 'No'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Private</span>
-                  <span>{settings.privateGame ? 'Yes' : 'No'}</span>
-                </div>
-                {settings.expansions.length > 0 && (
-                  <div>
-                    <span className="text-gray-400">Expansions:</span>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {settings.expansions.map((exp) => (
-                        <span
-                          key={exp}
-                          className="px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded text-xs"
-                        >
-                          {exp}
-                        </span>
-                      ))}
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Game Settings */}
+              <ThemedCard title="Game Settings">
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Players</span>
+                    <span className="text-white">{settings.playerCount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Victory Points</span>
+                    <span className="text-white">{settings.victoryPoints}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Milty Draft</span>
+                    <ThemedBadge color={settings.miltyDraft ? 'emerald' : 'cyan'}>
+                      {settings.miltyDraft ? 'Yes' : 'No'}
+                    </ThemedBadge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Private</span>
+                    <ThemedBadge color={settings.privateGame ? 'amber' : 'cyan'}>
+                      {settings.privateGame ? 'Yes' : 'No'}
+                    </ThemedBadge>
+                  </div>
+                  {settings.expansions.length > 0 && (
+                    <div>
+                      <span className="text-slate-400">Expansions:</span>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {settings.expansions.map((exp) => (
+                          <ThemedBadge key={exp} color="purple">
+                            {exp}
+                          </ThemedBadge>
+                        ))}
+                      </div>
                     </div>
+                  )}
+                  {settings.galacticEvents && settings.galacticEvents.length > 0 && (
+                    <div>
+                      <span className="text-slate-400">Galactic Events:</span>
+                      <div className="mt-1">
+                        <ThemedBadge color="amber">
+                          {settings.galacticEvents.length} selected
+                        </ThemedBadge>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {isHost && (
+                  <div className="mt-4 pt-4 border-t border-cyan-400/20">
+                    <GlassButton
+                      color="cyan"
+                      size="sm"
+                      onClick={() => {
+                        const newVp = settings.victoryPoints === 10 ? 12 : settings.victoryPoints === 12 ? 14 : 10;
+                        updateSettings({ victoryPoints: newVp });
+                      }}
+                    >
+                      Edit Settings
+                    </GlassButton>
                   </div>
                 )}
-                {settings.galacticEvents && settings.galacticEvents.length > 0 && (
-                  <div>
-                    <span className="text-gray-400">Galactic Events:</span>
-                    <div className="mt-1 text-sm text-purple-300">
-                      {settings.galacticEvents.length} selected
-                    </div>
-                  </div>
-                )}
-              </div>
+              </ThemedCard>
 
-              {/* Host controls */}
-              {isHost && (
-                <div className="mt-4 pt-4 border-t border-gray-700">
-                  <button
-                    onClick={() => {
-                      // Could open a settings modal
-                      const newVp = settings.victoryPoints === 10 ? 12 : settings.victoryPoints === 12 ? 14 : 10;
-                      updateSettings({ victoryPoints: newVp });
-                    }}
-                    className="text-sm text-blue-400 hover:text-blue-300"
-                  >
-                    Edit Settings
-                  </button>
-                </div>
+              {/* Galactic Events (Thunder's Edge) */}
+              {isHost && settings.expansions.includes('thunders_edge') && (
+                <ThemedCard title="Galactic Events">
+                  <GalacticEventsSelect
+                    selectedEvents={settings.galacticEvents || []}
+                    onEventsChange={(events) => updateSettings({ galacticEvents: events })}
+                    disabled={players.some((p) => p.ready)}
+                    maxEvents={3}
+                  />
+                </ThemedCard>
               )}
-            </div>
 
-            {/* Galactic Events (Thunder's Edge) - Host only */}
-            {isHost && settings.expansions.includes('thunders_edge') && (
-              <div className="bg-gray-800 rounded-lg p-6">
-                <GalacticEventsSelect
-                  selectedEvents={settings.galacticEvents || []}
-                  onEventsChange={(events) => updateSettings({ galacticEvents: events })}
-                  disabled={players.some((p) => p.ready)}
-                  maxEvents={3}
-                />
-              </div>
-            )}
+              {/* Your Selection */}
+              {currentPlayer && (
+                <ThemedCard title="Your Selection">
+                  {settings.miltyDraft && (
+                    <ThemedPanel variant="highlight" glow className="mb-4 p-3">
+                      <p className="text-sm text-cyan-300">
+                        <strong>Milty Draft enabled!</strong> Factions will be drafted after everyone is ready.
+                      </p>
+                    </ThemedPanel>
+                  )}
 
-            {/* Your Selection */}
-            {currentPlayer && (
-              <div className="bg-gray-800 rounded-lg p-6">
-                <h2 className="text-xl font-semibold mb-4">Your Selection</h2>
+                  {!settings.miltyDraft && (
+                    <div className="mb-4">
+                      <label className="block text-sm text-slate-400 mb-2">
+                        Faction
+                      </label>
+                      <FactionSelect
+                        selectedFaction={currentPlayer.faction}
+                        takenFactions={takenFactions}
+                        expansions={settings.expansions}
+                        onSelect={selectFaction}
+                        disabled={currentPlayer.ready}
+                      />
+                    </div>
+                  )}
 
-                {/* Milty Draft Notice */}
-                {settings.miltyDraft && (
-                  <div className="mb-4 p-3 bg-purple-900/30 border border-purple-500 rounded-lg">
-                    <p className="text-sm text-purple-300">
-                      <strong>Milty Draft enabled!</strong> Factions will be drafted after everyone is ready.
-                    </p>
-                  </div>
-                )}
-
-                {/* Faction Select - only show if NOT using Milty Draft */}
-                {!settings.miltyDraft && (
-                  <div className="mb-4">
-                    <label className="block text-sm text-gray-400 mb-2">
-                      Faction
+                  <div className="mb-6">
+                    <label className="block text-sm text-slate-400 mb-2">
+                      Color
                     </label>
-                    <FactionSelect
-                      selectedFaction={currentPlayer.faction}
-                      takenFactions={takenFactions}
-                      expansions={settings.expansions}
-                      onSelect={selectFaction}
+                    <ColorSelect
+                      selectedColor={currentPlayer.color}
+                      takenColors={takenColors}
+                      onSelect={selectColor}
                       disabled={currentPlayer.ready}
                     />
                   </div>
-                )}
 
-                {/* Color Select */}
-                <div className="mb-6">
-                  <label className="block text-sm text-gray-400 mb-2">
-                    Color
-                  </label>
-                  <ColorSelect
-                    selectedColor={currentPlayer.color}
-                    takenColors={takenColors}
-                    onSelect={selectColor}
-                    disabled={currentPlayer.ready}
-                  />
-                </div>
+                  {currentPlayer.ready ? (
+                    <PulseButton
+                      onClick={handleReadyToggle}
+                      color="amber"
+                      fullWidth
+                    >
+                      Cancel Ready
+                    </PulseButton>
+                  ) : (
+                    <ShieldButton
+                      onClick={handleReadyToggle}
+                      disabled={settings.miltyDraft ? !currentPlayer.color : (!currentPlayer.faction || !currentPlayer.color)}
+                      color="emerald"
+                      fullWidth
+                    >
+                      Ready Up
+                    </ShieldButton>
+                  )}
 
-                {/* Ready Button */}
-                <button
-                  onClick={handleReadyToggle}
-                  disabled={settings.miltyDraft ? !currentPlayer.color : (!currentPlayer.faction || !currentPlayer.color)}
-                  className={`w-full py-3 rounded-lg font-semibold ${
-                    currentPlayer.ready
-                      ? 'bg-yellow-600 hover:bg-yellow-700'
-                      : 'bg-green-600 hover:bg-green-700'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {currentPlayer.ready ? 'Cancel Ready' : 'Ready Up'}
-                </button>
-
-                {settings.miltyDraft ? (
-                  !currentPlayer.color ? (
-                    <p className="text-sm text-gray-500 mt-2 text-center">
-                      Select color to ready up
+                  {settings.miltyDraft ? (
+                    !currentPlayer.color ? (
+                      <p className="text-sm text-slate-400 mt-2 text-center">
+                        Select color to ready up
+                      </p>
+                    ) : null
+                  ) : !currentPlayer.faction || !currentPlayer.color ? (
+                    <p className="text-sm text-slate-400 mt-2 text-center">
+                      Select faction and color to ready up
                     </p>
-                  ) : null
-                ) : !currentPlayer.faction || !currentPlayer.color ? (
-                  <p className="text-sm text-gray-500 mt-2 text-center">
-                    Select faction and color to ready up
-                  </p>
-                ) : null}
-              </div>
-            )}
+                  ) : null}
+                </ThemedCard>
+              )}
 
-            {/* Start Game/Draft Button (Host only) */}
-            {isHost && (
-              <button
-                onClick={settings.miltyDraft ? handleStartDraft : handleStartGame}
-                disabled={!canStart}
-                className={`w-full py-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg ${
-                  settings.miltyDraft
-                    ? 'bg-purple-600 hover:bg-purple-700'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {!allReady
-                  ? players.length < 3
-                    ? 'Need at least 3 players'
-                    : 'Waiting for all players to ready'
-                  : settings.miltyDraft
-                    ? 'Start Milty Draft'
-                    : 'Start Game'}
-              </button>
-            )}
+              {/* Start Game/Draft Button */}
+              {isHost && (
+                <CommandButton
+                  onClick={settings.miltyDraft ? handleStartDraft : handleStartGame}
+                  disabled={!canStart}
+                  color={canStart ? 'emerald' : 'cyan'}
+                  size="lg"
+                  fullWidth
+                >
+                  {!allReady
+                    ? players.length < 3
+                      ? 'Need at least 3 players'
+                      : 'Waiting for all players'
+                    : settings.miltyDraft
+                      ? 'Start Milty Draft'
+                      : 'Start Game'}
+                </CommandButton>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ThemedBackground>
   );
 }
