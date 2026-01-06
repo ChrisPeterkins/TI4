@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { playSound } from '@/hooks/useSounds';
 
 interface Star {
   x: number;
@@ -213,6 +214,7 @@ function InteractiveGridCanvas() {
         opacity: 0.6,
         maxRadius: 300,
       });
+      playSound('ripple');
     };
 
     const animate = (time: number) => {

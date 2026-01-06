@@ -1,6 +1,7 @@
 'use client';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { playSound } from '@/hooks/useSounds';
 
 interface ThemedButtonProps {
   children: React.ReactNode;
@@ -119,10 +120,17 @@ export default function ThemedButton({
     }
   };
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         ${getSizeClasses()}
@@ -199,9 +207,16 @@ export function ThemedIconButton({
     }
   };
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       title={title}
       className={`
@@ -265,10 +280,17 @@ export function HoloBorderButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -339,10 +361,17 @@ export function HexButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -402,10 +431,17 @@ export function PulseButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -482,10 +518,17 @@ export function ScanLineButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -565,10 +608,17 @@ export function PowerCoreButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -675,10 +725,17 @@ export function GlassButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -743,10 +800,17 @@ export function WarpButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -829,10 +893,17 @@ export function ShieldButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -912,10 +983,17 @@ export function CommandButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -1008,10 +1086,17 @@ export function PlasmaButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -1108,10 +1193,17 @@ export function OrbitalButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -1217,10 +1309,17 @@ export function DataStreamButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative
@@ -1306,10 +1405,17 @@ export function NexusButton({
 }: HoloButtonProps) {
   const c = colorMap[color];
 
+  const handleClick = () => {
+    if (!disabled) {
+      playSound('click');
+      onClick?.();
+    }
+  };
+
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={handleClick}
       disabled={disabled}
       className={`
         group relative

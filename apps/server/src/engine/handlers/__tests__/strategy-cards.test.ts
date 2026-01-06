@@ -495,6 +495,71 @@ describe('Strategy Card Handlers', () => {
     });
   });
 
+  describe('Diplomacy Secondary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 2, 'player1');
+      state.strategicActionState!.primaryResolved = true;
+      state.subPhase = 'strategic_secondary';
+    });
+
+    it('should cost strategy token', () => {
+      const initialTokens = state.players[1].commandTokens.strategy;
+
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 2,
+        choices: {},
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      handleStrategicSecondary(state, action);
+
+      expect(state.players[1].commandTokens.strategy).toBe(initialTokens - 1);
+    });
+
+    it('should allow readying exhausted planets', () => {
+      state.players[1].planets = [
+        { planetId: 'moll-primus', exhausted: true, attachments: [] },
+      ];
+
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 2,
+        choices: {
+          planetsToReady: ['moll-primus'],
+        },
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should allow declining', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 2,
+        choices: {},
+        declined: true,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.strategicActionState!.secondaryResponses['player2']).toBe('declined');
+    });
+  });
+
   // ============================================
   // Tests: Politics (Card 3)
   // ============================================
@@ -557,6 +622,241 @@ describe('Strategy Card Handlers', () => {
       handleStrategicPrimary(state, action);
 
       expect(state.players[0].actionCards.length).toBe(initialCards + 2);
+    });
+
+    it('should fail if new speaker not found', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 3,
+        choices: {
+          newSpeakerId: 'nonexistent',
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('New speaker not found');
+    });
+  });
+
+  describe('Politics Secondary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 3, 'player1');
+      state.strategicActionState!.primaryResolved = true;
+      state.subPhase = 'strategic_secondary';
+    });
+
+    it('should cost strategy token', () => {
+      const initialTokens = state.players[1].commandTokens.strategy;
+
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 3,
+        choices: {},
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      handleStrategicSecondary(state, action);
+
+      expect(state.players[1].commandTokens.strategy).toBe(initialTokens - 1);
+    });
+
+    it('should draw 2 action cards', () => {
+      const initialCards = state.players[1].actionCards.length;
+
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 3,
+        choices: {},
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      handleStrategicSecondary(state, action);
+
+      expect(state.players[1].actionCards.length).toBe(initialCards + 2);
+    });
+
+    it('should allow declining', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 3,
+        choices: {},
+        declined: true,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.strategicActionState!.secondaryResponses['player2']).toBe('declined');
+    });
+  });
+
+  // ============================================
+  // Tests: Construction (Card 4)
+  // ============================================
+
+  describe('Construction Primary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 4, 'player1');
+    });
+
+    it('should place PDS on controlled planet', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 4,
+        choices: {
+          firstStructure: { type: 'pds', planetId: 'jord' },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(result.triggeredEvents).toContain('construction_primary_resolved');
+    });
+
+    it('should place space dock on controlled planet', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 4,
+        choices: {
+          firstStructure: { type: 'space_dock', planetId: 'jord' },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should place PDS as second structure', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 4,
+        choices: {
+          firstStructure: { type: 'space_dock', planetId: 'jord' },
+          secondStructure: { type: 'pds', planetId: 'wellon' },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+      expect((result.data as { placedStructures?: any[] })?.placedStructures).toHaveLength(2);
+    });
+
+    it('should fail if second structure is not PDS', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 4,
+        choices: {
+          firstStructure: { type: 'pds', planetId: 'jord' },
+          secondStructure: { type: 'space_dock', planetId: 'wellon' }, // Invalid
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Second structure must be a PDS');
+    });
+
+    it('should resolve without placing structures', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 4,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Construction Secondary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 4, 'player1');
+      state.strategicActionState!.primaryResolved = true;
+      state.subPhase = 'strategic_secondary';
+    });
+
+    it('should cost strategy token', () => {
+      const initialTokens = state.players[1].commandTokens.strategy;
+
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 4,
+        choices: {},
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      handleStrategicSecondary(state, action);
+
+      expect(state.players[1].commandTokens.strategy).toBe(initialTokens - 1);
+    });
+
+    it('should allow placing PDS on controlled planet', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 4,
+        choices: {
+          firstStructure: { type: 'pds', planetId: 'moll-primus' },
+        },
+        declined: false,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should allow declining', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 4,
+        choices: {},
+        declined: true,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.strategicActionState!.secondaryResponses['player2']).toBe('declined');
     });
   });
 
@@ -686,6 +986,156 @@ describe('Strategy Card Handlers', () => {
   });
 
   // ============================================
+  // Tests: Warfare (Card 6)
+  // ============================================
+
+  describe('Warfare Primary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 6, 'player1');
+      // Place a command token on a system
+      const tile = state.map.tiles.find(t => t.systemId === 19);
+      if (tile) {
+        tile.commandTokens.push('player1');
+      }
+    });
+
+    it('should remove command token from chosen system', () => {
+      const tile = state.map.tiles.find(t => t.systemId === 19);
+      expect(tile?.commandTokens).toContain('player1');
+
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          removedTokenSystem: { q: 0, r: 1 }, // System 19
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(tile?.commandTokens).not.toContain('player1');
+    });
+
+    it('should gain 1 command token', () => {
+      const initialTotal = state.players[0].commandTokens.tactics +
+        state.players[0].commandTokens.fleet +
+        state.players[0].commandTokens.strategy;
+
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      handleStrategicPrimary(state, action);
+
+      const newTotal = state.players[0].commandTokens.tactics +
+        state.players[0].commandTokens.fleet +
+        state.players[0].commandTokens.strategy;
+
+      expect(newTotal).toBe(initialTotal + 1);
+    });
+
+    it('should redistribute tokens according to choices', () => {
+      const initialTotal = state.players[0].commandTokens.tactics +
+        state.players[0].commandTokens.fleet +
+        state.players[0].commandTokens.strategy;
+
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          newTokenDistribution: {
+            tactics: 4,
+            fleet: 3,
+            strategy: initialTotal + 1 - 7, // Remaining
+          },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[0].commandTokens.tactics).toBe(4);
+      expect(state.players[0].commandTokens.fleet).toBe(3);
+    });
+
+    it('should fail with incorrect token distribution', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          newTokenDistribution: {
+            tactics: 10,
+            fleet: 10,
+            strategy: 10, // Way too many
+          },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Must distribute exactly');
+    });
+
+    it('should default to adding to tactics pool', () => {
+      const initialTactics = state.players[0].commandTokens.tactics;
+
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      handleStrategicPrimary(state, action);
+
+      expect(state.players[0].commandTokens.tactics).toBe(initialTactics + 1);
+    });
+  });
+
+  describe('Warfare Secondary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 6, 'player1');
+      state.strategicActionState!.primaryResolved = true;
+      state.subPhase = 'strategic_secondary';
+    });
+
+    it('should allow declining', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 6,
+        choices: {},
+        declined: true,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.strategicActionState!.secondaryResponses['player2']).toBe('declined');
+    });
+  });
+
+  // ============================================
   // Tests: Technology (Card 7)
   // ============================================
 
@@ -731,6 +1181,47 @@ describe('Strategy Card Handlers', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Already have this technology');
+    });
+
+    it('should resolve without researching any tech', () => {
+      const action: StrategicPrimaryAction = {
+        type: 'strategic_primary',
+        playerId: 'player1',
+        cardNumber: 7,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicPrimary(state, action);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Technology Secondary', () => {
+    let state: GameState;
+
+    beforeEach(() => {
+      state = createMockGameState(4);
+      setupStrategicAction(state, 7, 'player1');
+      state.strategicActionState!.primaryResolved = true;
+      state.subPhase = 'strategic_secondary';
+    });
+
+    it('should allow declining', () => {
+      const action: StrategicSecondaryAction = {
+        type: 'strategic_secondary',
+        playerId: 'player2',
+        cardNumber: 7,
+        choices: {},
+        declined: true,
+        timestamp: Date.now(),
+      };
+
+      const result = handleStrategicSecondary(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.strategicActionState!.secondaryResponses['player2']).toBe('declined');
     });
   });
 

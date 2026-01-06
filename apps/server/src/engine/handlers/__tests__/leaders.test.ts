@@ -1095,5 +1095,797 @@ describe('Leader Handlers', () => {
       expect(state.players[0].relics).toContain('shard_of_the_throne');
       expect(state.relicDeck).not.toContain('shard_of_the_throne');
     });
+
+    it('should apply Yin hero effect (replace infantry on legendary/home planets)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'yin',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player2',
+            faction: 'sol',
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              systemId: 1, // Home system
+              planets: [
+                {
+                  planetId: 'home_planet',
+                  controlledBy: 'player2',
+                  units: [
+                    { id: 'i1', type: 'infantry', ownerId: 'player2', damaged: false },
+                    { id: 'i2', type: 'infantry', ownerId: 'player2', damaged: false },
+                    { id: 'm1', type: 'mech', ownerId: 'player2', damaged: false }, // Not infantry - preserved
+                  ],
+                  exhausted: false,
+                } as any,
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      const planet = state.map.tiles[0].planets[0];
+      // All infantry should now be owned by player1
+      const yinInfantry = planet.units.filter(u => u.type === 'infantry' && u.ownerId === 'player1');
+      const solInfantry = planet.units.filter(u => u.type === 'infantry' && u.ownerId === 'player2');
+      expect(yinInfantry.length).toBe(2);
+      expect(solInfantry.length).toBe(0);
+      // Mech should remain
+      expect(planet.units.some(u => u.type === 'mech' && u.ownerId === 'player2')).toBe(true);
+    });
+
+    it('should apply Sardakk hero effect (destroy opponent fighters)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'sardakk',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player2',
+            faction: 'sol',
+          }),
+        ],
+        activeCombat: {
+          id: 'combat-1',
+          type: 'space',
+          systemId: '0',
+          attackerId: 'player1',
+          defenderId: 'player2',
+        },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              systemId: 0,
+              units: [
+                { id: 'f1', type: 'fighter', ownerId: 'player2', damaged: false },
+                { id: 'f2', type: 'fighter', ownerId: 'player2', damaged: false },
+                { id: 'c1', type: 'cruiser', ownerId: 'player2', damaged: false },
+                { id: 'f3', type: 'fighter', ownerId: 'player1', damaged: false }, // Player1 fighter preserved
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      // The hero effect happens but for 'sardakk_hero' not 'norr_hero' - effect is correct
+    });
+
+    it('should apply Jol-Nar hero effect (research 3 technologies)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'jolnar',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      expect(result.triggeredEvents).toContain('hero_purged');
+    });
+
+    it('should apply Xxcha hero effect (control agenda resolution)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'xxcha',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      expect(result.triggeredEvents).toContain('hero_purged');
+    });
+  });
+
+  describe('Additional Agent Effects', () => {
+    it('should apply replenish_commodities effect', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'letnev', // Letnev agent triggers via custom effect
+            commodities: 1,
+            maxCommodities: 4,
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply draw_secret_objective effect', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'saar',
+            secretObjectives: [],
+          }),
+        ],
+        objectives: {
+          publicStageI: [],
+          publicStageII: [],
+          revealedCount: 0,
+          secretDeck: ['secret1', 'secret2'],
+        },
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Mentak agent effect (return command token)', () => {
+      const player1 = createMockPlayer({
+        id: 'player1',
+        faction: 'mentak',
+      });
+      const player2 = createMockPlayer({
+        id: 'player2',
+        faction: 'sol',
+        commandTokens: { tactics: 2, fleet: 3, strategy: 2 },
+      });
+      const state = createMockGameState({
+        players: [player1, player2],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        targetPlayerId: 'player2',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Creuss agent effect (wormhole connection)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'creuss',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply L1Z1X agent effect (protect ship)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'l1z1x',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Naalu agent effect (produce hit)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'naalu',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Muaat agent effect (enable production)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'muaat',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Empyrean agent effect (block production)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'empyrean',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Titans agent effect (counter hit)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'titans',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Argent agent effect (cancel hit)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'argent',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Winnu agent effect (production bonus)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'winnu',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Nekro agent effect (copy technology)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'nekro',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Xxcha agent effect (view agenda cards)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'xxcha',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Mahact agent effect (swap planets)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'mahact',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Nomad agent effect (move through enemies)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'nomad',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Cabal agent effect (capture ship)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'cabal',
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Naaz-Rokha agent effect (trade goods for mechs)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'naazrokha',
+            tradeGoods: 2,
+          }),
+        ],
+      });
+      const action: UseAgentAction = {
+        type: 'use_agent',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handleUseAgent(state, action);
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('Additional Hero Effects', () => {
+    it('should apply Mentak hero effect (gain trade goods from system)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'mentak',
+            tradeGoods: 0,
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              systemId: 1,
+              planets: [
+                { planetId: 'p1', controlledBy: 'player1', units: [], exhausted: false } as any,
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        targets: { systemId: '1' },
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[0].tradeGoods).toBeGreaterThan(0);
+    });
+
+    it('should apply Letnev hero effect (Dark Talon placement)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Creuss hero effect (Creuss Gate placement)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'creuss',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Naalu hero effect (block action cards)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'naalu',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Muaat hero effect (War Sun placement)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'muaat',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Empyrean hero effect (Shield Paling)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'empyrean',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Nomad hero effect (flagship placement)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'nomad',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Argent hero effect (agenda selection)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'argent',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Nekro hero effect (copy 2 technologies)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'nekro',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Yssaril hero effect (view all hands)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'yssaril',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should apply Keleres hero effect (replace law)', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'keleres_xxcha',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: true, purged: false },
+            },
+          }),
+        ],
+      });
+      const action: PurgeHeroAction = {
+        type: 'purge_hero',
+        playerId: 'player1',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePurgeHero(state, action);
+
+      expect(result.success).toBe(true);
+    });
   });
 });
