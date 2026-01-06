@@ -1080,4 +1080,388 @@ describe('Component Actions', () => {
       expect(state.activePlayerId).toBe('player-1');
     });
   });
+
+  // ============================================================================
+  // Wormhole Generator (Creuss) Tests
+  // ============================================================================
+
+  describe('Wormhole Generator (Creuss) - Valid Cases', () => {
+    it('should place wormhole in system with controlled planet', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+      state.map.tiles[1].planets[0].controlledBy = 'player-1';
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '1' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.map.tiles[1].wormhole).toBe('delta');
+      expect(state.players[0].exhaustedTechnologies).toContain('wormhole_generator');
+    });
+
+    it('should place wormhole in non-home system without enemy ships', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '22' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      const tile = state.map.tiles.find(t => t.systemId === 22);
+      expect(tile?.wormhole).toBe('delta');
+    });
+
+    it('should remove old wormhole when placing new one', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      // Both wormhole_generator and wormhole_generator_omega are handled the same way
+      state.players[0].technologies = ['wormhole_generator_omega'];
+      state.map.tiles[1].wormhole = 'delta'; // Existing wormhole on tile 1
+      state.map.tiles[1].planets[0].controlledBy = 'player-1';
+      state.map.tiles[4].wormhole = 'delta'; // Also has delta on tile 4 (system 22)
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator_omega',
+        targets: { systemId: '1' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.map.tiles[1].wormhole).toBe('delta');
+      // Old wormhole on tile 4 should be removed
+      expect(state.map.tiles[4].wormhole).toBeNull();
+    });
+  });
+
+  describe('Wormhole Generator (Creuss) - Invalid Cases', () => {
+    it('should fail if not Creuss faction', () => {
+      const state = createMockGameState();
+      state.players[0].technologies = ['wormhole_generator'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '1' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Only Creuss can use Wormhole Generator');
+    });
+
+    it('should fail without system specified', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Must specify target system');
+    });
+
+    it('should fail with invalid system ID', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: 'invalid' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid system ID');
+    });
+
+    it('should fail when system not found', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '999' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('System not found');
+    });
+
+    it('should fail in home system without controlled planet', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+      // System 1 is a home system and controlled by player-1, so this would succeed
+      // Let's use system 2 (mentak's home) which is also a home system
+      // For this to fail, we need home system without controlled planet
+      // Actually, let's use a PoK home system that exists in the map
+      state.map.tiles.push(createMockTile(0, 1, 51, [])); // Add a PoK home system (51 is Creuss home)
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '51' }, // PoK home system, not controlled
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid target');
+    });
+
+    it('should allow placement in non-home system if controlled', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'creuss';
+      state.players[0].technologies = ['wormhole_generator'];
+      // System 22 (tile 4) is controlled by player-1 and has enemy ships
+      // Since player has controlled planet, it should succeed
+      state.map.tiles[4].units.push(createMockUnit('cruiser', 'player-2'));
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'wormhole_generator',
+        targets: { systemId: '22' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.map.tiles[4].wormhole).toBe('delta');
+    });
+  });
+
+  // ============================================================================
+  // Vortex (Vuil'Raith) Tests
+  // ============================================================================
+
+  describe('Vortex (Vuil\'Raith)', () => {
+    it('should capture enemy unit from adjacent system', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'vuil_raith';
+      state.players[0].technologies = ['vortex'];
+
+      // Add space dock to player-1's system (adjacent to target)
+      state.map.tiles[1].planets[0].units.push(createMockUnit('space_dock', 'player-1'));
+
+      // Add enemy unit to target system (22 is adjacent to 1)
+      const enemyUnit = createMockUnit('cruiser', 'player-2', 'enemy-cruiser-1');
+      state.map.tiles[4].units.push(enemyUnit);
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'vortex',
+        targets: { systemId: '22', unitType: 'enemy-cruiser-1' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[0].exhaustedTechnologies).toContain('vortex');
+      expect(state.map.tiles[4].units).not.toContain(enemyUnit);
+    });
+
+    it('should fail if not Vuil\'Raith', () => {
+      const state = createMockGameState();
+      state.players[0].technologies = ['vortex'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'vortex',
+        targets: { systemId: '22', unitType: 'cruiser' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Only Vuil\'Raith can use Vortex');
+    });
+
+    it('should fail without system specified', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'vuil_raith';
+      state.players[0].technologies = ['vortex'];
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'vortex',
+        targets: { unitType: 'cruiser' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Must specify target system and unit');
+    });
+  });
+
+  // ============================================================================
+  // Sling Relay - Invalid system ID Tests
+  // ============================================================================
+
+  describe('Sling Relay - Edge Cases', () => {
+    it('should fail with invalid system ID', () => {
+      const state = createMockGameState();
+      state.players[0].technologies = ['sling_relay'];
+      state.map.tiles[1].planets[0].units.push(createMockUnit('space_dock', 'player-1'));
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'sling_relay',
+        targets: { systemId: 'invalid', unitType: 'cruiser' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Invalid system ID');
+    });
+
+    it('should produce ship with floating space dock', () => {
+      const state = createMockGameState();
+      state.players[0].technologies = ['sling_relay'];
+
+      // Add floating space dock
+      state.map.tiles[1].units.push(createMockUnit('space_dock', 'player-1'));
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'tech',
+        componentId: 'sling_relay',
+        targets: { systemId: '1', unitType: 'destroyer' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.map.tiles[1].units.some(u => u.type === 'destroyer')).toBe(true);
+    });
+  });
+
+  // ============================================================================
+  // Orbital Drop - Invalid Cases
+  // ============================================================================
+
+  describe('Orbital Drop (Sol) - Edge Cases', () => {
+    it('should fail without strategy token', () => {
+      const state = createMockGameState();
+      state.players[0].commandTokens.strategy = 0;
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'faction_ability',
+        componentId: 'orbital_drop',
+        targets: { planetId: 'jord' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('No strategy tokens available');
+    });
+
+    it('should fail without target planet specified', () => {
+      const state = createMockGameState();
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'faction_ability',
+        componentId: 'orbital_drop',
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Must specify target planet');
+    });
+
+    it('should fail for non-existent planet', () => {
+      const state = createMockGameState();
+
+      const action: ComponentAction = {
+        type: 'component_action',
+        playerId: 'player-1',
+        timestamp: Date.now(),
+        componentType: 'faction_ability',
+        componentId: 'orbital_drop',
+        targets: { planetId: 'nonexistent' },
+      };
+
+      const result = handleComponentAction(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Planet not found');
+    });
+  });
 });
