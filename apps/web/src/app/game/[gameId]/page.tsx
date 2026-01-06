@@ -63,6 +63,12 @@ import type {
   UseRelicAction,
   UseAgentAction,
   PurgeHeroAction,
+  // Thunder's Edge actions
+  UseBreakthroughAction,
+  GalvanizeUnitAction,
+  PlayPlotCardAction,
+  PlaceBreachTokenAction,
+  FlipBreachTokenAction,
 } from '@ti4/shared';
 
 type TacticalUIState = 'idle' | 'selecting_system';
@@ -531,6 +537,48 @@ export default function GamePage() {
     } as Omit<StrategicSecondaryAction, 'playerId' | 'timestamp'>);
   };
 
+  // =============================================================================
+  // Thunder's Edge Handlers
+  // =============================================================================
+
+  // Handle use breakthrough ability
+  const handleUseBreakthrough = useCallback(() => {
+    sendAction({
+      type: 'use_breakthrough',
+    } as Omit<UseBreakthroughAction, 'playerId' | 'timestamp'>);
+  }, [sendAction]);
+
+  // Handle galvanize unit (view unit details - actual galvanizing happens after combat)
+  const handleGalvanizeUnit = useCallback((unitId: string) => {
+    // For now, this just views the unit - galvanizing is automatic after combat
+    console.log('View galvanized unit:', unitId);
+  }, []);
+
+  // Handle play plot card
+  const handlePlayPlotCard = useCallback((cardId: string) => {
+    sendAction({
+      type: 'play_plot_card',
+      cardId,
+    } as Omit<PlayPlotCardAction, 'playerId' | 'timestamp'>);
+  }, [sendAction]);
+
+  // Handle place breach token
+  const handlePlaceBreach = useCallback(() => {
+    // This would typically open a system selection UI
+    // For now, we'll need to integrate with the tactical action flow
+    console.log('Place breach token - requires system selection');
+  }, []);
+
+  // Handle flip breach token
+  const handleFlipBreach = useCallback((tokenId: string) => {
+    // Extract systemId from tokenId (format: breach-{systemId})
+    const systemId = tokenId.replace('breach-', '');
+    sendAction({
+      type: 'flip_breach_token',
+      tokenId: systemId,
+    } as Omit<FlipBreachTokenAction, 'playerId' | 'timestamp'>);
+  }, [sendAction]);
+
   // Handle pass with confirmation
   const handlePassWithConfirm = useCallback(async () => {
     if (!isMyTurn || gameState.phase !== 'action') return;
@@ -684,6 +732,13 @@ export default function GamePage() {
               <PlayerDashboard
                 player={currentPlayer}
                 isActivePlayer={currentPlayer.id === gameState.activePlayerId}
+                gameState={gameState}
+                isCurrentPlayer={currentPlayer.id === currentPlayerId}
+                onUseBreakthrough={handleUseBreakthrough}
+                onGalvanizeUnit={handleGalvanizeUnit}
+                onPlayPlotCard={handlePlayPlotCard}
+                onPlaceBreach={handlePlaceBreach}
+                onFlipBreach={handleFlipBreach}
               />
             )}
           </aside>

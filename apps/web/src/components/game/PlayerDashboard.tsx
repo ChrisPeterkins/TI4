@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { factions, technologies } from '@ti4/game-data';
-import type { PlayerState } from '@ti4/shared';
+import type { PlayerState, BreachTokenState, GameState } from '@ti4/shared';
 import {
   getFactionIconUrl,
   getCommandTokenUrl,
@@ -11,10 +11,31 @@ import {
   getTechnologyCardUrl,
 } from '@/lib/assets';
 import { PromissoryNotesPanel } from './PromissoryNotesPanel';
+import BreakthroughDisplay from './BreakthroughDisplay';
+import GalvanizeDisplay from './GalvanizeDisplay';
+import PlotCardsPanel from './PlotCardsPanel';
+import BreachTokensDisplay from './BreachTokensDisplay';
+
+// Thunder's Edge faction IDs
+const THUNDERS_EDGE_FACTIONS = [
+  'last_bastion',
+  'deepwrought',
+  'ral_nel',
+  'crimson_rebellion',
+  'firmament',
+  'obsidian',
+];
 
 interface PlayerDashboardProps {
   player: PlayerState;
   isActivePlayer: boolean;
+  gameState?: GameState;
+  isCurrentPlayer?: boolean;
+  onUseBreakthrough?: () => void;
+  onGalvanizeUnit?: (unitId: string) => void;
+  onPlayPlotCard?: (cardId: string) => void;
+  onPlaceBreach?: () => void;
+  onFlipBreach?: (tokenId: string) => void;
 }
 
 // Strategy card names
@@ -152,9 +173,20 @@ function TechCardModal({ techId, onClose }: { techId: string; onClose: () => voi
   );
 }
 
-export function PlayerDashboard({ player, isActivePlayer }: PlayerDashboardProps) {
+export function PlayerDashboard({
+  player,
+  isActivePlayer,
+  gameState,
+  isCurrentPlayer = false,
+  onUseBreakthrough,
+  onGalvanizeUnit,
+  onPlayPlotCard,
+  onPlaceBreach,
+  onFlipBreach,
+}: PlayerDashboardProps) {
   const [selectedTech, setSelectedTech] = useState<string | null>(null);
   const faction = factions[player.faction];
+  const isThundersEdgeFaction = THUNDERS_EDGE_FACTIONS.includes(player.faction);
 
   return (
     <div className={`
@@ -294,6 +326,54 @@ export function PlayerDashboard({ player, isActivePlayer }: PlayerDashboardProps
       {/* Promissory Notes */}
       <PromissoryNotesPanel player={player} compact />
 
+      {/* Thunder's Edge - Faction-Specific Components */}
+      {isThundersEdgeFaction && (
+        <div className="mt-4 space-y-3">
+          {/* Breakthrough Display - All Thunder's Edge factions */}
+          {player.breakthrough && (
+            <BreakthroughDisplay
+              factionId={player.faction}
+              isUnlocked={player.breakthrough.unlocked}
+              isExhausted={player.breakthrough.exhausted}
+              onUse={isCurrentPlayer ? onUseBreakthrough : undefined}
+              size="small"
+            />
+          )}
+
+          {/* Galvanize Display - Last Bastion only */}
+          {player.faction === 'last_bastion' && (
+            <GalvanizeDisplay
+              galvanizedUnits={getGalvanizedUnits(player, gameState)}
+              maxGalvanizeTokens={3}
+              isCurrentPlayer={isCurrentPlayer}
+              onViewUnit={onGalvanizeUnit ? (unit) => onGalvanizeUnit(unit.unitId) : undefined}
+            />
+          )}
+
+          {/* Plot Cards Panel - Firmament and Obsidian */}
+          {(player.faction === 'firmament' || player.faction === 'obsidian') && (
+            <PlotCardsPanel
+              plotCards={(player.plotCards || []) as PlotCardId[]}
+              facedownCards={player.plotCardsInPlay?.length || 0}
+              isCurrentPlayer={isCurrentPlayer}
+              onPlayCard={onPlayPlotCard as ((cardId: PlotCardId) => void) | undefined}
+            />
+          )}
+
+          {/* Breach Tokens Display - Crimson Rebellion only */}
+          {player.faction === 'crimson_rebellion' && gameState && (
+            <BreachTokensDisplay
+              breachTokens={getBreachTokensForPlayer(player.id, gameState)}
+              maxBreachTokens={4}
+              isSundered={false} // TODO: Check sundered state
+              isCurrentPlayer={isCurrentPlayer}
+              onPlaceBreach={onPlaceBreach}
+              onFlipBreach={onFlipBreach}
+            />
+          )}
+        </div>
+      )}
+
       {/* Tech card modal */}
       {selectedTech && (
         <TechCardModal techId={selectedTech} onClose={() => setSelectedTech(null)} />
@@ -301,6 +381,69 @@ export function PlayerDashboard({ player, isActivePlayer }: PlayerDashboardProps
     </div>
   );
 }
+
+// Helper to convert galvanize token unit IDs to full unit info
+function getGalvanizedUnits(player: PlayerState, gameState?: GameState) {
+  if (!player.galvanizeTokens || !gameState) return [];
+
+  const galvanizedUnits: Array<{
+    unitId: string;
+    unitType: string;
+    systemId: string;
+    planetId?: string;
+  }> = [];
+
+  // Search through map tiles to find the galvanized units
+  for (const tile of gameState.map.tiles) {
+    // Check space units
+    for (const unit of tile.units) {
+      if (player.galvanizeTokens.includes(unit.id)) {
+        galvanizedUnits.push({
+          unitId: unit.id,
+          unitType: unit.type,
+          systemId: tile.id,
+        });
+      }
+    }
+    // Check planet units
+    for (const planet of tile.planets) {
+      for (const unit of planet.units) {
+        if (player.galvanizeTokens.includes(unit.id)) {
+          galvanizedUnits.push({
+            unitId: unit.id,
+            unitType: unit.type,
+            systemId: tile.id,
+            planetId: planet.planetId,
+          });
+        }
+      }
+    }
+  }
+
+  return galvanizedUnits;
+}
+
+// Helper to get breach tokens for a specific player
+function getBreachTokensForPlayer(playerId: string, gameState: GameState) {
+  if (!gameState.breachTokens) return [];
+
+  return gameState.breachTokens
+    .filter(token => token.placedBy === playerId)
+    .map(token => ({
+      id: `breach-${token.systemId}`,
+      systemId: token.systemId,
+      isFlipped: token.active,
+    }));
+}
+
+// Plot card ID type for type safety
+type PlotCardId =
+  | 'shadow_strike'
+  | 'puppet_strings'
+  | 'false_flag'
+  | 'dark_bargain'
+  | 'hidden_agenda'
+  | 'blade_in_the_dark';
 
 function getColorHex(color: string): string {
   const colors: Record<string, string> = {

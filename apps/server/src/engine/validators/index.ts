@@ -25,6 +25,21 @@ import type {
   UseAgentAction,
   PurgeHeroAction,
   ComponentAction,
+  // Thunder's Edge
+  ClaimExpeditionSliceAction,
+  StartCoexistenceAction,
+  EndCoexistenceAction,
+  PlayOceanCardAction,
+  PickupStructureAction,
+  PlaceStructureAction,
+  PlaceBreachTokenAction,
+  FlipBreachTokenAction,
+  GalvanizeUnitAction,
+  RemoveGalvanizeAction,
+  DrawPlotCardAction,
+  PlayPlotCardAction,
+  TransformToObsidianAction,
+  UseBreakthroughAction,
 } from '@ti4/shared';
 import type { ValidationResult } from '../game-machine.js';
 import { validatePickStrategyCard } from './strategy-phase.js';
@@ -85,6 +100,23 @@ import {
   validatePurgeHero,
 } from './leaders.js';
 import { validateComponentAction } from './component-actions.js';
+// Thunder's Edge validators
+import {
+  validateClaimExpeditionSlice,
+  validateStartCoexistence,
+  validateEndCoexistence,
+  validatePlayOceanCard,
+  validatePickupStructure,
+  validatePlaceStructure,
+  validatePlaceBreachToken,
+  validateFlipBreachToken,
+  validateGalvanizeUnit,
+  validateRemoveGalvanize,
+  validateDrawPlotCard,
+  validatePlayPlotCard,
+  validateTransformToObsidian,
+  validateUseBreakthrough,
+} from './thunders-edge.js';
 
 /**
  * Main action validator - routes to specific validators based on action type
@@ -228,6 +260,55 @@ export function validateAction(state: GameState, action: GameAction): Validation
     case 'purge_hero':
       return validatePurgeHero(state, action as PurgeHeroAction);
 
+    // Thunder's Edge - Expedition
+    case 'claim_expedition_slice':
+      return validateClaimExpeditionSlice(state, action as ClaimExpeditionSliceAction);
+
+    // Thunder's Edge - Coexistence (Deepwrought)
+    case 'start_coexistence':
+      return validateStartCoexistence(state, action as StartCoexistenceAction);
+
+    case 'end_coexistence':
+      return validateEndCoexistence(state, action as EndCoexistenceAction);
+
+    case 'play_ocean_card':
+      return validatePlayOceanCard(state, action as PlayOceanCardAction);
+
+    // Thunder's Edge - Structure Transport (Ral Nel)
+    case 'pickup_structure':
+      return validatePickupStructure(state, action as PickupStructureAction);
+
+    case 'place_structure':
+      return validatePlaceStructure(state, action as PlaceStructureAction);
+
+    // Thunder's Edge - Breach Tokens (Crimson Rebellion)
+    case 'place_breach_token':
+      return validatePlaceBreachToken(state, action as PlaceBreachTokenAction);
+
+    case 'flip_breach_token':
+      return validateFlipBreachToken(state, action as FlipBreachTokenAction);
+
+    // Thunder's Edge - Galvanize (Last Bastion)
+    case 'galvanize_unit':
+      return validateGalvanizeUnit(state, action as GalvanizeUnitAction);
+
+    case 'remove_galvanize':
+      return validateRemoveGalvanize(state, action as RemoveGalvanizeAction);
+
+    // Thunder's Edge - Plot Cards (Firmament/Obsidian)
+    case 'draw_plot_card':
+      return validateDrawPlotCard(state, action as DrawPlotCardAction);
+
+    case 'play_plot_card':
+      return validatePlayPlotCard(state, action as PlayPlotCardAction);
+
+    case 'transform_to_obsidian':
+      return validateTransformToObsidian(state, action as TransformToObsidianAction);
+
+    // Thunder's Edge - Breakthroughs
+    case 'use_breakthrough':
+      return validateUseBreakthrough(state, action as UseBreakthroughAction);
+
     default:
       return { valid: false, error: `Unknown action type: ${action.type}` };
   }
@@ -252,6 +333,10 @@ function isPlayersTurn(state: GameState, action: GameAction): boolean {
     'play_promissory_note',     // Some notes can be played at timing windows
     'use_agent',                // Many agents trigger on other players' actions
     'unlock_commander',         // Can be triggered by game state changes
+    // Thunder's Edge
+    'play_plot_card',           // Plot cards can be played in response to events
+    'use_breakthrough',         // Breakthroughs can trigger at various timing windows
+    'play_ocean_card',          // Ocean cards (Deepwrought) during coexistence
   ];
   if (outOfTurnActions.includes(action.type)) {
     return true;

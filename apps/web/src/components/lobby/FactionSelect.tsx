@@ -26,6 +26,7 @@ export default function FactionSelect({
   const availableFactions = Object.values(factions).filter((faction) => {
     if (faction.expansion === 'base') return true;
     if (faction.expansion === 'pok' && expansions.includes('pok')) return true;
+    if (faction.expansion === 'thunders_edge' && expansions.includes('thunders_edge')) return true;
     return false;
   });
 
