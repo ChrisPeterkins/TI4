@@ -279,6 +279,10 @@ export interface GameState {
   breachTokens?: BreachTokenState[];
   /** Coexistence state for Deepwrought Scholarate mechanic */
   coexistenceState?: CoexistenceState[];
+  /** Thunder's Edge expedition state */
+  expeditionState?: ExpeditionState;
+  /** Space station control state (Thunder's Edge) */
+  spaceStationState?: SpaceStationState[];
 }
 
 /** Pending discard requirement (e.g., from Yssaril Scheming) */
@@ -315,22 +319,42 @@ export interface FractureState {
   isActive: boolean;
   /** Ingress tokens allowing access to The Fracture */
   ingressTokens: IngressToken[];
+  /** Neutral units guarding Fracture planets */
+  neutralUnits: NeutralUnit[];
+  /** Players who have entered The Fracture this round */
+  playersEnteredThisRound: UUID[];
 }
 
 /** Ingress token placed in a system to access The Fracture */
 export interface IngressToken {
   /** The system where the token is placed */
-  systemId: number;
+  systemId: string;
   /** Player who placed the token */
   playerId: UUID;
+  /** Whether the token is active */
+  active: boolean;
+}
+
+/** Neutral unit guarding a Fracture planet */
+export interface NeutralUnit {
+  /** Unique ID for this neutral unit */
+  id: string;
+  /** Type of neutral unit */
+  type: 'neutral_cruiser' | 'neutral_fighter' | 'neutral_infantry';
+  /** System ID where the unit is located */
+  systemId: string;
+  /** Planet ID if the unit is on a planet */
+  planetId?: string;
 }
 
 /** Breach token state (Crimson Rebellion) */
 export interface BreachTokenState {
   /** The system containing the breach token */
-  systemId: number;
+  systemId: string;
   /** Player who placed the breach token */
   placedBy: UUID;
+  /** Whether the breach token is active (flipped) */
+  active: boolean;
 }
 
 /** Coexistence state for a planet (Deepwrought Scholarate) */
@@ -340,6 +364,63 @@ export interface CoexistenceState {
   /** Player IDs who have units in coexistence on this planet */
   coexistingPlayers: UUID[];
 }
+
+/** Space station control state (Thunder's Edge) */
+export interface SpaceStationState {
+  /** The station's planet ID */
+  stationId: string;
+  /** System containing the station */
+  systemId: string;
+  /** Current controller (if any) */
+  controllerId?: UUID;
+  /** Whether the station is exhausted */
+  exhausted: boolean;
+}
+
+/** Player's breakthrough state (Thunder's Edge) */
+export interface PlayerBreakthroughState {
+  /** The breakthrough ID (from breakthroughs.ts) */
+  breakthroughId: string;
+  /** Whether the breakthrough has been unlocked */
+  unlocked: boolean;
+  /** Whether the breakthrough is currently exhausted */
+  exhausted: boolean;
+  /** Trade goods accumulated on the breakthrough (for Firmament's The Sowing) */
+  tradeGoodsOnCard?: number;
+  /** Action cards collected on breakthrough (for Ral Nel's Data Skimmer) */
+  collectedCards?: string[];
+}
+
+/** Expedition state tracking (Thunder's Edge) */
+export interface ExpeditionState {
+  /** The 6 expedition slices and their claim status */
+  slices: ExpeditionSlice[];
+  /** Players who have claimed slices (in order) */
+  claimOrder: UUID[];
+  /** Whether the expedition has been completed (all slices claimed or Thunder's Edge placed) */
+  completed: boolean;
+}
+
+/** A single expedition slice */
+export interface ExpeditionSlice {
+  /** Slice identifier (1-6) */
+  sliceNumber: number;
+  /** The cost type required to claim this slice */
+  costType: ExpeditionCostType;
+  /** Whether this slice has been claimed */
+  claimed: boolean;
+  /** Player who claimed this slice (if claimed) */
+  claimedBy?: UUID;
+}
+
+/** Types of costs for expedition slices */
+export type ExpeditionCostType =
+  | 'resources_5'        // Spend 5 resources
+  | 'action_cards_2'     // Discard 2 action cards
+  | 'influence_5'        // Spend 5 influence
+  | 'secret_objective'   // Discard 1 secret objective
+  | 'tech_specialty'     // Exhaust a planet with tech specialty
+  | 'trade_goods_3';     // Spend 3 trade goods
 
 /** Temporary tactical modifiers from action cards and relics */
 export interface TacticalModifiers {
@@ -472,6 +553,19 @@ export interface PlayerState {
     x?: { targetTechId: string; targetPlayerId: string };
     y?: { targetTechId: string; targetPlayerId: string };
   };
+  // =============================================================================
+  // THUNDER'S EDGE - Breakthroughs
+  // =============================================================================
+  /** Player's breakthrough state (Thunder's Edge) */
+  breakthrough?: PlayerBreakthroughState;
+  /** Galvanize tokens on units (Last Bastion) */
+  galvanizeTokens?: string[]; // Unit IDs that are galvanized
+  /** Plot cards in hand (Firmament) */
+  plotCards?: string[];
+  /** Plot cards in play area (Firmament) */
+  plotCardsInPlay?: string[];
+  /** Ocean cards in hand (Deepwrought) */
+  oceanCards?: string[];
 }
 
 /** Track available reinforcements per unit type */

@@ -8,3 +8,4 @@ export * from './leader-abilities.js';
 export * from './explorations.js';
 export * from './relics.js';
 export * from './breakthroughs.js';
+export * from './galactic-events.js';

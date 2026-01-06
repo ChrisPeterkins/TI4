@@ -276,6 +276,13 @@ const FACTION_ICON_NAMES: Record<string, string> = {
   xxcha: 'xxcha',
   yin: 'yin',
   yssaril: 'yssaril',
+  // Thunder's Edge factions
+  last_bastion: 'last_bastion',
+  deepwrought: 'deepwrought',
+  ral_nel: 'ral_nel',
+  crimson_rebellion: 'crimson_rebellion',
+  firmament: 'firmament',
+  obsidian: 'obsidian',
 };
 
 /**
@@ -693,5 +700,67 @@ export function getExplorationCardUrl(cardId: string): string {
  */
 export function getRelicCardUrl(relicId: string): string {
   return `${CARDS_PATH}/relic/${relicId}.jpg`;
+}
+
+// =============================================================================
+// THUNDER'S EDGE EXPANSION ASSETS
+// =============================================================================
+
+/**
+ * Get breakthrough card image URL
+ * Breakthroughs are faction-specific abilities from Thunder's Edge
+ */
+export function getBreakthroughCardUrl(factionId: string): string {
+  return `${CARDS_PATH}/breakthrough/${factionId}.jpg`;
+}
+
+/**
+ * Get galactic event card image URL
+ * Galactic events are optional rule modifiers from Thunder's Edge
+ */
+export function getGalacticEventCardUrl(eventId: string): string {
+  return `${CARDS_PATH}/galactic_event/${eventId}.jpg`;
+}
+
+/**
+ * Get galactic event card back URL
+ */
+export function getGalacticEventCardBackUrl(): string {
+  return `${IMAGES_BASE}/card-backs/galactic_event.jpg`;
+}
+
+/**
+ * Get plot card image URL (Firmament/Obsidian faction)
+ */
+export function getPlotCardUrl(plotId: string): string {
+  return `${CARDS_PATH}/plot/${plotId}.jpg`;
+}
+
+/**
+ * Get plot card back URL
+ */
+export function getPlotCardBackUrl(): string {
+  return `${IMAGES_BASE}/card-backs/plot.jpg`;
+}
+
+/**
+ * Get galvanize token URL (Last Bastion faction)
+ */
+export function getGalvanizeTokenUrl(): string {
+  return `${TOKENS_PATH}/galvanize.png`;
+}
+
+/**
+ * Get breach token URL (Crimson Rebellion faction)
+ */
+export function getBreachTokenUrl(isFlipped: boolean = false): string {
+  return `${TOKENS_PATH}/breach${isFlipped ? '_flipped' : ''}.png`;
+}
+
+/**
+ * Get ocean card image URL (Deepwrought faction)
+ */
+export function getOceanCardUrl(cardId: string): string {
+  return `${CARDS_PATH}/ocean/${cardId}.jpg`;
 }
 

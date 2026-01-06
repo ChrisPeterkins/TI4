@@ -545,6 +545,148 @@ export interface FlipIonStormAction extends BaseAction {
   type: 'flip_ion_storm';
 }
 
+// =============================================================================
+// THUNDER'S EDGE EXPANSION ACTIONS
+// =============================================================================
+
+// Expedition Actions
+export interface ClaimExpeditionSliceAction extends BaseAction {
+  type: 'claim_expedition_slice';
+  /** Which slice to claim (0-5) */
+  sliceIndex: number;
+  /** Payment for the slice */
+  payment: ExpeditionPayment;
+}
+
+export interface ExpeditionPayment {
+  /** Resources spent (for slice 0) */
+  resources?: number;
+  /** Planets exhausted for resources */
+  exhaustedPlanets?: string[];
+  /** Action card IDs discarded (for slice 1) */
+  actionCardIds?: string[];
+  /** Influence spent (for slice 2) */
+  influence?: number;
+  /** Secret objective ID discarded (for slice 3) */
+  secretObjectiveId?: string;
+  /** Trade goods spent (for slice 5) */
+  tradeGoods?: number;
+}
+
+// Coexistence Actions (Deepwrought)
+export interface StartCoexistenceAction extends BaseAction {
+  type: 'start_coexistence';
+  /** Planet where coexistence is established */
+  planetId: string;
+  /** The other player in the coexistence */
+  withPlayerId: UUID;
+}
+
+export interface EndCoexistenceAction extends BaseAction {
+  type: 'end_coexistence';
+  /** Planet where coexistence ends */
+  planetId: string;
+}
+
+export interface PlayOceanCardAction extends BaseAction {
+  type: 'play_ocean_card';
+  /** Ocean card ID */
+  cardId: string;
+  /** Targets for the ocean card effect */
+  targets?: {
+    playerId?: UUID;
+    planetId?: string;
+    systemId?: string;
+  };
+}
+
+// Structure Transport Actions (Ral Nel)
+export interface PickupStructureAction extends BaseAction {
+  type: 'pickup_structure';
+  /** The structure unit ID to pick up */
+  structureId: UUID;
+  /** The ship carrying the structure */
+  carrierId: UUID;
+}
+
+export interface PlaceStructureAction extends BaseAction {
+  type: 'place_structure';
+  /** The structure unit ID to place */
+  structureId: UUID;
+  /** Planet to place the structure on */
+  planetId: string;
+}
+
+export interface SurvivalInstinctAction extends BaseAction {
+  type: 'survival_instinct';
+  /** Ships to relocate from adjacent systems */
+  shipRelocations: {
+    unitId: UUID;
+    fromSystemId: string;
+    toSystemId: string;
+  }[];
+}
+
+// Breach Token Actions (Crimson Rebellion)
+export interface PlaceBreachTokenAction extends BaseAction {
+  type: 'place_breach_token';
+  /** System to place the breach token */
+  systemId: string;
+}
+
+export interface FlipBreachTokenAction extends BaseAction {
+  type: 'flip_breach_token';
+  /** Breach token ID to flip */
+  tokenId: string;
+}
+
+// Galvanize Actions (Last Bastion)
+export interface GalvanizeUnitAction extends BaseAction {
+  type: 'galvanize_unit';
+  /** Unit to galvanize after winning combat */
+  unitId: UUID;
+}
+
+export interface RemoveGalvanizeAction extends BaseAction {
+  type: 'remove_galvanize';
+  /** Unit to remove galvanize token from */
+  unitId: UUID;
+}
+
+// Plot Card Actions (Firmament/Obsidian)
+export interface DrawPlotCardAction extends BaseAction {
+  type: 'draw_plot_card';
+}
+
+export interface PlayPlotCardAction extends BaseAction {
+  type: 'play_plot_card';
+  /** Plot card ID */
+  cardId: string;
+  /** Targets for the plot card effect */
+  targets?: {
+    playerId?: UUID;
+    systemId?: string;
+    planetId?: string;
+    unitId?: UUID;
+  };
+}
+
+export interface TransformToObsidianAction extends BaseAction {
+  type: 'transform_to_obsidian';
+}
+
+// Breakthrough Actions
+export interface UseBreakthroughAction extends BaseAction {
+  type: 'use_breakthrough';
+  /** Targets for breakthrough abilities that require them */
+  targets?: {
+    playerId?: UUID;
+    systemId?: string;
+    planetId?: string;
+    unitIds?: UUID[];
+  };
+}
+
 // Union of all action types
 export type GameAction =
   | PickStrategyCardAction
@@ -602,7 +744,23 @@ export type GameAction =
   | PurgeHeroAction
   | AdvanceCombatAction
   | PlaceIonStormAction
-  | FlipIonStormAction;
+  | FlipIonStormAction
+  // Thunder's Edge Actions
+  | ClaimExpeditionSliceAction
+  | StartCoexistenceAction
+  | EndCoexistenceAction
+  | PlayOceanCardAction
+  | PickupStructureAction
+  | PlaceStructureAction
+  | SurvivalInstinctAction
+  | PlaceBreachTokenAction
+  | FlipBreachTokenAction
+  | GalvanizeUnitAction
+  | RemoveGalvanizeAction
+  | DrawPlotCardAction
+  | PlayPlotCardAction
+  | TransformToObsidianAction
+  | UseBreakthroughAction;
 
 // Action result
 export interface ActionResult {

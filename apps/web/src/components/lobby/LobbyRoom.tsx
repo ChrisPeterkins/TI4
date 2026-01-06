@@ -5,6 +5,7 @@ import type { LobbySettings, LobbyPlayer } from '@ti4/shared';
 import PlayerSlot from './PlayerSlot';
 import FactionSelect from './FactionSelect';
 import ColorSelect from './ColorSelect';
+import GalacticEventsSelect from './GalacticEventsSelect';
 
 interface LobbyRoomProps {
   lobbyId: string;
@@ -180,6 +181,14 @@ export default function LobbyRoom({
                     </div>
                   </div>
                 )}
+                {settings.galacticEvents && settings.galacticEvents.length > 0 && (
+                  <div>
+                    <span className="text-gray-400">Galactic Events:</span>
+                    <div className="mt-1 text-sm text-purple-300">
+                      {settings.galacticEvents.length} selected
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Host controls */}
@@ -198,6 +207,18 @@ export default function LobbyRoom({
                 </div>
               )}
             </div>
+
+            {/* Galactic Events (Thunder's Edge) - Host only */}
+            {isHost && settings.expansions.includes('thunders_edge') && (
+              <div className="bg-gray-800 rounded-lg p-6">
+                <GalacticEventsSelect
+                  selectedEvents={settings.galacticEvents || []}
+                  onEventsChange={(events) => updateSettings({ galacticEvents: events })}
+                  disabled={players.some((p) => p.ready)}
+                  maxEvents={3}
+                />
+              </div>
+            )}
 
             {/* Your Selection */}
             {currentPlayer && (

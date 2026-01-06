@@ -1723,4 +1723,597 @@ export const systems: Record<number, SystemData> = {
     ],
     expansion: 'thunders_edge',
   },
+
+  // =====================================================================
+  // THUNDER'S EDGE - LEGENDARY PLANET SYSTEMS
+  // =====================================================================
+
+  // Tile 97: Faunus (Legendary)
+  97: {
+    id: 97,
+    tileNumber: '97',
+    type: 'blue',
+    planets: [
+      {
+        id: 'faunus',
+        name: 'Faunus',
+        resources: 1,
+        influence: 3,
+        trait: 'industrial',
+        techSpecialty: 'green',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to gain control of 1 uncontrolled, non-home, non-legendary planet.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 98: Garbozia (Legendary)
+  98: {
+    id: 98,
+    tileNumber: '98',
+    type: 'blue',
+    planets: [
+      {
+        id: 'garbozia',
+        name: 'Garbozia',
+        resources: 2,
+        influence: 1,
+        trait: 'hazardous',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to place 1 action card from the action card discard pile face up on this card. ACTION: Purge this card to play the action card on it.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 99: Emelpar (Legendary)
+  99: {
+    id: 99,
+    tileNumber: '99',
+    type: 'blue',
+    planets: [
+      {
+        id: 'emelpar',
+        name: 'Emelpar',
+        resources: 0,
+        influence: 2,
+        trait: 'cultural',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to ready 1 of your other non-strategy cards.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 100: Tempesta (Legendary)
+  100: {
+    id: 100,
+    tileNumber: '100',
+    type: 'blue',
+    planets: [
+      {
+        id: 'tempesta',
+        name: 'Tempesta',
+        resources: 1,
+        influence: 1,
+        trait: 'hazardous',
+        techSpecialty: 'blue',
+        legendary: true,
+        legendaryAbility: 'After another player activates a system: You may exhaust this card to apply +1 to the move value of 1 of your ships during this activation.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 101: Industrex (Legendary)
+  101: {
+    id: 101,
+    tileNumber: '101',
+    type: 'blue',
+    planets: [
+      {
+        id: 'industrex',
+        name: 'Industrex',
+        resources: 2,
+        influence: 0,
+        trait: 'industrial',
+        techSpecialty: 'red',
+        legendary: true,
+        legendaryAbility: 'ACTION: Exhaust this card to place 1 unit upgrade unit from your reinforcements in a system that contains your units.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // =====================================================================
+  // THUNDER'S EDGE - STANDARD SYSTEMS
+  // =====================================================================
+
+  // Tile 102: Andeara (Alpha Wormhole)
+  102: {
+    id: 102,
+    tileNumber: '102',
+    type: 'blue',
+    wormhole: 'alpha',
+    planets: [
+      {
+        id: 'andeara',
+        name: 'Andeara',
+        resources: 1,
+        influence: 1,
+        trait: 'industrial',
+        techSpecialty: 'blue',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 103: Olergodt
+  103: {
+    id: 103,
+    tileNumber: '103',
+    type: 'blue',
+    planets: [
+      {
+        id: 'olergodt',
+        name: 'Olergodt',
+        resources: 2,
+        influence: 1,
+        trait: 'hazardous',
+        techSpecialty: 'red',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 104: Vira-Pics III
+  104: {
+    id: 104,
+    tileNumber: '104',
+    type: 'blue',
+    planets: [
+      {
+        id: 'vira_pics_iii',
+        name: 'Vira-Pics III',
+        resources: 2,
+        influence: 3,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 105: Lesab
+  105: {
+    id: 105,
+    tileNumber: '105',
+    type: 'blue',
+    planets: [
+      {
+        id: 'lesab',
+        name: 'Lesab',
+        resources: 2,
+        influence: 1,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 106: New Terra + Tinnes
+  106: {
+    id: 106,
+    tileNumber: '106',
+    type: 'blue',
+    planets: [
+      {
+        id: 'new_terra',
+        name: 'New Terra',
+        resources: 1,
+        influence: 1,
+        trait: 'industrial',
+        techSpecialty: 'green',
+      },
+      {
+        id: 'tinnes',
+        name: 'Tinnes',
+        resources: 2,
+        influence: 1,
+        trait: 'hazardous',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 107: Cresius + Lazul Rex
+  107: {
+    id: 107,
+    tileNumber: '107',
+    type: 'blue',
+    planets: [
+      {
+        id: 'cresius',
+        name: 'Cresius',
+        resources: 0,
+        influence: 1,
+        trait: 'hazardous',
+      },
+      {
+        id: 'lazul_rex',
+        name: 'Lazul Rex',
+        resources: 2,
+        influence: 2,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 108: Hercalor
+  108: {
+    id: 108,
+    tileNumber: '108',
+    type: 'blue',
+    planets: [
+      {
+        id: 'hercalor',
+        name: 'Hercalor',
+        resources: 1,
+        influence: 0,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 109: Capha + Kostboth
+  109: {
+    id: 109,
+    tileNumber: '109',
+    type: 'blue',
+    planets: [
+      {
+        id: 'capha',
+        name: 'Capha',
+        resources: 3,
+        influence: 0,
+        trait: 'hazardous',
+      },
+      {
+        id: 'kostboth',
+        name: 'Kostboth',
+        resources: 0,
+        influence: 1,
+        trait: 'cultural',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 110: Bellatrix + Tsion Station (Space Station)
+  110: {
+    id: 110,
+    tileNumber: '110',
+    type: 'blue',
+    spaceStation: true,
+    planets: [
+      {
+        id: 'bellatrix',
+        name: 'Bellatrix',
+        resources: 1,
+        influence: 2,
+        trait: 'cultural',
+      },
+      {
+        id: 'tsion_station',
+        name: 'Tsion Station',
+        resources: 1,
+        influence: 1,
+        isSpaceStation: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 111: Tarana + Oluz Station (Space Station)
+  111: {
+    id: 111,
+    tileNumber: '111',
+    type: 'blue',
+    spaceStation: true,
+    planets: [
+      {
+        id: 'tarana',
+        name: 'Tarana',
+        resources: 1,
+        influence: 2,
+        trait: 'cultural',
+      },
+      {
+        id: 'oluz_station',
+        name: 'Oluz Station',
+        resources: 1,
+        influence: 1,
+        isSpaceStation: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // =====================================================================
+  // THUNDER'S EDGE - ANOMALY SYSTEMS
+  // =====================================================================
+
+  // Tile 112: Empty with Gravity Rift
+  112: {
+    id: 112,
+    tileNumber: '112',
+    type: 'red',
+    anomaly: 'gravity_rift',
+    planets: [],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 113: Empty with Asteroid Field
+  113: {
+    id: 113,
+    tileNumber: '113',
+    type: 'red',
+    anomaly: 'asteroid',
+    planets: [],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 114: Empty with Nebula
+  114: {
+    id: 114,
+    tileNumber: '114',
+    type: 'red',
+    anomaly: 'nebula',
+    planets: [],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 115: Empty with Supernova
+  115: {
+    id: 115,
+    tileNumber: '115',
+    type: 'red',
+    anomaly: 'supernova',
+    planets: [],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 116: Lemox in Entropic Scar
+  116: {
+    id: 116,
+    tileNumber: '116',
+    type: 'red',
+    anomaly: 'entropic_scar',
+    planets: [
+      {
+        id: 'lemox',
+        name: 'Lemox',
+        resources: 0,
+        influence: 3,
+        trait: 'industrial',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 117: The Watchtower (Space Station with Asteroid + Gravity Rift)
+  117: {
+    id: 117,
+    tileNumber: '117',
+    type: 'red',
+    anomaly: 'asteroid', // Primary anomaly
+    secondaryAnomaly: 'gravity_rift',
+    spaceStation: true,
+    planets: [
+      {
+        id: 'the_watchtower',
+        name: 'The Watchtower',
+        resources: 1,
+        influence: 1,
+        isSpaceStation: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 118: Thunder's Edge (Legendary)
+  118: {
+    id: 118,
+    tileNumber: '118',
+    type: 'blue',
+    planets: [
+      {
+        id: 'thunders_edge',
+        name: "Thunder's Edge",
+        resources: 5,
+        influence: 1,
+        legendary: true,
+        legendaryAbility: 'When you gain this card, gain your breakthrough. ACTION: Exhaust this card to perform 1 tactical action without placing a command token from your tactic pool.',
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // =====================================================================
+  // THUNDER'S EDGE - THE FRACTURE
+  // =====================================================================
+
+  // Tile 125: Fracture Tile A (Cocytus + Styx)
+  125: {
+    id: 125,
+    tileNumber: '125',
+    type: 'fracture',
+    isFracture: true,
+    planets: [
+      {
+        id: 'cocytus',
+        name: 'Cocytus',
+        resources: 3,
+        influence: 0,
+        isFracturePlanet: true,
+      },
+      {
+        id: 'styx',
+        name: 'Styx',
+        resources: 4,
+        influence: 0,
+        legendary: true,
+        legendaryAbility: 'When you gain this card, gain 1 victory point. When you lose this card, lose 1 victory point.',
+        isFracturePlanet: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 126: Fracture Tile B (Lethe + Phlegethon)
+  126: {
+    id: 126,
+    tileNumber: '126',
+    type: 'fracture',
+    isFracture: true,
+    planets: [
+      {
+        id: 'lethe',
+        name: 'Lethe',
+        resources: 0,
+        influence: 2,
+        isFracturePlanet: true,
+      },
+      {
+        id: 'phlegethon',
+        name: 'Phlegethon',
+        resources: 1,
+        influence: 2,
+        isFracturePlanet: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 127: Fracture Tile C (Acheron)
+  127: {
+    id: 127,
+    tileNumber: '127',
+    type: 'fracture',
+    isFracture: true,
+    planets: [
+      {
+        id: 'acheron',
+        name: 'Acheron',
+        resources: 2,
+        influence: 2,
+        isFracturePlanet: true,
+      },
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // =====================================================================
+  // THUNDER'S EDGE - HYPERLANE TILES
+  // =====================================================================
+
+  // Tile 119: Hyperlane (A/B sides)
+  119: {
+    id: 119,
+    tileNumber: '119',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [0, 3],
+      [1, 4],
+    ],
+    hyperlaneConnectionsB: [
+      [0, 3],
+      [2, 5],
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 120: Hyperlane (A/B sides)
+  120: {
+    id: 120,
+    tileNumber: '120',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [0, 2],
+      [3, 5],
+    ],
+    hyperlaneConnectionsB: [
+      [1, 3],
+      [2, 4],
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 121: Hyperlane (A/B sides)
+  121: {
+    id: 121,
+    tileNumber: '121',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [0, 4],
+      [1, 5],
+    ],
+    hyperlaneConnectionsB: [
+      [0, 2],
+      [1, 3],
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 122: Hyperlane (A/B sides)
+  122: {
+    id: 122,
+    tileNumber: '122',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [1, 4],
+      [2, 5],
+    ],
+    hyperlaneConnectionsB: [
+      [0, 5],
+      [2, 3],
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 123: Hyperlane (A/B sides)
+  123: {
+    id: 123,
+    tileNumber: '123',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [0, 3],
+    ],
+    hyperlaneConnectionsB: [
+      [1, 4],
+    ],
+    expansion: 'thunders_edge',
+  },
+
+  // Tile 124: Hyperlane (A/B sides)
+  124: {
+    id: 124,
+    tileNumber: '124',
+    type: 'hyperlane',
+    planets: [],
+    hyperlaneConnectionsA: [
+      [2, 5],
+    ],
+    hyperlaneConnectionsB: [
+      [0, 3],
+    ],
+    expansion: 'thunders_edge',
+  },
 };

@@ -20,7 +20,7 @@ export type PlanetTrait = 'cultural' | 'hazardous' | 'industrial';
 
 export type WormholeType = 'alpha' | 'beta' | 'gamma' | 'delta' | 'epsilon';
 
-export type AnomalyType = 'asteroid' | 'nebula' | 'supernova' | 'gravity_rift';
+export type AnomalyType = 'asteroid' | 'nebula' | 'supernova' | 'gravity_rift' | 'entropic_scar';
 
 export type UnitType =
   | 'fighter'

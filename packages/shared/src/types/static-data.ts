@@ -240,12 +240,18 @@ export interface UnitData {
 export interface SystemData {
   id: number;
   tileNumber: string;
-  type: 'home' | 'blue' | 'red' | 'hyperlane' | 'mecatol';
+  type: 'home' | 'blue' | 'red' | 'hyperlane' | 'mecatol' | 'fracture';
   factionId?: string;
   planets: PlanetData[];
   wormhole?: WormholeType;
   anomaly?: AnomalyType;
+  /** Secondary anomaly (e.g., The Watchtower has both asteroid and gravity rift) */
+  secondaryAnomaly?: AnomalyType;
   expansion: Expansion;
+  /** Whether this system contains a space station (Thunder's Edge) */
+  spaceStation?: boolean;
+  /** Whether this is a Fracture dimension tile (Thunder's Edge) */
+  isFracture?: boolean;
   /**
    * For hyperlane tiles: defines which edges are connected on the A side.
    * Each connection is a pair of edge indices (0-5, clockwise from top).
@@ -258,6 +264,8 @@ export interface SystemData {
    * Used when the map configuration specifies the B side of the tile.
    */
   hyperlaneConnectionsB?: [number, number][];
+  /** Alias for hyperlaneConnections (A side) */
+  hyperlaneConnectionsA?: [number, number][];
 }
 
 export interface PlanetData {
@@ -269,6 +277,10 @@ export interface PlanetData {
   techSpecialty?: TechColor;
   legendary?: boolean;
   legendaryAbility?: string;
+  /** Whether this is a space station (Thunder's Edge) */
+  isSpaceStation?: boolean;
+  /** Whether this planet is in the Fracture dimension (Thunder's Edge) */
+  isFracturePlanet?: boolean;
 }
 
 // Strategy Card Data

@@ -402,6 +402,7 @@ export interface LobbySettings {
   mapPreset?: string;
   miltyDraft: boolean;
   privateGame: boolean;
+  galacticEvents?: string[]; // Selected galactic event IDs (Thunder's Edge)
 }
 
 // Milty Draft Types

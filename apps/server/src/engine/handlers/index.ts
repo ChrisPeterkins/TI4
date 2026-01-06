@@ -37,6 +37,19 @@ import type {
   PurgeHeroAction,
   ComponentAction,
   PlaceIonStormAction,
+  // Thunder's Edge Actions
+  ClaimExpeditionSliceAction,
+  StartCoexistenceAction,
+  EndCoexistenceAction,
+  PlayOceanCardAction,
+  PickupStructureAction,
+  PlaceStructureAction,
+  PlaceBreachTokenAction,
+  FlipBreachTokenAction,
+  GalvanizeUnitAction,
+  PlayPlotCardAction,
+  TransformToObsidianAction,
+  UseBreakthroughAction,
 } from '@ti4/shared';
 import type { HandlerResult } from '../game-machine.js';
 import { handlePickStrategyCard } from './strategy-phase.js';
@@ -106,6 +119,127 @@ import {
   handlePurgeHero,
 } from './leaders.js';
 import { handleComponentAction, handlePlaceIonStorm } from './component-actions.js';
+// Thunder's Edge Handlers
+import {
+  handleClaimExpeditionSlice as handleClaimExpeditionSliceInternal,
+  type ClaimExpeditionSliceAction as InternalExpeditionAction,
+} from './expedition.js';
+import {
+  handleStartCoexistence as handleStartCoexistenceInternal,
+  handleEndCoexistence as handleEndCoexistenceInternal,
+  handlePlayOceanCard as handlePlayOceanCardInternal,
+  type StartCoexistenceAction as InternalStartCoexistenceAction,
+  type EndCoexistenceAction as InternalEndCoexistenceAction,
+  type OceanCardAction as InternalOceanCardAction,
+} from './deepwrought.js';
+import {
+  handlePickupStructure as handlePickupStructureInternal,
+  handlePlaceStructure as handlePlaceStructureInternal,
+  type TransportStructureAction as InternalTransportAction,
+  type PlaceStructureAction as InternalPlaceStructureAction,
+} from './ral-nel.js';
+import {
+  handlePlaceBreach as handlePlaceBreachInternal,
+  handleFlipBreach as handleFlipBreachInternal,
+  type PlaceBreachAction as InternalPlaceBreachAction,
+  type FlipBreachAction as InternalFlipBreachAction,
+} from './crimson-rebellion.js';
+import {
+  handleGalvanize as handleGalvanizeInternal,
+  type GalvanizeAction as InternalGalvanizeAction,
+} from './last-bastion.js';
+import {
+  handlePlayPlotCard,
+  handleTransformToObsidian,
+} from './firmament.js';
+import { executeBreakthroughEffect } from './breakthroughs.js';
+import { BREAKTHROUGHS_BY_FACTION } from '@ti4/shared';
+
+// Adapter functions to convert shared action types to internal handler types
+function handleClaimExpeditionSlice(state: GameState, action: ClaimExpeditionSliceAction): HandlerResult {
+  const internalAction: InternalExpeditionAction = {
+    type: 'claim_expedition_slice',
+    playerId: action.playerId,
+    sliceNumber: action.sliceIndex, // Map sliceIndex -> sliceNumber
+    payment: action.payment,
+  };
+  return handleClaimExpeditionSliceInternal(state, internalAction);
+}
+
+function handleStartCoexistence(state: GameState, action: StartCoexistenceAction): HandlerResult {
+  const internalAction: InternalStartCoexistenceAction = {
+    type: 'start_coexistence',
+    playerId: action.playerId,
+    planetId: action.planetId,
+  };
+  return handleStartCoexistenceInternal(state, internalAction);
+}
+
+function handleEndCoexistence(state: GameState, action: EndCoexistenceAction): HandlerResult {
+  const internalAction: InternalEndCoexistenceAction = {
+    type: 'end_coexistence',
+    planetId: action.planetId,
+    reason: 'withdrawal', // Default reason for player-initiated end
+  };
+  return handleEndCoexistenceInternal(state, internalAction);
+}
+
+function handlePlayOceanCard(state: GameState, action: PlayOceanCardAction): HandlerResult {
+  const internalAction: InternalOceanCardAction = {
+    type: 'play_ocean_card',
+    playerId: action.playerId,
+    cardId: action.cardId,
+    targetPlanetId: action.targets?.planetId,
+  };
+  return handlePlayOceanCardInternal(state, internalAction);
+}
+
+function handlePickupStructure(state: GameState, action: PickupStructureAction): HandlerResult {
+  const internalAction: InternalTransportAction = {
+    type: 'transport_structure',
+    playerId: action.playerId,
+    structureId: action.structureId,
+    shipId: action.carrierId, // Map carrierId -> shipId
+  };
+  return handlePickupStructureInternal(state, internalAction);
+}
+
+function handlePlaceStructure(state: GameState, action: PlaceStructureAction): HandlerResult {
+  const internalAction: InternalPlaceStructureAction = {
+    type: 'place_structure',
+    playerId: action.playerId,
+    structureId: action.structureId,
+    planetId: action.planetId,
+  };
+  return handlePlaceStructureInternal(state, internalAction);
+}
+
+function handlePlaceBreach(state: GameState, action: PlaceBreachTokenAction): HandlerResult {
+  const internalAction: InternalPlaceBreachAction = {
+    type: 'place_breach',
+    playerId: action.playerId,
+    systemId: action.systemId,
+  };
+  return handlePlaceBreachInternal(state, internalAction);
+}
+
+function handleFlipBreach(state: GameState, action: FlipBreachTokenAction): HandlerResult {
+  const internalAction: InternalFlipBreachAction = {
+    type: 'flip_breach',
+    playerId: action.playerId,
+    systemId: action.tokenId, // Map tokenId -> systemId (breach identified by system)
+  };
+  return handleFlipBreachInternal(state, internalAction);
+}
+
+function handleGalvanize(state: GameState, action: GalvanizeUnitAction): HandlerResult {
+  const internalAction: InternalGalvanizeAction = {
+    type: 'galvanize',
+    playerId: action.playerId,
+    unitId: action.unitId,
+  };
+  return handleGalvanizeInternal(state, internalAction);
+}
 
 /**
  * Main action handler - routes to specific handlers based on action type
@@ -271,6 +405,65 @@ export function handleAction(state: GameState, action: GameAction): HandlerResul
     case 'flip_ion_storm':
       // Flip is handled automatically during movement, not as a direct action
       return { success: false, error: 'Ion Storm flips automatically when ships pass through' };
+
+    // Thunder's Edge - Expedition
+    case 'claim_expedition_slice':
+      return handleClaimExpeditionSlice(state, action as ClaimExpeditionSliceAction);
+
+    // Thunder's Edge - Deepwrought Coexistence
+    case 'start_coexistence':
+      return handleStartCoexistence(state, action as StartCoexistenceAction);
+
+    case 'end_coexistence':
+      return handleEndCoexistence(state, action as EndCoexistenceAction);
+
+    case 'play_ocean_card':
+      return handlePlayOceanCard(state, action as PlayOceanCardAction);
+
+    // Thunder's Edge - Ral Nel Structure Transport
+    case 'pickup_structure':
+      return handlePickupStructure(state, action as PickupStructureAction);
+
+    case 'place_structure':
+      return handlePlaceStructure(state, action as PlaceStructureAction);
+
+    // Thunder's Edge - Crimson Rebellion Breach Tokens
+    case 'place_breach_token':
+      return handlePlaceBreach(state, action as PlaceBreachTokenAction);
+
+    case 'flip_breach_token':
+      return handleFlipBreach(state, action as FlipBreachTokenAction);
+
+    // Thunder's Edge - Last Bastion Galvanize
+    case 'galvanize_unit':
+      return handleGalvanize(state, action as GalvanizeUnitAction);
+
+    // Thunder's Edge - Firmament/Obsidian Plot Cards
+    case 'play_plot_card':
+      return handlePlayPlotCard(state, action as PlayPlotCardAction);
+
+    case 'transform_to_obsidian':
+      return handleTransformToObsidian(state, action as TransformToObsidianAction);
+
+    // Thunder's Edge - Breakthroughs
+    case 'use_breakthrough': {
+      const breakthroughAction = action as UseBreakthroughAction;
+      const player = state.players.find(p => p.id === breakthroughAction.playerId);
+      if (!player) {
+        return { success: false, error: 'Player not found' };
+      }
+      const breakthrough = BREAKTHROUGHS_BY_FACTION[player.faction];
+      if (!breakthrough) {
+        return { success: false, error: 'No breakthrough for faction' };
+      }
+      return executeBreakthroughEffect({
+        state,
+        player,
+        breakthrough,
+        trigger: { type: 'action' },
+        targets: breakthroughAction.targets,
+      });
+    }
 
     default:
       return { success: false, error: `No handler for action type: ${action.type}` };
