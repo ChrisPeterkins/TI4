@@ -3,6 +3,8 @@ import {
   handleScoreObjective,
   handleSkipScoring,
   handleRedistributeTokens,
+  handleSelectSecretObjective,
+  handleDoneScoring,
   initializeStatusPhase,
   advanceStatusPhaseStep,
   revealPublicObjective,
@@ -11,6 +13,8 @@ import {
   readyCards,
   repairUnits,
   returnStrategyCards,
+  getPlayerTokenGain,
+  getStatusPhaseStepInfo,
 } from '../status-phase.js';
 import type {
   GameState,
@@ -815,6 +819,401 @@ describe('Status Phase Handlers', () => {
 
       expect(state.phase).toBe('agenda');
       expect(state.round).toBe(2);
+    });
+
+    it('should do nothing if statusPhase is undefined', () => {
+      const state = createMockGameState();
+      state.statusPhase = undefined;
+      const originalPhase = state.phase;
+
+      advanceStatusPhaseStep(state);
+
+      expect(state.phase).toBe(originalPhase);
+    });
+  });
+
+  describe('handleSelectSecretObjective', () => {
+    it('should fail if player not found', () => {
+      const state = createMockGameState();
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'nonexistent',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Player not found');
+    });
+
+    it('should fail if player does not have exactly 2 secrets', () => {
+      const state = createMockGameState();
+      state.players[0].secretObjectives = ['secret1']; // Only 1
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Player does not have 2 secrets to choose from');
+    });
+
+    it('should fail if selected objective is not in player hand', () => {
+      const state = createMockGameState();
+      state.players[0].secretObjectives = ['secret1', 'secret2'];
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret3', // Not in hand
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Selected objective is not in player\'s hand');
+    });
+
+    it('should fail if discarded objective is not in player hand', () => {
+      const state = createMockGameState();
+      state.players[0].secretObjectives = ['secret1', 'secret2'];
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret3', // Not in hand
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Discarded objective is not in player\'s hand');
+    });
+
+    it('should fail if selecting and discarding same objective', () => {
+      const state = createMockGameState();
+      state.players[0].secretObjectives = ['secret1', 'secret2'];
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret1', // Same!
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Cannot select and discard the same objective');
+    });
+
+    it('should keep selected objective and return discarded to deck', () => {
+      const state = createMockGameState();
+      state.players[0].secretObjectives = ['secret1', 'secret2'];
+      state.objectives.secretDeck = ['secret3'];
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      const result = handleSelectSecretObjective(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[0].secretObjectives).toEqual(['secret1']);
+      expect(state.objectives.secretDeck).toContain('secret2');
+    });
+
+    it('should transition to strategy phase when all players done selecting in setup', () => {
+      const state = createMockGameState();
+      state.phase = 'setup';
+      // All players have only 1 secret (already selected), except player1
+      state.players.forEach((p, i) => {
+        if (i === 0) {
+          p.secretObjectives = ['secret1', 'secret2'];
+        } else {
+          p.secretObjectives = ['secret_kept'];
+        }
+      });
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      handleSelectSecretObjective(state, action);
+
+      expect(state.phase).toBe('strategy');
+      expect(state.round).toBe(1);
+      expect(state.activePlayerId).toBe(state.speakerId);
+    });
+
+    it('should move to next player who needs to select', () => {
+      const state = createMockGameState();
+      state.phase = 'setup';
+      // Player1 and Player2 have 2 secrets
+      state.players[0].secretObjectives = ['secret1', 'secret2'];
+      state.players[1].secretObjectives = ['secret3', 'secret4'];
+      state.players[2].secretObjectives = ['secret_kept'];
+      state.players[3].secretObjectives = ['secret_kept'];
+
+      const action = {
+        type: 'select_secret_objective' as const,
+        playerId: 'player1',
+        selectedObjectiveId: 'secret1',
+        discardedObjectiveId: 'secret2',
+        timestamp: Date.now(),
+      };
+
+      handleSelectSecretObjective(state, action);
+
+      expect(state.activePlayerId).toBe('player2');
+    });
+  });
+
+  describe('handleDoneScoring', () => {
+    it('should mark player as done with scoring', () => {
+      const state = createMockGameState();
+
+      handleDoneScoring(state, 'player1');
+
+      expect(state.statusPhase?.scoringComplete).toContain('player1');
+    });
+
+    it('should advance to next step when all players done', () => {
+      const state = createMockGameState();
+      state.statusPhase!.scoringComplete = ['player2', 'player3', 'player4'];
+
+      handleDoneScoring(state, 'player1');
+
+      expect(state.statusPhase?.currentStep).toBeGreaterThan(1);
+    });
+
+    it('should advance to next player when not all done', () => {
+      const state = createMockGameState();
+      state.statusPhase!.scoringComplete = [];
+      state.activePlayerId = 'player1';
+
+      handleDoneScoring(state, 'player1');
+
+      expect(state.activePlayerId).toBe('player2');
+    });
+  });
+
+  describe('getPlayerTokenGain', () => {
+    it('should return base 2 tokens for normal factions', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'hacan';
+
+      const tokens = getPlayerTokenGain(state, 'player1');
+
+      expect(tokens).toBe(2);
+    });
+
+    it('should return 3 tokens for Sol (Versatile ability)', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'sol';
+
+      const tokens = getPlayerTokenGain(state, 'player1');
+
+      expect(tokens).toBe(3);
+    });
+  });
+
+  describe('getStatusPhaseStepInfo', () => {
+    it('should return null if not in status phase', () => {
+      const state = createMockGameState();
+      state.phase = 'action';
+      state.statusPhase = undefined;
+
+      const info = getStatusPhaseStepInfo(state);
+
+      expect(info).toBeNull();
+    });
+
+    it('should return null if statusPhase tracking is undefined', () => {
+      const state = createMockGameState();
+      state.phase = 'status';
+      state.statusPhase = undefined;
+
+      const info = getStatusPhaseStepInfo(state);
+
+      expect(info).toBeNull();
+    });
+
+    it('should return step info during score_objectives', () => {
+      const state = createMockGameState();
+      state.phase = 'status';
+      state.statusPhase = {
+        currentStep: 1,
+        scoringComplete: ['player1'],
+        scoredThisPhase: [],
+        redistributionComplete: [],
+      };
+
+      const info = getStatusPhaseStepInfo(state);
+
+      expect(info).not.toBeNull();
+      expect(info!.currentStep).toBe(1);
+      expect(info!.stepName).toBe('score_objectives');
+      expect(info!.waitingFor).toEqual(['player2', 'player3', 'player4']);
+    });
+
+    it('should return step info during gain_redistribute_tokens', () => {
+      const state = createMockGameState();
+      state.phase = 'status';
+      state.statusPhase = {
+        currentStep: 5,
+        scoringComplete: ['player1', 'player2', 'player3', 'player4'],
+        scoredThisPhase: [],
+        redistributionComplete: ['player1', 'player2'],
+      };
+
+      const info = getStatusPhaseStepInfo(state);
+
+      expect(info).not.toBeNull();
+      expect(info!.currentStep).toBe(5);
+      expect(info!.stepName).toBe('gain_redistribute_tokens');
+      expect(info!.waitingFor).toEqual(['player3', 'player4']);
+    });
+  });
+
+  describe('drawActionCards edge cases', () => {
+    it('should reshuffle discard pile when deck is empty', () => {
+      const state = createMockGameState();
+      state.actionCardDeck = []; // Empty deck
+      state.actionCardDiscard = ['discard1', 'discard2', 'discard3', 'discard4', 'discard5'];
+
+      drawActionCards(state);
+
+      // Cards should have been reshuffled and dealt
+      expect(state.players[0].actionCards).toHaveLength(1);
+      expect(state.players[1].actionCards).toHaveLength(1);
+      // Discard should now be empty (reshuffled into deck)
+      expect(state.actionCardDiscard).toEqual([]);
+    });
+
+    it('should draw additional card for Yssaril Scheming', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'yssaril';
+      state.actionCardDeck = Array.from({ length: 10 }, (_, i) => `card${i + 1}`);
+
+      drawActionCards(state);
+
+      // Yssaril gets 1 base + 1 Scheming = 2 cards
+      expect(state.players[0].actionCards).toHaveLength(2);
+    });
+
+    it('should set up pending discard for Yssaril Scheming', () => {
+      const state = createMockGameState();
+      state.players[0].faction = 'yssaril';
+      state.actionCardDeck = Array.from({ length: 10 }, (_, i) => `card${i + 1}`);
+
+      drawActionCards(state);
+
+      expect(state.pendingDiscards).toBeDefined();
+      expect(state.pendingDiscards).toContainEqual({
+        playerId: 'player1',
+        reason: 'scheming',
+        count: 1,
+      });
+    });
+
+    it('should handle empty deck with no discard to reshuffle', () => {
+      const state = createMockGameState();
+      state.actionCardDeck = [];
+      state.actionCardDiscard = [];
+
+      drawActionCards(state);
+
+      // No cards to draw - should not crash
+      expect(state.players[0].actionCards).toHaveLength(0);
+    });
+  });
+
+  describe('readyCards edge cases', () => {
+    it('should clear exhaustedTechnologies array', () => {
+      const state = createMockGameState();
+      state.players[0].exhaustedTechnologies = ['sarween_tools', 'gravity_drive'];
+
+      readyCards(state);
+
+      expect(state.players[0].exhaustedTechnologies).toEqual([]);
+    });
+
+    it('should clear exhaustedRelics array', () => {
+      const state = createMockGameState();
+      state.players[0].exhaustedRelics = ['maw_of_worlds', 'shard_of_the_throne'];
+
+      readyCards(state);
+
+      expect(state.players[0].exhaustedRelics).toEqual([]);
+    });
+
+    it('should handle players without leaders', () => {
+      const state = createMockGameState();
+      state.players[0].leaders = undefined as any;
+
+      // Should not throw
+      expect(() => readyCards(state)).not.toThrow();
+    });
+  });
+
+  describe('handleRedistributeTokens edge cases', () => {
+    it('should fail if player not found', () => {
+      const state = createMockGameState();
+      state.subPhase = 'gain_redistribute_tokens';
+
+      const action: RedistributeTokensAction = {
+        type: 'redistribute_tokens',
+        playerId: 'nonexistent',
+        distribution: { tactics: 4, fleet: 4, strategy: 2 },
+        timestamp: Date.now(),
+      };
+
+      const result = handleRedistributeTokens(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Player not found');
+    });
+
+    it('should account for Sol Versatile +1 token', () => {
+      const state = createMockGameState();
+      state.subPhase = 'gain_redistribute_tokens';
+      state.players[0].faction = 'sol';
+      // Sol gets 3 tokens instead of 2, so total should be 8 + 3 = 11
+
+      const action: RedistributeTokensAction = {
+        type: 'redistribute_tokens',
+        playerId: 'player1',
+        distribution: { tactics: 4, fleet: 4, strategy: 3 }, // Total 11
+        timestamp: Date.now(),
+      };
+
+      const result = handleRedistributeTokens(state, action);
+
+      expect(result.success).toBe(true);
     });
   });
 });

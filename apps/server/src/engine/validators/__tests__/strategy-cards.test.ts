@@ -675,6 +675,330 @@ describe('validateStrategicPrimary', () => {
 
       expect(result.valid).toBe(true);
     });
+
+    it('should fail if already have the technology', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 7;
+      state.players[0].technologies = ['neural_motivator'];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 7,
+        choices: { firstTechId: 'neural_motivator' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Already have this technology');
+    });
+
+    it('should fail if researching another faction technology', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 7;
+      // Player is Sol, trying to research Letnev faction tech
+      state.players[0].faction = 'sol';
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 7,
+        choices: { firstTechId: 'letnev_munitions' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe("Cannot research another faction's technology");
+    });
+
+    it('should fail if unknown technology', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 7;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 7,
+        choices: { firstTechId: 'nonexistent_tech' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Unknown technology');
+    });
+
+    it('should fail if not enough resources for second tech', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 7;
+      // Exhaust all planets and set trade goods to 0 so player has < 6 resources
+      state.map.tiles[0].planets[0].exhausted = true;
+      state.players[0].tradeGoods = 0;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 7,
+        choices: {
+          firstTechId: 'neural_motivator',
+          secondTechId: 'sarween_tools',
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Not enough resources for second technology (need 6)');
+    });
+  });
+
+  describe('Warfare (6) primary', () => {
+    it('should fail if removing token from system without own token', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+      // No command token in system
+      state.map.tiles[0].commandTokens = [];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: { removedTokenSystem: { q: 0, r: 0 } },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('No command token in that system');
+    });
+
+    it('should fail if removing token from nonexistent system', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: { removedTokenSystem: { q: 99, r: 99 } },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('System not found');
+    });
+
+    it('should fail if negative token redistribution', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+      state.players[0].commandTokens = { tactics: 3, fleet: 3, strategy: 2 };
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          newTokenDistribution: { tactics: -1, fleet: 5, strategy: 5 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Token distribution cannot be negative');
+    });
+
+    it('should fail if token redistribution does not equal current + 1', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+      state.players[0].commandTokens = { tactics: 3, fleet: 3, strategy: 2 }; // Total 8
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          newTokenDistribution: { tactics: 3, fleet: 3, strategy: 2 }, // Total 8, should be 9
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Must distribute exactly 9 tokens');
+    });
+
+    it('should allow valid Warfare primary', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+      state.players[0].commandTokens = { tactics: 3, fleet: 3, strategy: 2 }; // Total 8
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          newTokenDistribution: { tactics: 3, fleet: 4, strategy: 2 }, // Total 9 (current + 1)
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow removing command token from own system', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 6;
+      state.map.tiles[0].commandTokens = ['player1'];
+      state.players[0].commandTokens = { tactics: 3, fleet: 3, strategy: 2 };
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 6,
+        choices: {
+          removedTokenSystem: { q: 0, r: 0 },
+          newTokenDistribution: { tactics: 3, fleet: 4, strategy: 2 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('Imperial (8) primary', () => {
+    it('should fail if objective not found', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: { scoredObjectiveId: 'nonexistent' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Objective not found or not revealed');
+    });
+
+    it('should fail if already scored the objective', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+      state.objectives.publicStageI = [
+        { id: 'obj1', revealed: true, scoredBy: ['player1'] } as any,
+      ];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: { scoredObjectiveId: 'obj1' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Already scored this objective');
+    });
+
+    it('should allow scoring valid public objective Stage I', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+      state.objectives.publicStageI = [
+        { id: 'obj1', revealed: true, scoredBy: [] } as any,
+      ];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: { scoredObjectiveId: 'obj1' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow scoring valid public objective Stage II', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+      state.objectives.publicStageII = [
+        { id: 'obj2', revealed: true, scoredBy: [] } as any,
+      ];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: { scoredObjectiveId: 'obj2' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail if objective is not revealed', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+      state.objectives.publicStageI = [
+        { id: 'obj1', revealed: false, scoredBy: [] } as any,
+      ];
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: { scoredObjectiveId: 'obj1' },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Objective not found or not revealed');
+    });
+
+    it('should allow Imperial primary with no objective score', () => {
+      const state = createMockGameState();
+      state.strategicActionState!.cardNumber = 8;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 8,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
   });
 });
 
@@ -915,6 +1239,487 @@ describe('validateStrategicSecondary', () => {
       const result = validateStrategicSecondary(state, action);
 
       expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('Leadership (1) secondary', () => {
+    it('should fail if not enough influence for tokens', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 1;
+      // Exhaust all planets
+      state.map.tiles[0].planets[0].exhausted = true;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 1,
+        declined: false,
+        choices: {
+          influenceSpent: 10, // More than available
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Not enough influence available');
+    });
+
+    it('should fail if token distribution does not match influence spent', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 1;
+      // Give player2 a planet with lots of influence (3 influence according to mock)
+      // Adding multiple planets to have more than 3 influence available
+      const player2Tile1 = createMockTile({
+        position: { q: 1, r: 1 },
+        systemId: 26,
+        planets: [createMockPlanet({
+          planetId: 'planet2',
+          controlledBy: 'player2',
+          exhausted: false,
+        })],
+      });
+      const player2Tile2 = createMockTile({
+        position: { q: 2, r: 1 },
+        systemId: 25,
+        planets: [createMockPlanet({
+          planetId: 'planet1',
+          controlledBy: 'player2',
+          exhausted: false,
+        })],
+      });
+      state.map.tiles.push(player2Tile1, player2Tile2);
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 1,
+        declined: false,
+        choices: {
+          influenceSpent: 3, // Should give 1 token
+          commandTokenDistribution: { tactics: 2, fleet: 0, strategy: 0 }, // Distributing 2, should be 1
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Must distribute exactly 1 tokens');
+    });
+
+    it('should allow valid Leadership secondary with 0 influence spent', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 1;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 1,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('Construction (4) secondary', () => {
+    it('should fail if no system specified for structure placement', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'pds' as const, planetId: 'planet1' },
+          // Missing systemPosition
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Must specify a system for structure placement');
+    });
+
+    it('should fail if system not found', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'pds' as const, planetId: 'planet1' },
+          systemPosition: { q: 99, r: 99 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('System not found');
+    });
+
+    it('should fail if planet not controlled by player', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+      // Planet controlled by player1, not player2
+      state.map.tiles[0].planets[0].controlledBy = 'player1';
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'pds' as const, planetId: 'planet1' },
+          systemPosition: { q: 0, r: 0 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('You do not control this planet');
+    });
+
+    it('should allow valid Construction secondary', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+      state.map.tiles[0].planets[0].controlledBy = 'player2';
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'pds' as const, planetId: 'planet1' },
+          systemPosition: { q: 0, r: 0 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow Construction secondary without building', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail if PDS limit reached (6)', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+      state.map.tiles[0].planets[0].controlledBy = 'player2';
+      // Add 6 PDS units for player2
+      const pdsUnits = Array.from({ length: 6 }, (_, i) => createMockUnit({
+        id: `pds-${i}`,
+        type: 'pds',
+        ownerId: 'player2',
+      }));
+      state.map.tiles[0].planets[0].units = pdsUnits;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'pds' as const, planetId: 'planet1' },
+          systemPosition: { q: 0, r: 0 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Maximum PDS limit reached (6)');
+    });
+
+    it('should fail if Space Dock limit reached (3)', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+      state.map.tiles[0].planets[0].controlledBy = 'player2';
+      // Add 3 space docks for player2 across different planets
+      const spaceDocks = Array.from({ length: 3 }, (_, i) => createMockUnit({
+        id: `sd-${i}`,
+        type: 'space_dock',
+        ownerId: 'player2',
+      }));
+      state.map.tiles[0].planets[0].units = spaceDocks;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'space_dock' as const, planetId: 'planet1' },
+          systemPosition: { q: 0, r: 0 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Maximum Space Dock limit reached (3)');
+    });
+
+    it('should fail if planet already has a Space Dock', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 4;
+      state.map.tiles[0].planets[0].controlledBy = 'player2';
+      state.map.tiles[0].planets[0].units = [createMockUnit({
+        id: 'sd-1',
+        type: 'space_dock',
+        ownerId: 'player2',
+      })];
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 4,
+        declined: false,
+        choices: {
+          structureBuilt: { type: 'space_dock' as const, planetId: 'planet1' },
+          systemPosition: { q: 0, r: 0 },
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Planet already has a Space Dock');
+    });
+  });
+
+  describe('Warfare (6) secondary', () => {
+    // Note: validateWarfareSecondary uses require('@ti4/game-data') for faction lookup
+    // which doesn't work well with vitest mocks, so we test the error path
+    it('should fail if home system not found', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 6;
+      // Remove all tiles so no home system exists
+      state.map.tiles = [];
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 6,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      // When home system isn't found, the validator returns 'Home system not found'
+      expect(result.error).toBe('Home system not found');
+    });
+  });
+
+  describe('Technology (7) secondary', () => {
+    it('should fail if not enough resources for tech (need 4)', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 7;
+      state.players[1].tradeGoods = 0;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 7,
+        declined: false,
+        choices: {
+          techId: 'neural_motivator',
+          exhaustedPlanets: [],
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Not enough resources (need 4)');
+    });
+
+    it('should allow valid Technology secondary with enough resources', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 7;
+      state.players[1].tradeGoods = 5;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 7,
+        declined: false,
+        choices: {
+          techId: 'neural_motivator',
+          exhaustedPlanets: [],
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail if player already has the technology', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 7;
+      state.players[1].tradeGoods = 5;
+      state.players[1].technologies = ['neural_motivator'];
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 7,
+        declined: false,
+        choices: {
+          techId: 'neural_motivator',
+          exhaustedPlanets: [],
+        },
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Already have this technology');
+    });
+  });
+
+  describe('Politics (3) secondary', () => {
+    it('should always be valid (just draws cards)', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 3;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 3,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('Trade (5) secondary', () => {
+    it('should always be valid (just refreshes commodities)', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 5;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 5,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('unknown strategy card', () => {
+    it('should fail for unknown primary strategy card', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState!.cardNumber = 99;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 99,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Unknown strategy card');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should fail if strategic action state is null', () => {
+      const state = createMockGameState({ subPhase: 'strategic_secondary' });
+      state.strategicActionState = null as any;
+
+      const action = {
+        type: 'strategic_secondary' as const,
+        playerId: 'player2',
+        cardNumber: 1,
+        declined: false,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicSecondary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Strategy card mismatch');
+    });
+
+    it('should fail primary if strategic action state is null', () => {
+      const state = createMockGameState();
+      state.strategicActionState = null as any;
+
+      const action = {
+        type: 'strategic_primary' as const,
+        playerId: 'player1',
+        cardNumber: 1,
+        choices: {},
+        timestamp: Date.now(),
+      };
+
+      const result = validateStrategicPrimary(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Strategy card mismatch');
     });
   });
 });

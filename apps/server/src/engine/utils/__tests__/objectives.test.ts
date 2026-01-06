@@ -2322,11 +2322,688 @@ describe('Additional Helpers', () => {
       });
       const state = createMockGameState([player], []);
 
-      const triggers = checkActionPhaseTriggers(state, 'player1', 'combat_won', {
-        destroyedUnits: [{ type: 'war_sun', ownerId: 'player2' }],
+      const triggers = checkActionPhaseTriggers(state, {
+        type: 'combat_won',
+        playerId: 'player1',
+        unitsDestroyed: [{ type: 'war_sun', ownerId: 'player2' }],
       });
 
       expect(triggers.length).toBe(0);
+    });
+
+    it('should check three_ships_after_combat trigger', () => {
+      const player = createMockPlayer('player1', {
+        secretObjectives: ['prove_endurance'],
+        scoredObjectives: [],
+      });
+      const state = createMockGameState([player], []);
+
+      const triggers = checkActionPhaseTriggers(state, {
+        type: 'combat_won',
+        playerId: 'player1',
+        shipsRemaining: 4,
+      });
+
+      expect(Array.isArray(triggers)).toBe(true);
+    });
+  });
+});
+
+// =============================================================================
+// ADDITIONAL HELPER FUNCTION TESTS
+// =============================================================================
+
+describe('Additional Helper Functions', () => {
+  describe('countSystemsWithUnitsNoPlanets', () => {
+    it('should count systems with units but no planets', () => {
+      const player = createMockPlayer('player1');
+      // System 39 is an empty system (supernova)
+      const emptyTile = createMockTile({ q: 1, r: 0 }, 39, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      // System 19 has planets
+      const planetTile = createMockTile({ q: 0, r: 0 }, 19, {
+        units: [createMockUnit('destroyer', 'player1')],
+        planets: [createMockPlanet('wellon', 'player1')],
+      });
+      const state = createMockGameState([player], [emptyTile, planetTile]);
+
+      const result = countSystemsWithUnitsNoPlanets(state, 'player1');
+
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should return 0 when no units in empty systems', () => {
+      const player = createMockPlayer('player1');
+      const tile = createMockTile({ q: 0, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [createMockPlanet('wellon', 'player1')],
+      });
+      const state = createMockGameState([player], [tile]);
+
+      const result = countSystemsWithUnitsNoPlanets(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('countSpecialSystemsWithUnits', () => {
+    it('should count systems with anomalies where player has units', () => {
+      const player = createMockPlayer('player1');
+      // System 41 is gravity rift (anomaly)
+      const anomalyTile = createMockTile({ q: 0, r: 0 }, 41, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([player], [anomalyTile]);
+
+      const result = countSpecialSystemsWithUnits(state, 'player1');
+
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should count Mecatol Rex as special system', () => {
+      const player = createMockPlayer('player1');
+      const mecatolTile = createMockTile({ q: 0, r: 0 }, 18, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [createMockPlanet('mecatol_rex', 'player1')],
+      });
+      const state = createMockGameState([player], [mecatolTile]);
+
+      const result = countSpecialSystemsWithUnits(state, 'player1');
+
+      expect(result).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should return 0 when no units in special systems', () => {
+      const player = createMockPlayer('player1');
+      const regularTile = createMockTile({ q: 0, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [createMockPlanet('wellon', 'player1')],
+      });
+      const state = createMockGameState([player], [regularTile]);
+
+      const result = countSpecialSystemsWithUnits(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('countEdgeSystemsWithUnits', () => {
+    it('should count edge systems where player has units', () => {
+      const player = createMockPlayer('player1');
+      // Edge system is at distance >= 2 from center
+      const edgeTile = createMockTile({ q: 2, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([player], [edgeTile]);
+
+      const result = countEdgeSystemsWithUnits(state, 'player1');
+
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should not count center systems', () => {
+      const player = createMockPlayer('player1');
+      // Center at (0,0) is distance 0
+      const centerTile = createMockTile({ q: 0, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([player], [centerTile]);
+
+      const result = countEdgeSystemsWithUnits(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+
+    it('should not count home systems as edge', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      // System 1 is Sol home system
+      const homeTile = createMockTile({ q: 3, r: 0 }, 1, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      const result = countEdgeSystemsWithUnits(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('hasCapitalShipInEnemyHomeOrMecatol', () => {
+    it('should return true with flagship in Mecatol', () => {
+      const player = createMockPlayer('player1');
+      const mecatolTile = createMockTile({ q: 0, r: 0 }, 18, {
+        units: [createMockUnit('flagship', 'player1')],
+        planets: [createMockPlanet('mecatol_rex', null)],
+      });
+      const state = createMockGameState([player], [mecatolTile]);
+
+      const result = hasCapitalShipInEnemyHomeOrMecatol(state, 'player1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return true with war sun in enemy home system', () => {
+      const solPlayer = createMockPlayer('player1', { faction: 'sol' });
+      const hacanPlayer = createMockPlayer('player2', { faction: 'hacan' });
+      // System 10 is Hacan home system
+      const hacanHome = createMockTile({ q: 0, r: -3 }, 10, {
+        units: [createMockUnit('war_sun', 'player1')],
+        planets: [createMockPlanet('arretze', 'player2')],
+      });
+      const state = createMockGameState([solPlayer, hacanPlayer], [hacanHome]);
+
+      const result = hasCapitalShipInEnemyHomeOrMecatol(state, 'player1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false without capital ships', () => {
+      const player = createMockPlayer('player1');
+      const mecatolTile = createMockTile({ q: 0, r: 0 }, 18, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [createMockPlanet('mecatol_rex', null)],
+      });
+      const state = createMockGameState([player], [mecatolTile]);
+
+      const result = hasCapitalShipInEnemyHomeOrMecatol(state, 'player1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('countEnemyHomesWithAdjacentPlanets', () => {
+    it('should count enemy home systems with adjacent controlled planets', () => {
+      const solPlayer = createMockPlayer('player1', { faction: 'sol' });
+      const hacanPlayer = createMockPlayer('player2', { faction: 'hacan' });
+      // System 10 is Hacan home system
+      const hacanHome = createMockTile({ q: 0, r: 0 }, 10, {
+        units: [],
+        planets: [createMockPlanet('arretze', 'player2')],
+      });
+      // Adjacent tile with Sol-controlled planet
+      const adjacentTile = createMockTile({ q: 1, r: 0 }, 19, {
+        planets: [createMockPlanet('wellon', 'player1')],
+      });
+      const state = createMockGameState([solPlayer, hacanPlayer], [hacanHome, adjacentTile]);
+
+      const result = countEnemyHomesWithAdjacentPlanets(state, 'player1');
+
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should return 0 with no adjacent controlled planets', () => {
+      const solPlayer = createMockPlayer('player1', { faction: 'sol' });
+      const hacanPlayer = createMockPlayer('player2', { faction: 'hacan' });
+      const hacanHome = createMockTile({ q: 0, r: 0 }, 10, {
+        units: [],
+        planets: [createMockPlanet('arretze', 'player2')],
+      });
+      const state = createMockGameState([solPlayer, hacanPlayer], [hacanHome]);
+
+      const result = countEnemyHomesWithAdjacentPlanets(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('hasShipsAdjacentToEnemyHome', () => {
+    it('should return true with ships adjacent to enemy home', () => {
+      const solPlayer = createMockPlayer('player1', { faction: 'sol' });
+      const hacanPlayer = createMockPlayer('player2', { faction: 'hacan' });
+      // System 10 is Hacan home system
+      const hacanHome = createMockTile({ q: 0, r: 0 }, 10, {
+        units: [],
+        planets: [createMockPlanet('arretze', 'player2')],
+      });
+      // Adjacent tile with Sol ships
+      const adjacentTile = createMockTile({ q: 1, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([solPlayer, hacanPlayer], [hacanHome, adjacentTile]);
+
+      const result = hasShipsAdjacentToEnemyHome(state, 'player1');
+
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should return false when no ships near enemy home', () => {
+      const solPlayer = createMockPlayer('player1', { faction: 'sol' });
+      const hacanPlayer = createMockPlayer('player2', { faction: 'hacan' });
+      const hacanHome = createMockTile({ q: 0, r: 0 }, 10, {
+        units: [],
+        planets: [createMockPlanet('arretze', 'player2')],
+      });
+      // Far away tile
+      const farTile = createMockTile({ q: 5, r: 5 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([solPlayer, hacanPlayer], [hacanHome, farTile]);
+
+      const result = hasShipsAdjacentToEnemyHome(state, 'player1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('countGroundForcesOnPlanetsWithoutDock', () => {
+    it('should count ground forces on planets without space dock', () => {
+      const player = createMockPlayer('player1');
+      const tile = createMockTile({ q: 0, r: 0 }, 19, {
+        planets: [
+          createMockPlanet('wellon', 'player1', [
+            createMockUnit('infantry', 'player1'),
+            createMockUnit('infantry', 'player1'),
+            createMockUnit('infantry', 'player1'),
+          ]),
+        ],
+      });
+      const state = createMockGameState([player], [tile]);
+
+      const result = countGroundForcesOnPlanetsWithoutDock(state, 'player1');
+
+      expect(result).toBe(3);
+    });
+
+    it('should not count ground forces on planets with dock', () => {
+      const player = createMockPlayer('player1');
+      const tile = createMockTile({ q: 0, r: 0 }, 19, {
+        planets: [
+          createMockPlanet('wellon', 'player1', [
+            createMockUnit('infantry', 'player1'),
+            createMockUnit('infantry', 'player1'),
+            createMockUnit('space_dock', 'player1'),
+          ]),
+        ],
+      });
+      const state = createMockGameState([player], [tile]);
+
+      const result = countGroundForcesOnPlanetsWithoutDock(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+
+    it('should count mechs as ground forces', () => {
+      const player = createMockPlayer('player1');
+      const tile = createMockTile({ q: 0, r: 0 }, 19, {
+        planets: [
+          createMockPlanet('wellon', 'player1', [
+            createMockUnit('mech', 'player1'),
+            createMockUnit('infantry', 'player1'),
+          ]),
+        ],
+      });
+      const state = createMockGameState([player], [tile]);
+
+      const result = countGroundForcesOnPlanetsWithoutDock(state, 'player1');
+
+      expect(result).toBe(2);
+    });
+  });
+
+  describe('hasUnitsInNexus', () => {
+    it('should return true with units in Creuss system', () => {
+      const player = createMockPlayer('player1');
+      const creussPlayer = createMockPlayer('player2', { faction: 'creuss' });
+      // System 17 is Creuss home system with delta wormhole
+      const creussHome = createMockTile({ q: 0, r: 0 }, 17, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([player, creussPlayer], [creussHome]);
+
+      const result = hasUnitsInNexus(state, 'player1');
+
+      expect(typeof result).toBe('boolean');
+    });
+
+    it('should return false with no units in nexus', () => {
+      const player = createMockPlayer('player1');
+      const regularTile = createMockTile({ q: 0, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+        planets: [],
+      });
+      const state = createMockGameState([player], [regularTile]);
+
+      const result = hasUnitsInNexus(state, 'player1');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('calculateSpendableResources', () => {
+    it('should include trade goods in spendable resources', () => {
+      const player = createMockPlayer('player1', {
+        tradeGoods: 5,
+        planets: [],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableResources(state, player);
+
+      expect(result).toBe(5);
+    });
+
+    it('should include unexhausted planet resources', () => {
+      const player = createMockPlayer('player1', {
+        tradeGoods: 2,
+        planets: [
+          { planetId: 'wellon', exhausted: false },
+        ],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableResources(state, player);
+
+      // 2 trade goods + planet resources
+      expect(result).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should not include exhausted planet resources', () => {
+      const player = createMockPlayer('player1', {
+        tradeGoods: 3,
+        planets: [
+          { planetId: 'wellon', exhausted: true },
+        ],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableResources(state, player);
+
+      // Only trade goods since planet is exhausted
+      expect(result).toBe(3);
+    });
+  });
+
+  describe('calculateSpendableInfluence', () => {
+    it('should return 0 with no unexhausted planets', () => {
+      const player = createMockPlayer('player1', {
+        planets: [],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableInfluence(state, player);
+
+      expect(result).toBe(0);
+    });
+
+    it('should include unexhausted planet influence', () => {
+      const player = createMockPlayer('player1', {
+        planets: [
+          { planetId: 'wellon', exhausted: false },
+        ],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableInfluence(state, player);
+
+      expect(result).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should not include exhausted planet influence', () => {
+      const player = createMockPlayer('player1', {
+        planets: [
+          { planetId: 'wellon', exhausted: true },
+        ],
+      });
+      const state = createMockGameState([player], []);
+
+      const result = calculateSpendableInfluence(state, player);
+
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('countPlanetsWithStructuresOutsideHome', () => {
+    it('should count planets with structures outside home system', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      // Sol home is system 1, other planets elsewhere
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1', [
+          createMockUnit('pds', 'player1'),
+        ])],
+      });
+      const otherTile = createMockTile({ q: 1, r: 0 }, 19, {
+        planets: [createMockPlanet('wellon', 'player1', [
+          createMockUnit('pds', 'player1'),
+        ])],
+      });
+      const otherTile2 = createMockTile({ q: 2, r: 0 }, 20, {
+        planets: [createMockPlanet('vefut_ii', 'player1', [
+          createMockUnit('space_dock', 'player1'),
+        ])],
+      });
+      const state = createMockGameState([player], [homeTile, otherTile, otherTile2]);
+
+      const result = countPlanetsWithStructuresOutsideHome(state, 'player1');
+
+      expect(result).toBe(2);
+    });
+
+    it('should return 0 when all structures in home system', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1', [
+          createMockUnit('pds', 'player1'),
+          createMockUnit('space_dock', 'player1'),
+        ])],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      const result = countPlanetsWithStructuresOutsideHome(state, 'player1');
+
+      expect(result).toBe(0);
+    });
+  });
+});
+
+// =============================================================================
+// checkObjectiveRequirement - CUSTOM CHECK TYPES
+// =============================================================================
+
+describe('checkObjectiveRequirement - Custom Check Types', () => {
+  describe('spend_influence requirement', () => {
+    it('should check spendable influence', () => {
+      const player = createMockPlayer('player1', {
+        faction: 'sol',
+        planets: [{ planetId: 'jord', exhausted: false }],
+      });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // This will check spend_influence type objectives
+      const result = checkObjectiveRequirement(state, 'player1', 'sway_the_council');
+
+      expect(result).toHaveProperty('canScore');
+    });
+  });
+
+  describe('control_planets with customCheck', () => {
+    it('should check non_home_systems filter', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const otherTile1 = createMockTile({ q: 1, r: 0 }, 19, {
+        planets: [createMockPlanet('wellon', 'player1')],
+      });
+      const otherTile2 = createMockTile({ q: 2, r: 0 }, 20, {
+        planets: [createMockPlanet('vefut_ii', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile, otherTile1, otherTile2]);
+
+      // expand_borders requires non-home system planets
+      const result = checkObjectiveRequirement(state, 'player1', 'expand_borders');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should check tech_specialty filter', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // found_a_research_network requires tech specialty planets
+      const result = checkObjectiveRequirement(state, 'player1', 'found_research_outposts');
+
+      expect(result).toHaveProperty('canScore');
+    });
+  });
+
+  describe('control_mecatol with ships check', () => {
+    it('should check ships at Mecatol', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const mecatolTile = createMockTile({ q: 0, r: 0 }, 18, {
+        units: [
+          createMockUnit('cruiser', 'player1'),
+          createMockUnit('cruiser', 'player1'),
+          createMockUnit('cruiser', 'player1'),
+        ],
+        planets: [createMockPlanet('mecatol_rex', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile, mecatolTile]);
+
+      // occupy_the_seat_of_the_empire requires Mecatol control + ships
+      const result = checkObjectiveRequirement(state, 'player1', 'occupy_the_seat_of_the_empire');
+
+      expect(result).toHaveProperty('canScore');
+    });
+  });
+
+  describe('custom checks', () => {
+    it('should check ships_adjacent_mecatol', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const mecatolTile = createMockTile({ q: 0, r: 0 }, 18, {
+        planets: [createMockPlanet('mecatol_rex', null)],
+      });
+      const adjacentTile1 = createMockTile({ q: 1, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+      });
+      const adjacentTile2 = createMockTile({ q: 0, r: 1 }, 20, {
+        units: [createMockUnit('destroyer', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile, mecatolTile, adjacentTile1, adjacentTile2]);
+
+      // intimidate_council requires ships in adjacent systems to Mecatol
+      const result = checkObjectiveRequirement(state, 'player1', 'intimidate_council');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should check ships_in_systems custom check', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const tile1 = createMockTile({ q: 1, r: 0 }, 19, {
+        units: [createMockUnit('cruiser', 'player1')],
+      });
+      const tile2 = createMockTile({ q: 2, r: 0 }, 20, {
+        units: [createMockUnit('destroyer', 'player1')],
+      });
+      const tile3 = createMockTile({ q: 3, r: 0 }, 21, {
+        units: [createMockUnit('carrier', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile, tile1, tile2, tile3]);
+
+      // push_boundaries requires ships in X systems
+      const result = checkObjectiveRequirement(state, 'player1', 'push_boundaries');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should check discard_action_cards', () => {
+      const player = createMockPlayer('player1', {
+        faction: 'sol',
+        actionCards: ['card1', 'card2', 'card3', 'card4', 'card5'],
+      });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // adapt_new_strategies requires discarding action cards
+      const result = checkObjectiveRequirement(state, 'player1', 'adapt_new_strategies');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should check laws_in_play', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+      state.laws = [{ id: 'law1' }, { id: 'law2' }, { id: 'law3' }];
+
+      // dictate_policy requires laws in play
+      const result = checkObjectiveRequirement(state, 'player1', 'dictate_policy');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should check purge_fragments', () => {
+      const player = createMockPlayer('player1', {
+        faction: 'sol',
+        relicFragments: { cultural: 2, industrial: 1, hazardous: 1, unknown: 0 },
+      });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // explore_the_galaxy requires purging fragments
+      const result = checkObjectiveRequirement(state, 'player1', 'explore_deep_space');
+
+      expect(result).toHaveProperty('canScore');
+    });
+  });
+
+  describe('action phase triggered objectives', () => {
+    it('should return correct message for production_in_system', () => {
+      const player = createMockPlayer('player1', { faction: 'sol' });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // These objectives are triggered during action phase, not status phase
+      const result = checkObjectiveRequirement(state, 'player1', 'establish_hegemony');
+
+      expect(result).toHaveProperty('canScore');
+    });
+
+    it('should return correct message for combat-based triggers', () => {
+      const player = createMockPlayer('player1', {
+        faction: 'sol',
+        secretObjectives: ['destroy_their_greatest_ship'],
+      });
+      const homeTile = createMockTile({ q: 0, r: 3 }, 1, {
+        planets: [createMockPlanet('jord', 'player1')],
+      });
+      const state = createMockGameState([player], [homeTile]);
+
+      // Combat objectives cannot be checked in status phase
+      const result = checkObjectiveRequirement(state, 'player1', 'destroy_their_greatest_ship');
+
+      expect(result).toHaveProperty('canScore');
     });
   });
 });

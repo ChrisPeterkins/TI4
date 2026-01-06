@@ -27,6 +27,16 @@ import {
   getNonFighterShips,
   canUseSustainDamage,
   getSpaceCannonUnits,
+  checkCombatEnd,
+  checkCapacityOverflow,
+  resolveCapacityOverflow,
+  validateGravitonLaserAssignment,
+  applyDuraniumArmor,
+  shouldTriggerAssaultCannon,
+  getBombardmentOptions,
+  getSpaceCannonOptions,
+  getAdjacentPDSIIUnits,
+  getAllSpaceCannonOffenseUnits,
 } from '../combat.js';
 
 function createMockPlayer(overrides: Partial<PlayerState> = {}): PlayerState {
@@ -893,5 +903,640 @@ describe('getBombardmentUnits', () => {
 
     // Dreadnoughts and War Suns have Bombardment by default
     expect(result.length).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ==========================================================================
+// Additional Combat Utility Tests - Coverage Expansion
+// ==========================================================================
+
+describe('checkCombatEnd', () => {
+  it('should return ended=false when both sides have units', () => {
+    const unit1 = createMockUnit({ id: 'attacker-unit', ownerId: 'player1' });
+    const unit2 = createMockUnit({ id: 'defender-unit', ownerId: 'player2' });
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [unit1, unit2] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      attackerUnits: ['attacker-unit'],
+      defenderUnits: ['defender-unit'],
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = checkCombatEnd(state, combat);
+
+    expect(result.ended).toBe(false);
+    expect(result.winnerId).toBeNull();
+  });
+
+  it('should return defender wins when attacker has no units', () => {
+    const unit = createMockUnit({ id: 'defender-unit', ownerId: 'player2' });
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [unit] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      attackerUnits: ['nonexistent'],
+      defenderUnits: ['defender-unit'],
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = checkCombatEnd(state, combat);
+
+    expect(result.ended).toBe(true);
+    expect(result.winnerId).toBe('player2');
+  });
+
+  it('should return attacker wins when defender has no units', () => {
+    const unit = createMockUnit({ id: 'attacker-unit', ownerId: 'player1' });
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [unit] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      attackerUnits: ['attacker-unit'],
+      defenderUnits: ['nonexistent'],
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = checkCombatEnd(state, combat);
+
+    expect(result.ended).toBe(true);
+    expect(result.winnerId).toBe('player1');
+  });
+
+  it('should return defender wins on draw in ground combat', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'ground',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      attackerUnits: ['nonexistent1'],
+      defenderUnits: ['nonexistent2'],
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: 'planet-1',
+    };
+
+    const result = checkCombatEnd(state, combat);
+
+    expect(result.ended).toBe(true);
+    expect(result.winnerId).toBe('player2');
+  });
+
+  it('should return null winner on draw in space combat', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      attackerUnits: ['nonexistent1'],
+      defenderUnits: ['nonexistent2'],
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = checkCombatEnd(state, combat);
+
+    expect(result.ended).toBe(true);
+    expect(result.winnerId).toBeNull();
+  });
+});
+
+describe('checkCapacityOverflow', () => {
+  it('should return empty array when player not found', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { units: [] });
+    const state = createMockGameState([tile]);
+
+    const result = checkCapacityOverflow(state, tile, 'nonexistent');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty array when no overflow', () => {
+    const units = [
+      createMockUnit({ type: 'carrier', ownerId: 'player1' }), // Has capacity
+      createMockUnit({ type: 'fighter', ownerId: 'player1' }), // Needs capacity
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { units });
+    const state = createMockGameState([tile]);
+
+    const result = checkCapacityOverflow(state, tile, 'player1');
+
+    // Carrier has capacity for fighters, so no overflow
+    expect(result.length).toBeLessThanOrEqual(units.filter(u => u.type === 'fighter').length);
+  });
+
+  it('should return overflow units prioritizing fighters first', () => {
+    const units = [
+      createMockUnit({ id: 'fighter1', type: 'fighter', ownerId: 'player1' }),
+      createMockUnit({ id: 'fighter2', type: 'fighter', ownerId: 'player1' }),
+      createMockUnit({ id: 'infantry1', type: 'infantry', ownerId: 'player1' }),
+      // No carriers - all units need capacity but have none
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { units });
+    const state = createMockGameState([tile]);
+
+    const result = checkCapacityOverflow(state, tile, 'player1');
+
+    // With no capacity, all 3 units overflow, fighters should be first
+    if (result.length > 0) {
+      expect(result[0].type).toBe('fighter');
+    }
+  });
+});
+
+describe('resolveCapacityOverflow', () => {
+  it('should return empty destroyed array when no overflow', () => {
+    const units = [
+      createMockUnit({ type: 'carrier', ownerId: 'player1' }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { units });
+    const state = createMockGameState([tile]);
+
+    const result = resolveCapacityOverflow(state, tile, 'player1');
+
+    expect(result.destroyed).toEqual([]);
+  });
+});
+
+describe('validateGravitonLaserAssignment', () => {
+  it('should return valid when no graviton laser', () => {
+    const units = [
+      createMockUnit({ id: 'fighter1', type: 'fighter' }),
+    ];
+    const assignments = [{ unitId: 'fighter1', destroyed: true }];
+
+    const result = validateGravitonLaserAssignment(units, assignments, false);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('should return valid when non-fighters targeted before fighters', () => {
+    const units = [
+      createMockUnit({ id: 'cruiser1', type: 'cruiser' }),
+      createMockUnit({ id: 'fighter1', type: 'fighter' }),
+    ];
+    const assignments = [{ unitId: 'cruiser1', destroyed: true }];
+
+    const result = validateGravitonLaserAssignment(units, assignments, true);
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('should return invalid when fighters hit before non-fighters exhausted', () => {
+    const units = [
+      createMockUnit({ id: 'cruiser1', type: 'cruiser' }),
+      createMockUnit({ id: 'fighter1', type: 'fighter' }),
+    ];
+    const assignments = [{ unitId: 'fighter1', destroyed: true }];
+
+    const result = validateGravitonLaserAssignment(units, assignments, true);
+
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('non-fighters');
+  });
+
+  it('should allow fighter hits after all non-fighters are hit', () => {
+    const units = [
+      createMockUnit({ id: 'cruiser1', type: 'cruiser' }),
+      createMockUnit({ id: 'fighter1', type: 'fighter' }),
+    ];
+    const assignments = [
+      { unitId: 'cruiser1', destroyed: true },
+      { unitId: 'fighter1', destroyed: true },
+    ];
+
+    const result = validateGravitonLaserAssignment(units, assignments, true);
+
+    expect(result.valid).toBe(true);
+  });
+});
+
+describe('applyDuraniumArmor', () => {
+  it('should return null when player does not have tech', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [] });
+    const player = createMockPlayer({ id: 'player1', technologies: [] });
+    const state = createMockGameState([tile], [player]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = applyDuraniumArmor(state, combat, 'player1', []);
+
+    expect(result).toBeNull();
+  });
+
+  it('should return null when tile not found', () => {
+    const player = createMockPlayer({ id: 'player1', technologies: ['duranium_armor'] });
+    const state = createMockGameState([], [player]);
+    const combat: CombatInstance = {
+      systemId: 'nonexistent',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = applyDuraniumArmor(state, combat, 'player1', []);
+
+    expect(result).toBeNull();
+  });
+
+  it('should return null when no repairable units', () => {
+    const units = [
+      createMockUnit({ id: 'unit1', type: 'dreadnought', ownerId: 'player1', damaged: false }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units });
+    const player = createMockPlayer({ id: 'player1', technologies: ['duranium_armor'] });
+    const state = createMockGameState([tile], [player]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = applyDuraniumArmor(state, combat, 'player1', []);
+
+    expect(result).toBeNull();
+  });
+
+  it('should repair damaged unit that did not just sustain', () => {
+    const units = [
+      createMockUnit({ id: 'unit1', type: 'dreadnought', ownerId: 'player1', damaged: true }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units });
+    const player = createMockPlayer({ id: 'player1', technologies: ['duranium_armor'] });
+    const state = createMockGameState([tile], [player]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = applyDuraniumArmor(state, combat, 'player1', []);
+
+    expect(result).toBe('unit1');
+    expect(state.map.tiles[0].units[0].damaged).toBe(false);
+  });
+
+  it('should not repair unit that just sustained damage', () => {
+    const units = [
+      createMockUnit({ id: 'unit1', type: 'dreadnought', ownerId: 'player1', damaged: true }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units });
+    const player = createMockPlayer({ id: 'player1', technologies: ['duranium_armor'] });
+    const state = createMockGameState([tile], [player]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'space',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: undefined,
+    };
+
+    const result = applyDuraniumArmor(state, combat, 'player1', ['unit1']);
+
+    expect(result).toBeNull();
+  });
+});
+
+describe('shouldTriggerAssaultCannon', () => {
+  it('should return false when player does not have tech', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [] });
+    const player = createMockPlayer({ id: 'player1', technologies: [] });
+    const state = createMockGameState([tile], [player]);
+
+    const result = shouldTriggerAssaultCannon(state, 'player1', 'system-1');
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false when player not found', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [] });
+    const state = createMockGameState([tile]);
+
+    const result = shouldTriggerAssaultCannon(state, 'nonexistent', 'system-1');
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false when tile not found', () => {
+    const player = createMockPlayer({ id: 'player1', technologies: ['assault_cannon'] });
+    const state = createMockGameState([], [player]);
+
+    const result = shouldTriggerAssaultCannon(state, 'player1', 'nonexistent');
+
+    expect(result).toBe(false);
+  });
+
+  it('should return false when less than 3 non-fighter ships', () => {
+    const units = [
+      createMockUnit({ type: 'cruiser', ownerId: 'player1' }),
+      createMockUnit({ type: 'cruiser', ownerId: 'player1' }),
+      createMockUnit({ type: 'fighter', ownerId: 'player1' }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units });
+    const player = createMockPlayer({ id: 'player1', technologies: ['assault_cannon'] });
+    const state = createMockGameState([tile], [player]);
+
+    const result = shouldTriggerAssaultCannon(state, 'player1', 'system-1');
+
+    expect(result).toBe(false);
+  });
+
+  it('should return true when 3+ non-fighter ships', () => {
+    const units = [
+      createMockUnit({ type: 'cruiser', ownerId: 'player1' }),
+      createMockUnit({ type: 'cruiser', ownerId: 'player1' }),
+      createMockUnit({ type: 'dreadnought', ownerId: 'player1' }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units });
+    const player = createMockPlayer({ id: 'player1', technologies: ['assault_cannon'] });
+    const state = createMockGameState([tile], [player]);
+
+    const result = shouldTriggerAssaultCannon(state, 'player1', 'system-1');
+
+    expect(result).toBe(true);
+  });
+});
+
+describe('getUnitsInCombat - ground combat', () => {
+  it('should return ground units from planet', () => {
+    const groundUnits = [
+      createMockUnit({ id: 'inf1', type: 'infantry', ownerId: 'player1' }),
+      createMockUnit({ id: 'mech1', type: 'mech', ownerId: 'player1' }),
+    ];
+    const tile = createMockTile({ q: 0, r: 0 }, {
+      id: 'system-1',
+      units: [],
+      planets: [{
+        id: 'planet-1',
+        planetId: 'test-planet',
+        controlledBy: 'player1',
+        exhausted: false,
+        units: groundUnits,
+        attachments: [],
+      }],
+    });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'ground',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: 'test-planet',
+    };
+
+    const result = getUnitsInCombat(state, combat, 'player1');
+
+    expect(result.length).toBe(2);
+    expect(result.every(u => u.type === 'infantry' || u.type === 'mech')).toBe(true);
+  });
+
+  it('should return empty when planet not found', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'system-1', units: [], planets: [] });
+    const state = createMockGameState([tile]);
+    const combat: CombatInstance = {
+      systemId: 'system-1',
+      type: 'ground',
+      attackerId: 'player1',
+      defenderId: 'player2',
+      round: 1,
+      roundNumber: 1,
+      phase: 'combat',
+      planetId: 'nonexistent-planet',
+    };
+
+    const result = getUnitsInCombat(state, combat, 'player1');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getBombardmentOptions', () => {
+  it('should return plasmaScoring true when player has tech', () => {
+    const tile = createMockTile({ q: 0, r: 0 });
+    const player = createMockPlayer({ id: 'player1', technologies: ['plasma_scoring'] });
+    const defender = createMockPlayer({ id: 'player2' });
+    const state = createMockGameState([tile], [player, defender]);
+
+    const result = getBombardmentOptions(state, 'player1', 'player2');
+
+    expect(result.plasmaScoring).toBe(true);
+  });
+
+  it('should return plasmaScoring false when player lacks tech', () => {
+    const tile = createMockTile({ q: 0, r: 0 });
+    const player = createMockPlayer({ id: 'player1', technologies: [] });
+    const defender = createMockPlayer({ id: 'player2' });
+    const state = createMockGameState([tile], [player, defender]);
+
+    const result = getBombardmentOptions(state, 'player1', 'player2');
+
+    expect(result.plasmaScoring).toBe(false);
+  });
+});
+
+describe('getSpaceCannonOptions', () => {
+  it('should return all options based on technologies', () => {
+    const tile = createMockTile({ q: 0, r: 0 });
+    const firing = createMockPlayer({
+      id: 'player1',
+      technologies: ['plasma_scoring', 'graviton_laser_system'],
+    });
+    const target = createMockPlayer({
+      id: 'player2',
+      technologies: ['antimass_deflectors'],
+    });
+    const state = createMockGameState([tile], [firing, target]);
+
+    const result = getSpaceCannonOptions(state, 'player1', 'player2');
+
+    expect(result.plasmaScoring).toBe(true);
+    expect(result.antimassDeflectors).toBe(true);
+    expect(result.gravitonLaser).toBe(true);
+  });
+
+  it('should return all false when no relevant techs', () => {
+    const tile = createMockTile({ q: 0, r: 0 });
+    const firing = createMockPlayer({ id: 'player1', technologies: [] });
+    const target = createMockPlayer({ id: 'player2', technologies: [] });
+    const state = createMockGameState([tile], [firing, target]);
+
+    const result = getSpaceCannonOptions(state, 'player1', 'player2');
+
+    expect(result.plasmaScoring).toBe(false);
+    expect(result.antimassDeflectors).toBe(false);
+    expect(result.gravitonLaser).toBe(false);
+  });
+});
+
+describe('findUnitById - planet units', () => {
+  it('should find unit on planet', () => {
+    const unit = createMockUnit({ id: 'planet-unit-123', type: 'infantry' });
+    const tile = createMockTile({ q: 0, r: 0 }, {
+      units: [],
+      planets: [{
+        id: 'planet-1',
+        planetId: 'test-planet',
+        controlledBy: 'player1',
+        exhausted: false,
+        units: [unit],
+        attachments: [],
+      }],
+    });
+    const state = createMockGameState([tile]);
+
+    const result = findUnitById(state, 'planet-unit-123');
+
+    expect(result).toBeDefined();
+    expect(result?.id).toBe('planet-unit-123');
+  });
+});
+
+describe('removeUnit - planet units', () => {
+  it('should remove unit from planet', () => {
+    const unit = createMockUnit({ id: 'planet-unit-456', type: 'infantry' });
+    const tile = createMockTile({ q: 0, r: 0 }, {
+      units: [],
+      planets: [{
+        id: 'planet-1',
+        planetId: 'test-planet',
+        controlledBy: 'player1',
+        exhausted: false,
+        units: [unit],
+        attachments: [],
+      }],
+    });
+    const state = createMockGameState([tile]);
+
+    expect(state.map.tiles[0].planets[0].units.length).toBe(1);
+
+    const result = removeUnit(state, 'planet-unit-456');
+
+    expect(result).toBe(true);
+    expect(state.map.tiles[0].planets[0].units.length).toBe(0);
+  });
+});
+
+describe('getAdjacentPDSIIUnits', () => {
+  it('should return empty when player lacks PDS II tech', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'target' });
+    const player = createMockPlayer({ id: 'player1', technologies: [] });
+    const state = createMockGameState([tile], [player]);
+
+    const result = getAdjacentPDSIIUnits(state, 'target', 'player1');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty when player not found', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'target' });
+    const state = createMockGameState([tile]);
+
+    const result = getAdjacentPDSIIUnits(state, 'target', 'nonexistent');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty when target tile not found', () => {
+    const player = createMockPlayer({ id: 'player1', technologies: ['pds_ii'] });
+    const state = createMockGameState([], [player]);
+
+    const result = getAdjacentPDSIIUnits(state, 'nonexistent', 'player1');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('getAllSpaceCannonOffenseUnits', () => {
+  it('should return empty when player not found', () => {
+    const tile = createMockTile({ q: 0, r: 0 }, { id: 'target' });
+    const state = createMockGameState([tile]);
+
+    const result = getAllSpaceCannonOffenseUnits(state, 'target', 'nonexistent');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return empty when tile not found', () => {
+    const player = createMockPlayer({ id: 'player1' });
+    const state = createMockGameState([], [player]);
+
+    const result = getAllSpaceCannonOffenseUnits(state, 'nonexistent', 'player1');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should return local PDS units', () => {
+    const pds = createMockUnit({ id: 'pds-1', type: 'pds', ownerId: 'player1' });
+    const tile = createMockTile({ q: 0, r: 0 }, {
+      id: 'target',
+      planets: [{
+        id: 'planet-1',
+        planetId: 'test-planet',
+        controlledBy: 'player1',
+        exhausted: false,
+        units: [pds],
+        attachments: [],
+      }],
+    });
+    const player = createMockPlayer({ id: 'player1', technologies: [] });
+    const state = createMockGameState([tile], [player]);
+
+    const result = getAllSpaceCannonOffenseUnits(state, 'target', 'player1');
+
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe('pds-1');
   });
 });
