@@ -367,8 +367,18 @@ export function resolveTimingWindow(
       }
 
       // If Sabotage was NOT cancelled, it cancels the original card
+      // LAST BASTION COMMANDER: Nip and Tuck - Action cards cannot be cancelled by Sabotage
       if (!cancelled) {
-        originalCardSabotaged = true;
+        const sourcePlayerId = window.context?.sourcePlayerId;
+        const sourcePlayer = sourcePlayerId ? state.players.find(p => p.id === sourcePlayerId) : null;
+        const hasLastBastionImmunity = sourcePlayer?.faction === 'last_bastion' &&
+          sourcePlayer.leaders?.commander.unlocked;
+
+        if (!hasLastBastionImmunity) {
+          originalCardSabotaged = true;
+        } else {
+          console.log('Last Bastion commander prevents Sabotage from cancelling card');
+        }
       }
     }
 

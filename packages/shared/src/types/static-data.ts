@@ -85,6 +85,8 @@ export type AbilityTrigger =
   | 'ground_unit_destroyed'
   | 'combat_win'
   | 'combat_loss'
+  | 'combat_end' // When combat ends for any reason
+  | 'retreat_declared' // When a player declares retreat
   | 'planet_control_gained'
   | 'movement_into_system'
   | 'system_activated'
@@ -99,6 +101,7 @@ export type AbilityTrigger =
   | 'unit_produced'
   | 'research'
   | 'tech_researched'
+  | 'technology_researched' // Alias for tech_researched (used by Deepwrought)
   | 'exploration'
   | 'explore_planet'
   | 'transaction'

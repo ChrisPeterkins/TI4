@@ -34,6 +34,14 @@ export interface AbilityContext {
   count?: number;
   // Card IDs (for card-related triggers)
   cardIds?: string[];
+  // Unit type (for unit destruction triggers)
+  unitType?: UnitType;
+  // Unit ID (for unit-specific triggers)
+  unitId?: string;
+  // Technology ID (for tech-related triggers)
+  techId?: string;
+  // Retreat system (for retreat triggers)
+  retreatSystem?: HexCoord;
 }
 
 /**

@@ -504,6 +504,11 @@ export function handleAssignHits(
     }
 
     if (assignment.destroyed) {
+      // Get unit info before removal for ability triggers
+      const destroyedUnit = findUnitById(state, assignment.unitId);
+      const destroyedUnitType = destroyedUnit?.type;
+      const destroyedUnitOwnerId = destroyedUnit?.ownerId;
+
       removeUnit(state, assignment.unitId);
       // Remove from combat unit list
       if (isAttacker) {
@@ -517,6 +522,25 @@ export function handleAssignHits(
 
       // NEKRO TECHNOLOGICAL SINGULARITY: After opponent's unit destroyed, gain tech
       checkTechnologicalSingularity(state, combat, action.playerId);
+
+      // THUNDER'S EDGE UNIT DESTRUCTION TRIGGERS
+      if (destroyedUnitOwnerId) {
+        // Fire unit_destroyed trigger for relevant abilities
+        const destroyTriggers = checkAbilityTriggers(state, 'unit_destroyed', {
+          playerId: destroyedUnitOwnerId,
+          targetPlayerId: action.playerId,
+          systemId: combat.systemId,
+          unitType: destroyedUnitType,
+          unitId: assignment.unitId,
+        });
+
+        // LAST BASTION AGENT: Dame Briar - Galvanize another unit when one is destroyed
+        // LAST BASTION HERO: Lyra Keen - Trigger when galvanized unit is destroyed
+        // OBSIDIAN AGENT: Vos Hollow - Force opponent to destroy matching ship
+        for (const trigger of destroyTriggers) {
+          console.log(`Unit destroyed trigger: ${trigger.abilityName} for player ${trigger.playerId}`);
+        }
+      }
     }
   }
 
@@ -743,6 +767,17 @@ export function handleAnnounceRetreat(
     } else {
       combat.retreatAnnounced.defender = true;
     }
+
+    // RAL NEL COMMANDER: Watchful Ojz - Early retreat trigger
+    // When retreat is declared, fire retreat_declared trigger
+    const retreatTriggers = checkAbilityTriggers(state, 'retreat_declared', {
+      playerId: action.playerId,
+      systemId: combat.systemId,
+      retreatSystem: action.retreatSystem,
+    });
+    for (const trigger of retreatTriggers) {
+      console.log(`Retreat declared trigger: ${trigger.abilityName} for player ${trigger.playerId}`);
+    }
   }
 
   // Move to combat roll phase
@@ -873,6 +908,29 @@ export function completeCombat(
     : null;
 
   combat.state = 'combat_complete';
+
+  // CRIMSON REBELLION COMMANDER: Ahk Siever - After combat ends, gain commodity
+  // Fire combat_end trigger for all participants
+  const combatEndTriggers = checkAbilityTriggers(state, 'combat_end', {
+    playerId: combat.attackerId,
+    targetPlayerId: combat.defenderId,
+    systemId: combat.systemId,
+    combatType: combat.type,
+  });
+  if (combatEndTriggers.length > 0) {
+    console.log('Combat end triggers:', combatEndTriggers.map(t => t.abilityName));
+  }
+
+  // Also check for defender
+  const defenderEndTriggers = checkAbilityTriggers(state, 'combat_end', {
+    playerId: combat.defenderId,
+    targetPlayerId: combat.attackerId,
+    systemId: combat.systemId,
+    combatType: combat.type,
+  });
+  if (defenderEndTriggers.length > 0) {
+    console.log('Combat end triggers (defender):', defenderEndTriggers.map(t => t.abilityName));
+  }
 
   // Fire combat_win trigger for winner (e.g., Nekro's Galactic Threat)
   if (actualWinnerId && loserId) {

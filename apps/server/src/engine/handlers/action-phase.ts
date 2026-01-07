@@ -40,6 +40,23 @@ export function handlePass(state: GameState, action: PassAction): HandlerResult 
     return { success: false, error: 'Player not found' };
   }
 
+  // RAL NEL COMMANDER: Watchful Ojz - Track "last to pass" for unlock condition
+  // Check if this player will be the last to pass
+  const othersNotPassed = state.players.filter(p => p.id !== action.playerId && !p.passed);
+  if (othersNotPassed.length === 0) {
+    // This player is the last to pass - set flag for Ral Nel unlock
+    player.wasLastToPass = true;
+
+    // Clear any previous "last to pass" flags
+    for (const p of state.players) {
+      if (p.id !== action.playerId) {
+        p.wasLastToPass = false;
+      }
+    }
+
+    console.log(`Player ${action.playerId} was last to pass in Action Phase`);
+  }
+
   player.passed = true;
 
   // Log the action

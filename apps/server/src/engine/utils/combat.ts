@@ -550,6 +550,17 @@ export function calculateCombatModifiers(
         }
         break;
 
+      case 'obsidian':
+        // Aroz Hollow (Commander): +1 to all combat rolls in The Fracture
+        if (player.leaders?.commander.unlocked) {
+          const isFracture = tile.systemId === 125 || tile.systemId === 126;
+          if (isFracture) {
+            total += 1;
+            descriptions.push('Aroz Hollow: +1 (Fracture)');
+          }
+        }
+        break;
+
       // Other commanders with combat effects can be added here
     }
   }

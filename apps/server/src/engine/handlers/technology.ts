@@ -7,6 +7,7 @@ import type { HandlerResult } from '../game-machine.js';
 import { technologies, systems, meetsPrerequisites, type TechnologyData } from '@ti4/game-data';
 import { checkAllCommanderUnlocks } from './leaders.js';
 import { logAbilityTriggered } from '../utils/game-log.js';
+import { checkAbilityTriggers } from '../abilities/ability-triggers.js';
 
 /**
  * Handle researching a technology
@@ -51,6 +52,24 @@ export function handleResearchTechnology(
 
   // Add the technology to the player
   player.technologies.push(action.techId);
+
+  // DEEPWROUGHT AGENT/COMMANDER: Doctor Carrina / Aello
+  // Fire technology_researched trigger for all other players (Deepwrought may respond)
+  for (const otherPlayer of state.players) {
+    if (otherPlayer.id === action.playerId) continue;
+    if (otherPlayer.faction === 'deepwrought') {
+      // Doctor Carrina (Agent): When another player researches - may ignore prerequisite, place infantry
+      // Aello (Commander): When another spends resources to research - may reduce cost, gain commodity
+      const techTriggers = checkAbilityTriggers(state, 'technology_researched', {
+        playerId: otherPlayer.id,
+        targetPlayerId: action.playerId,
+        techId: action.techId,
+      });
+      for (const trigger of techTriggers) {
+        console.log(`Technology trigger: ${trigger.abilityName} for Deepwrought player ${trigger.playerId}`);
+      }
+    }
+  }
 
   // Exhaust planets used for tech specialties
   if (action.exhaustedPlanets) {
