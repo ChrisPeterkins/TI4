@@ -566,6 +566,10 @@ export interface PlayerState {
   plotCardsInPlay?: string[];
   /** Ocean cards in hand (Deepwrought) */
   oceanCards?: string[];
+  /** Whether this player was the last to pass in the Action Phase (Ral Nel unlock condition) */
+  wasLastToPass?: boolean;
+  /** Ships stored on Crimson Rebellion hero card (Homesick Phantom) */
+  storedHeroShips?: { type: string }[];
 }
 
 /** Track available reinforcements per unit type */

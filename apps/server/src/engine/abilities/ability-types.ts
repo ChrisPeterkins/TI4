@@ -59,20 +59,34 @@ export interface CombatAbilityContext {
 export interface AbilityChoices {
   // Planet selection (for unit placement, etc.)
   selectedPlanetId?: string;
-  // System selection
+  // System selection (as tile ID)
   selectedSystem?: HexCoord;
+  selectedSystemId?: string;
   // Unit type selection
   selectedUnitType?: UnitType;
   // Number selection (how many to place, spend, etc.)
   amount?: number;
   // Unit IDs selection
   selectedUnitIds?: string[];
+  // Single unit selection
+  selectedUnitId?: string;
   // Technology selection
   selectedTechId?: string;
   // Player selection
   selectedPlayerId?: string;
   // Generic yes/no choice
   confirmed?: boolean;
+  // Whether to convert commodity to trade good
+  convertCommodity?: boolean;
+  // Action card selection
+  selectedCardId?: string;
+  // Plot card selection (Firmament)
+  selectedPlotCardId?: string;
+  // Control token owner selection
+  controlTokenPlayerId?: string;
+  // Ship swap data (Crimson Rebellion agent)
+  ship1?: { unitId: string; fromSystem: string; toSystem: string };
+  ship2?: { unitId: string; fromSystem: string; toSystem: string };
 }
 
 /**

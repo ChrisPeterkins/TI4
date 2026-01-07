@@ -15,6 +15,7 @@ const EXPANSIONS = [
   { id: 'codex1', name: 'Codex Volume I' },
   { id: 'codex2', name: 'Codex Volume II' },
   { id: 'codex3', name: 'Codex Volume III' },
+  { id: 'thunders_edge', name: "Thunder's Edge" },
 ];
 
 export default function CreateLobbyModal({ onClose }: CreateLobbyModalProps) {

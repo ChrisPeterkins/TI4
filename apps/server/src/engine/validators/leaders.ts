@@ -631,6 +631,79 @@ function checkCustomUnlockCondition(
       return { canUnlock: false, reason: 'Must spend 1 TG after playing action card with component action' };
     }
 
+    // ============================================
+    // THUNDER'S EDGE FACTION UNLOCK CONDITIONS
+    // ============================================
+
+    case 'last_bastion_galvanized_units': {
+      // Last Bastion: Have 3 galvanized units on the board
+      const galvanizedCount = player.galvanizeTokens?.length || 0;
+      if (galvanizedCount >= 3) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: `Need 3 galvanized units, have ${galvanizedCount}` };
+    }
+
+    case 'deepwrought_ocean_card': {
+      // Deepwrought: Have an ocean card in play
+      const hasOceanInPlay = (player.oceanCards?.length || 0) > 0;
+      if (hasOceanInPlay) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must have an ocean card in play' };
+    }
+
+    case 'ral_nel_last_to_pass': {
+      // Ral Nel: Be last to pass during an Action Phase
+      // This is tracked via wasLastToPass flag set by the pass handler
+      if (player.wasLastToPass) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must be last to pass during Action Phase' };
+    }
+
+    case 'crimson_rebellion_breach_placed': {
+      // Crimson Rebellion: Place a breach token in a system that contains another player's unit
+      // Check breachTokens on game state for any placed by this player
+      const playerBreaches = state.breachTokens?.filter(bt => bt.placedBy === playerId) || [];
+      if (playerBreaches.length > 0) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must place a breach token in a system with opponent units' };
+    }
+
+    case 'firmament_plot_card': {
+      // Firmament: Have a plot card in play
+      const hasPlotInPlay = (player.plotCardsInPlay?.length || 0) > 0;
+      if (hasPlotInPlay) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must have a plot card in play' };
+    }
+
+    case 'obsidian_units_in_fracture': {
+      // Obsidian: Have units in The Fracture (tiles 125, 126 or isFracture: true)
+      const hasUnitsInFracture = state.map.tiles.some(tile => {
+        // Check if this is a Fracture tile
+        const isFractureTile = tile.systemId === 125 || tile.systemId === 126;
+        if (!isFractureTile) return false;
+
+        // Check for player units in space
+        const hasSpaceUnits = tile.units.some(u => u.ownerId === playerId);
+        // Check for player units on planets
+        const hasPlanetUnits = tile.planets.some(p =>
+          p.units.some(u => u.ownerId === playerId)
+        );
+
+        return hasSpaceUnits || hasPlanetUnits;
+      });
+
+      if (hasUnitsInFracture) {
+        return { canUnlock: true };
+      }
+      return { canUnlock: false, reason: 'Must have units in The Fracture' };
+    }
+
     // These are already handled by other condition types in the main function
     case 'creuss_wormhole_token': {
       // Creuss commander is 'units_in_wormhole_systems' - already handled
