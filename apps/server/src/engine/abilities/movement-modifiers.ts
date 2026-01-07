@@ -94,6 +94,15 @@ export function getMovementModifiers(
     }
   }
 
+  // FIRMAMENT AGENT (Myru Vos): When exhausted, protected player's ships can pass through enemies
+  // (if not transporting units)
+  if (
+    state.firmamentAgentProtection?.protectedPlayerId === playerId &&
+    state.firmamentAgentProtection.canPassThroughEnemies
+  ) {
+    modifiers.canMoveThroughEnemies = true;
+  }
+
   return modifiers;
 }
 

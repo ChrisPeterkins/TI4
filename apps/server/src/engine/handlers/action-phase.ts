@@ -230,6 +230,9 @@ export function completeTacticalAction(state: GameState): HandlerResult {
   // Clear ceasefire blocks from this tactical action
   state.ceasefireBlocks = undefined;
 
+  // Clear Firmament agent protection (expires at end of tactical action)
+  state.firmamentAgentProtection = undefined;
+
   state.subPhase = 'awaiting_action';
   advanceToNextActivePlayer(state);
 
@@ -562,6 +565,9 @@ function completeTacticalActionInternal(state: GameState): HandlerResult {
 
   // Clear ceasefire blocks from this tactical action
   state.ceasefireBlocks = undefined;
+
+  // Clear Firmament agent protection (expires at end of tactical action)
+  state.firmamentAgentProtection = undefined;
 
   // Check for commander unlocks after tactical action completion
   // This covers production, movement, and combat resolution

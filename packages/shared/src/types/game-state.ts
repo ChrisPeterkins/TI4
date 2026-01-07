@@ -283,6 +283,16 @@ export interface GameState {
   expeditionState?: ExpeditionState;
   /** Space station control state (Thunder's Edge) */
   spaceStationState?: SpaceStationState[];
+  /** Firmament agent (Myru Vos) protection active during current movement */
+  firmamentAgentProtection?: FirmamentAgentProtection;
+}
+
+/** Firmament agent (Myru Vos) protection state during movement */
+export interface FirmamentAgentProtection {
+  /** Player whose ships are protected from space cannon */
+  protectedPlayerId: UUID;
+  /** Whether ships can pass through enemy ships (true if not transporting) */
+  canPassThroughEnemies: boolean;
 }
 
 /** Pending discard requirement (e.g., from Yssaril Scheming) */

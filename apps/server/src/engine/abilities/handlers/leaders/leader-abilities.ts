@@ -1231,9 +1231,18 @@ const firmamentAgent: AbilityHandler = (
 
   const targetPlayerId = context.targetPlayerId || playerId;
 
+  // Determine if ships are transporting - if choices.confirmed is true, they're NOT transporting
+  // This lets them pass through enemy ships in addition to space cannon immunity
+  const isNotTransporting = context.choices?.confirmed ?? false;
+
   exhaustAgent(state, playerId);
 
-  // Set temporary movement flags (would be checked by movement/space cannon handlers)
+  // Set the protection state for the movement system to check
+  state.firmamentAgentProtection = {
+    protectedPlayerId: targetPlayerId,
+    canPassThroughEnemies: isNotTransporting,
+  };
+
   return {
     success: true,
     stateModified: true,
@@ -1242,6 +1251,7 @@ const firmamentAgent: AbilityHandler = (
       agentId: 'myru_vos',
       targetPlayer: targetPlayerId,
       effect: 'space_cannon_immunity_ship_passthrough',
+      canPassThrough: isNotTransporting,
     },
   };
 };

@@ -398,6 +398,26 @@ export function getAllSpaceCannonOffenseUnits(
 }
 
 /**
+ * Check if a player's ships are protected from Space Cannon Offense
+ * (e.g., by Firmament agent Myru Vos)
+ *
+ * This should be checked BEFORE rolling space cannon offense dice against moving ships.
+ */
+export function isProtectedFromSpaceCannonOffense(
+  state: GameState,
+  movingPlayerId: string
+): boolean {
+  // Firmament agent (Myru Vos) protection
+  if (
+    state.firmamentAgentProtection?.protectedPlayerId === movingPlayerId
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Helper: Check if two hex positions are adjacent
  */
 function isAdjacentHex(a: HexCoord, b: HexCoord): boolean {
