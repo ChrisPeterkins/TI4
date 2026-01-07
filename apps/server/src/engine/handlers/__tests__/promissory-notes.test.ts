@@ -4,6 +4,8 @@ import {
   returnPromissoryNoteFromPlay,
   hasNoteInPlay,
   getNoteOriginalOwner,
+  canUseCommanderViaAlliance,
+  hasCommanderAccess,
 } from '../promissory-notes.js';
 import type {
   GameState,
@@ -1093,6 +1095,474 @@ describe('Promissory Note Handlers', () => {
       });
 
       expect(getNoteOriginalOwner(player, 'stymie')).toBe('arborec_player');
+    });
+  });
+
+  // =============================================================================
+  // ALLIANCE PROMISSORY NOTE TESTS
+  // =============================================================================
+
+  describe('canUseCommanderViaAlliance', () => {
+    it('should return false if player not found', () => {
+      const state = createMockGameState();
+
+      const result = canUseCommanderViaAlliance(state, 'nonexistent', 'sol');
+
+      expect(result.canUse).toBe(false);
+    });
+
+    it('should return false if player has no Alliance in play', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [], // No Alliance
+          }),
+        ],
+      });
+
+      const result = canUseCommanderViaAlliance(state, 'player1', 'sol');
+
+      expect(result.canUse).toBe(false);
+    });
+
+    it('should return false if Alliance original owner is different faction', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_red', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev', // Different faction
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      // Looking for sol commander, but Alliance is from letnev
+      const result = canUseCommanderViaAlliance(state, 'player1', 'sol');
+
+      expect(result.canUse).toBe(false);
+    });
+
+    it('should return false if Alliance original owner commander is not unlocked', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_red', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: false }, // Not unlocked
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      const result = canUseCommanderViaAlliance(state, 'player1', 'letnev');
+
+      expect(result.canUse).toBe(false);
+    });
+
+    it('should return true if Alliance grants access to unlocked commander', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_red', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true }, // Unlocked!
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      const result = canUseCommanderViaAlliance(state, 'player1', 'letnev');
+
+      expect(result.canUse).toBe(true);
+      expect(result.allyPlayerId).toBe('player2');
+    });
+
+    it('should handle multiple alliances', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_red', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+              { noteId: 'alliance_green', originalOwnerId: 'player3', receivedFrom: 'player3', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: false }, // Not unlocked
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player3',
+            color: 'green',
+            faction: 'yssaril',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true }, // Unlocked!
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      // Letnev commander not accessible (not unlocked)
+      expect(canUseCommanderViaAlliance(state, 'player1', 'letnev').canUse).toBe(false);
+      // Yssaril commander accessible
+      expect(canUseCommanderViaAlliance(state, 'player1', 'yssaril').canUse).toBe(true);
+    });
+  });
+
+  describe('hasCommanderAccess', () => {
+    it('should return false if player not found', () => {
+      const state = createMockGameState();
+
+      const result = hasCommanderAccess(state, 'nonexistent');
+
+      expect(result).toBe(false);
+    });
+
+    it('should return true if player own commander is unlocked', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'sol',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      const result = hasCommanderAccess(state, 'player1');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false if player own commander is not unlocked', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'sol',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: false },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      const result = hasCommanderAccess(state, 'player1');
+
+      expect(result).toBe(false);
+    });
+
+    it('should check own commander if faction matches', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'sol',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      const result = hasCommanderAccess(state, 'player1', 'sol');
+
+      expect(result).toBe(true);
+    });
+
+    it('should check Alliance for different faction commander', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'sol',
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_red', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: false },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      // Sol player can use Letnev commander via Alliance
+      const result = hasCommanderAccess(state, 'player1', 'letnev');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false for different faction without Alliance', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            faction: 'sol',
+            promissoryNotesInPlay: [], // No Alliance
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'red',
+            faction: 'letnev',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true },
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+        ],
+      });
+
+      // Sol player cannot use Letnev commander without Alliance
+      const result = hasCommanderAccess(state, 'player1', 'letnev');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  // =============================================================================
+  // ADDITIONAL NOTE EFFECT TESTS
+  // =============================================================================
+
+  describe('additional note effects', () => {
+    it('Trade Agreement is played via timing window (when_replenish)', () => {
+      // Trade Agreement has timing 'when_replenish' which means it's played
+      // via timing window when commodities are replenished, not directly.
+      // The handler correctly rejects direct play attempts.
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'awaiting_action',
+        activePlayerId: 'player1',
+        players: [
+          createMockPlayer({
+            commodities: 2,
+            promissoryNotesInHand: ['trade_agreement_blue'],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'blue',
+            promissoryNotesOwned: ['trade_agreement_blue'],
+            commodities: 4,
+          }),
+        ],
+      });
+
+      const action: PlayPromissoryNoteAction = {
+        type: 'play_promissory_note',
+        playerId: 'player1',
+        noteId: 'trade_agreement_blue',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePlayPromissoryNote(state, action);
+
+      // Trade Agreement is handled via timing window, not direct play
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('replenished');
+    });
+
+    it('should execute Military Support - remove Sol strategy token', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'awaiting_action',
+        activePlayerId: 'player1',
+        players: [
+          createMockPlayer({
+            promissoryNotesInHand: ['military_support_blue'],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'blue',
+            faction: 'sol',
+            promissoryNotesOwned: ['military_support_blue'],
+            commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
+          }),
+        ],
+      });
+
+      const action: PlayPromissoryNoteAction = {
+        type: 'play_promissory_note',
+        playerId: 'player1',
+        noteId: 'military_support_blue',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePlayPromissoryNote(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[1].commandTokens.strategy).toBe(1);
+    });
+
+    it('should fail Military Support when Sol has no strategy tokens', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'awaiting_action',
+        activePlayerId: 'player1',
+        players: [
+          createMockPlayer({
+            promissoryNotesInHand: ['military_support_blue'],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'blue',
+            faction: 'sol',
+            promissoryNotesOwned: ['military_support_blue'],
+            commandTokens: { tactics: 3, fleet: 3, strategy: 0 },
+          }),
+        ],
+      });
+
+      const action: PlayPromissoryNoteAction = {
+        type: 'play_promissory_note',
+        playerId: 'player1',
+        noteId: 'military_support_blue',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePlayPromissoryNote(state, action);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('no strategy tokens');
+    });
+
+    it('should execute Stymie - place in play area', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'awaiting_action',
+        activePlayerId: 'player1',
+        players: [
+          createMockPlayer({
+            promissoryNotesInHand: ['stymie_purple'],
+            promissoryNotesInPlay: [],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'purple',
+            faction: 'arborec',
+            promissoryNotesOwned: ['stymie_purple'],
+          }),
+        ],
+      });
+
+      const action: PlayPromissoryNoteAction = {
+        type: 'play_promissory_note',
+        playerId: 'player1',
+        noteId: 'stymie_purple',
+        timestamp: Date.now(),
+      };
+
+      const result = handlePlayPromissoryNote(state, action);
+
+      expect(result.success).toBe(true);
+      expect(state.players[0].promissoryNotesInPlay).toHaveLength(1);
+      expect(state.players[0].promissoryNotesInPlay[0].noteId).toBe('stymie_purple');
+    });
+
+    it('should correctly handle Support for the Throne VP loss on return', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            promissoryNotesInPlay: [
+              { noteId: 'support_for_the_throne_blue', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            color: 'blue',
+            promissoryNotesOwned: ['support_for_the_throne_blue'],
+            promissoryNotesInHand: [],
+            score: 5, // Player 2 has 5 VP from receiving SFTT
+          }),
+        ],
+      });
+
+      // Return due to activation (triggering SFTT return)
+      const result = returnPromissoryNoteFromPlay(state, 'player1', 'support_for_the_throne_blue', 'activation');
+
+      expect(result.success).toBe(true);
+      // Player 2 should lose 1 VP
+      expect(state.players[1].score).toBe(4);
+      // Note returned to player 2's hand
+      expect(state.players[1].promissoryNotesInHand).toContain('support_for_the_throne_blue');
+    });
+
+    it('should handle different return reasons correctly', () => {
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            promissoryNotesInPlay: [
+              { noteId: 'alliance_blue', originalOwnerId: 'player2', receivedFrom: 'player2', placedRound: 1 },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            promissoryNotesOwned: ['alliance_blue'],
+            promissoryNotesInHand: [],
+          }),
+        ],
+      });
+
+      const result = returnPromissoryNoteFromPlay(state, 'player1', 'alliance_blue', 'elimination');
+
+      expect(result.success).toBe(true);
+      expect(result.data?.reason).toBe('elimination');
+      expect(result.triggeredEvents).toContain('promissory_note_returned');
     });
   });
 });
