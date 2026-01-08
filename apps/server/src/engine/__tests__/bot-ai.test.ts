@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateBotAction, getCurrentBotPlayerId } from '../bot-ai.js';
+import { generateBotAction, getCurrentBotPlayerId, getBotActionDelay, isBot } from '../bot-ai.js';
 import type { GameState, PlayerState, MapTile, HexCoord, UnitInstance } from '@ti4/shared';
 
 function createMockUnit(overrides: Partial<UnitInstance> = {}): UnitInstance {
@@ -858,6 +858,781 @@ describe('Bot AI', () => {
       // Should skip since the only objective is already scored
       expect(action).not.toBeNull();
       expect(action?.type).toBe('skip_scoring');
+    });
+  });
+
+  // ==========================================================================
+  // UTILITY FUNCTIONS
+  // ==========================================================================
+
+  describe('isBot', () => {
+    it('should return true if player is in bot set', () => {
+      const state = createMockGameState();
+      const botIds = new Set(['player1', 'player2']);
+
+      expect(isBot(state, 'player1', botIds)).toBe(true);
+      expect(isBot(state, 'player2', botIds)).toBe(true);
+    });
+
+    it('should return false if player is not in bot set', () => {
+      const state = createMockGameState();
+      const botIds = new Set(['player2']);
+
+      expect(isBot(state, 'player1', botIds)).toBe(false);
+    });
+  });
+
+  describe('getBotActionDelay', () => {
+    it('should return shorter delays for harder difficulties', () => {
+      const easyDelay = getBotActionDelay('easy');
+      const mediumDelay = getBotActionDelay('medium');
+      const hardDelay = getBotActionDelay('hard');
+
+      // Easy: 2000-3000ms, Medium: 1000-2000ms, Hard: 500-1000ms
+      expect(easyDelay).toBeGreaterThanOrEqual(2000);
+      expect(easyDelay).toBeLessThanOrEqual(3000);
+
+      expect(mediumDelay).toBeGreaterThanOrEqual(1000);
+      expect(mediumDelay).toBeLessThanOrEqual(2000);
+
+      expect(hardDelay).toBeGreaterThanOrEqual(500);
+      expect(hardDelay).toBeLessThanOrEqual(1000);
+    });
+  });
+
+  // ==========================================================================
+  // SETUP PHASE
+  // ==========================================================================
+
+  describe('Setup Phase', () => {
+    it('should select a secret objective when two are available', () => {
+      const state = createMockGameState({
+        phase: 'setup',
+        subPhase: 'select_secret',
+        players: [
+          createMockPlayer({
+            secretObjectives: ['destroy_their_greatest_ship', 'spark_a_rebellion'],
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('select_secret_objective');
+      const selectAction = action as any;
+      expect(selectAction.selectedObjectiveId).toBeDefined();
+      expect(selectAction.discardedObjectiveId).toBeDefined();
+      expect(selectAction.selectedObjectiveId).not.toBe(selectAction.discardedObjectiveId);
+    });
+
+    it('should return null if only one secret objective', () => {
+      const state = createMockGameState({
+        phase: 'setup',
+        subPhase: 'select_secret',
+        players: [
+          createMockPlayer({
+            secretObjectives: ['destroy_their_greatest_ship'], // Only 1 - already selected
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).toBeNull();
+    });
+  });
+
+  // ==========================================================================
+  // STRATEGY PHASE
+  // ==========================================================================
+
+  describe('Strategy Phase', () => {
+    it('should pick Imperial as highest priority when available', () => {
+      const state = createMockGameState({
+        phase: 'strategy',
+        subPhase: 'pick_strategy_card',
+        players: [
+          createMockPlayer({
+            strategyCard: null, // No card yet
+          }),
+        ],
+        strategyCards: [
+          { number: 1, name: 'Leadership', pickedBy: null, bonus: 0 },
+          { number: 8, name: 'Imperial', pickedBy: null, bonus: 0 },
+          { number: 3, name: 'Politics', pickedBy: null, bonus: 0 },
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('pick_strategy_card');
+      expect((action as any).cardNumber).toBe(8); // Imperial is highest priority
+    });
+
+    it('should pick Construction if Imperial is taken', () => {
+      const state = createMockGameState({
+        phase: 'strategy',
+        subPhase: 'pick_strategy_card',
+        players: [
+          createMockPlayer({
+            strategyCard: null,
+          }),
+        ],
+        strategyCards: [
+          { number: 1, name: 'Leadership', pickedBy: null, bonus: 0 },
+          { number: 4, name: 'Construction', pickedBy: null, bonus: 0 },
+          { number: 8, name: 'Imperial', pickedBy: 'player2', bonus: 0 }, // Taken
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('pick_strategy_card');
+      expect((action as any).cardNumber).toBe(4); // Construction is next priority
+    });
+
+    it('should return null if player already has a strategy card', () => {
+      const state = createMockGameState({
+        phase: 'strategy',
+        subPhase: 'pick_strategy_card',
+        players: [
+          createMockPlayer({
+            strategyCard: 8, // Already has Imperial
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).toBeNull();
+    });
+  });
+
+  // ==========================================================================
+  // COMBAT
+  // ==========================================================================
+
+  describe('Combat Actions', () => {
+    // Note: Retreat decision tests require complex state setup that the bot AI
+    // validates thoroughly. These tests verify hit assignment which is simpler.
+
+    it('should assign hits using sustain damage first', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'space_combat',
+        activeCombat: {
+          id: 'combat1',
+          systemId: 'tile-0-1',
+          attackerId: 'player1',
+          defenderId: 'player2',
+          type: 'space',
+          round: 1,
+          state: 'combat_round_assign',
+          pendingHits: { attacker: 2, defender: 0 },
+          retreatAnnounced: { attacker: false, defender: false },
+        } as any,
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 1 }, {
+              id: 'tile-0-1',
+              systemId: 19,
+              units: [
+                createMockUnit({ id: 'dread-1', type: 'dreadnought', ownerId: 'player1', damaged: false }),
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' }),
+                createMockUnit({ id: 'fighter-1', type: 'fighter', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('assign_hits');
+      const assignments = (action as any).assignments;
+      // Should sustain on dreadnought first, then sacrifice fighter
+      const dreadAssignment = assignments.find((a: any) => a.unitId === 'dread-1');
+      expect(dreadAssignment?.sustainDamage).toBe(true);
+      expect(dreadAssignment?.destroyed).toBe(false);
+    });
+
+    it('should sacrifice fighters before cruisers', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'space_combat',
+        activeCombat: {
+          id: 'combat1',
+          systemId: 'tile-0-1',
+          attackerId: 'player1',
+          defenderId: 'player2',
+          type: 'space',
+          round: 1,
+          state: 'combat_round_assign',
+          pendingHits: { attacker: 1, defender: 0 },
+          retreatAnnounced: { attacker: false, defender: false },
+        } as any,
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 1 }, {
+              id: 'tile-0-1',
+              systemId: 19,
+              units: [
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' }),
+                createMockUnit({ id: 'fighter-1', type: 'fighter', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('assign_hits');
+      const assignments = (action as any).assignments;
+      // Should destroy fighter before cruiser
+      const destroyedUnit = assignments.find((a: any) => a.destroyed);
+      expect(destroyedUnit?.unitId).toBe('fighter-1');
+    });
+  });
+
+  // ==========================================================================
+  // INVASION
+  // ==========================================================================
+
+  describe('Invasion Actions', () => {
+    it('should select invasion targets when ground forces available', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'invasion',
+        activatedSystem: { q: 0, r: 2 },
+        invasionPhase: {
+          currentStep: 'select_planets',
+          targetPlanets: [],
+          groundForceCommitments: {},
+          bombardmentComplete: false,
+        } as any,
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 2 }, {
+              systemId: 20,
+              planets: [
+                { planetId: 'abyz', controlledBy: null, exhausted: false, units: [] } as any,
+                { planetId: 'fria', controlledBy: 'player2', exhausted: false, units: [] } as any,
+              ],
+              units: [
+                createMockUnit({ type: 'infantry', ownerId: 'player1' }),
+                createMockUnit({ type: 'infantry', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('select_invasion_targets');
+      const targets = (action as any).targetPlanets;
+      expect(targets).toContain('abyz');
+      expect(targets).toContain('fria');
+    });
+
+    it('should skip invasion if no ground forces', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'invasion',
+        activatedSystem: { q: 0, r: 2 },
+        invasionPhase: {
+          currentStep: 'select_planets',
+          targetPlanets: [],
+          groundForceCommitments: {},
+          bombardmentComplete: false,
+        } as any,
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 2 }, {
+              systemId: 20,
+              planets: [
+                { planetId: 'abyz', controlledBy: null, exhausted: false, units: [] } as any,
+              ],
+              units: [
+                createMockUnit({ type: 'cruiser', ownerId: 'player1' }), // No ground forces
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('skip_invasion');
+    });
+
+    it('should commit ground forces to target planets', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'invasion',
+        activatedSystem: { q: 0, r: 2 },
+        invasionPhase: {
+          currentStep: 'commit_ground_forces',
+          targetPlanets: ['abyz', 'fria'],
+          groundForceCommitments: {},
+          bombardmentComplete: false,
+        } as any,
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 2 }, {
+              systemId: 20,
+              planets: [
+                { planetId: 'abyz', controlledBy: null, exhausted: false, units: [] } as any,
+                { planetId: 'fria', controlledBy: null, exhausted: false, units: [] } as any,
+              ],
+              units: [
+                createMockUnit({ id: 'inf-1', type: 'infantry', ownerId: 'player1' }),
+                createMockUnit({ id: 'inf-2', type: 'infantry', ownerId: 'player1' }),
+                createMockUnit({ id: 'inf-3', type: 'infantry', ownerId: 'player1' }),
+                createMockUnit({ id: 'inf-4', type: 'infantry', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('commit_ground_forces');
+      const assignments = (action as any).assignments;
+      expect(assignments.length).toBe(4); // All 4 infantry committed
+      // Should distribute evenly
+      const abyzCount = assignments.filter((a: any) => a.planetId === 'abyz').length;
+      const friaCount = assignments.filter((a: any) => a.planetId === 'fria').length;
+      expect(abyzCount).toBe(2);
+      expect(friaCount).toBe(2);
+    });
+  });
+
+  // ==========================================================================
+  // MOVEMENT
+  // ==========================================================================
+
+  describe('Movement Actions', () => {
+    it('should move ships to activated system', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 0, r: 2 },
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            // Target system
+            createMockTile({ q: 0, r: 2 }, {
+              systemId: 20,
+              planets: [{ planetId: 'abyz', controlledBy: null, exhausted: false, units: [] } as any],
+              units: [],
+            }),
+            // Home system with ships
+            createMockTile({ q: 0, r: 3 }, {
+              systemId: 1,
+              planets: [{ planetId: 'jord', controlledBy: 'player1', exhausted: false, units: [] } as any],
+              units: [
+                createMockUnit({ id: 'carrier-1', type: 'carrier', ownerId: 'player1' }),
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('move_units');
+      const moves = (action as any).moves;
+      expect(moves.length).toBeGreaterThan(0);
+      // All moves should target the activated system
+      moves.forEach((move: any) => {
+        expect(move.to.systemPosition).toEqual({ q: 0, r: 2 });
+      });
+    });
+
+    it('should skip movement if no ships can reach', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 5, r: 5 }, // Far away
+        players: [createMockPlayer()],
+        map: {
+          tiles: [
+            // Target system - far away
+            createMockTile({ q: 5, r: 5 }, {
+              systemId: 20,
+              planets: [{ planetId: 'abyz', controlledBy: null, exhausted: false, units: [] } as any],
+              units: [],
+            }),
+            // Home system with ships (move value 1-2, can't reach q:5,r:5)
+            createMockTile({ q: 0, r: 3 }, {
+              systemId: 1,
+              planets: [{ planetId: 'jord', controlledBy: 'player1', exhausted: false, units: [] } as any],
+              units: [
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('skip_movement');
+    });
+  });
+
+  // ==========================================================================
+  // STRATEGIC PRIMARY ACTIONS
+  // ==========================================================================
+
+  describe('Strategic Primary Actions', () => {
+    it('should generate Leadership primary with token distribution', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_primary',
+        strategicActionState: {
+          cardNumber: 1, // Leadership
+          primaryResolved: false,
+          secondaryOrder: [],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [createMockPlayer({ strategyCard: 1 })],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_primary');
+      const choices = (action as any).choices;
+      expect(choices.tokenDistribution).toBeDefined();
+      expect(choices.tokenDistribution.tactics + choices.tokenDistribution.fleet + choices.tokenDistribution.strategy).toBe(3);
+    });
+
+    it('should generate Construction primary with structure placement', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_primary',
+        strategicActionState: {
+          cardNumber: 4, // Construction
+          primaryResolved: false,
+          secondaryOrder: [],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            strategyCard: 4,
+            planets: [{ planetId: 'abyz', exhausted: false, attachments: [] }],
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 2 }, {
+              systemId: 20,
+              planets: [{
+                planetId: 'abyz',
+                controlledBy: 'player1',
+                exhausted: false,
+                units: [], // No space dock
+              } as any],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_primary');
+      const choices = (action as any).choices;
+      expect(choices.firstStructure).toBeDefined();
+      expect(choices.firstStructure.type).toBe('space_dock');
+    });
+
+    it('should generate Warfare primary with token redistribution', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_primary',
+        strategicActionState: {
+          cardNumber: 6, // Warfare
+          primaryResolved: false,
+          secondaryOrder: [],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            strategyCard: 6,
+            commandTokens: { tactics: 2, fleet: 3, strategy: 1 },
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_primary');
+      const choices = (action as any).choices;
+      expect(choices.newTokenDistribution).toBeDefined();
+      // Should add 1 to tactics
+      expect(choices.newTokenDistribution.tactics).toBe(3);
+    });
+
+    it('should generate Imperial primary to score objective if possible', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_primary',
+        strategicActionState: {
+          cardNumber: 8, // Imperial
+          primaryResolved: false,
+          secondaryOrder: [],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            strategyCard: 8,
+            technologies: ['antimass_deflectors', 'gravity_drive', 'neural_motivator', 'dacxive_animators'],
+            scoredObjectives: [],
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 3 }, {
+              systemId: 1,
+              planets: [{ planetId: 'jord', controlledBy: 'player1', exhausted: false, units: [] } as any],
+            }),
+          ],
+          playerCount: 6,
+        },
+        objectives: {
+          revealedCount: 0,
+          secretDeck: [],
+          publicStageI: [
+            { id: 'diversify_research', revealed: true, scoredBy: [] },
+          ],
+          publicStageII: [],
+        },
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_primary');
+      const choices = (action as any).choices;
+      expect(choices.scoredObjectiveId).toBe('diversify_research');
+    });
+  });
+
+  // ==========================================================================
+  // STRATEGIC SECONDARY ACTIONS
+  // ==========================================================================
+
+  describe('Strategic Secondary Actions', () => {
+    it('should decline secondary if no strategy tokens', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_secondary',
+        activePlayerId: 'player2', // Different player is active
+        strategicActionState: {
+          cardNumber: 7, // Technology
+          primaryResolved: true,
+          secondaryOrder: ['player1'],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            commandTokens: { tactics: 3, fleet: 3, strategy: 0 }, // No strategy tokens
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_secondary');
+      expect((action as any).declined).toBe(true);
+    });
+
+    it('should use Trade secondary to replenish commodities', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_secondary',
+        activePlayerId: 'player2',
+        strategicActionState: {
+          cardNumber: 5, // Trade
+          primaryResolved: true,
+          secondaryOrder: ['player1'],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
+            commodities: 0,
+            maxCommodities: 4,
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_secondary');
+      expect((action as any).declined).toBe(false); // Should use to get commodities
+    });
+
+    it('should decline Trade secondary if already at max commodities', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'strategic_secondary',
+        activePlayerId: 'player2',
+        strategicActionState: {
+          cardNumber: 5, // Trade
+          primaryResolved: true,
+          secondaryOrder: ['player1'],
+          currentSecondaryIndex: 0,
+          secondaryResponses: {},
+        },
+        players: [
+          createMockPlayer({
+            commandTokens: { tactics: 3, fleet: 3, strategy: 2 },
+            commodities: 4, // Already at max
+            maxCommodities: 4,
+          }),
+        ],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('strategic_secondary');
+      expect((action as any).declined).toBe(true); // No benefit
+    });
+  });
+
+  // ==========================================================================
+  // TIMING WINDOWS
+  // ==========================================================================
+
+  describe('Timing Windows', () => {
+    it('should pass on timing windows', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        activeTimingWindow: {
+          id: 'window1',
+          type: 'after_activation',
+          triggerPlayerId: 'player1',
+          eligiblePlayers: ['player1'],
+          responses: { player1: 'pending' },
+        } as any,
+        players: [createMockPlayer()],
+      });
+
+      const action = generateBotAction(state, 'player1');
+
+      expect(action).not.toBeNull();
+      expect(action?.type).toBe('timing_window_response');
+      expect((action as any).response).toBe('pass');
+    });
+  });
+
+  // ==========================================================================
+  // getCurrentBotPlayerId EDGE CASES
+  // ==========================================================================
+
+  describe('getCurrentBotPlayerId edge cases', () => {
+    it('should return bot in combat hit assignment phase', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        subPhase: 'space_combat',
+        activeCombat: {
+          id: 'combat1',
+          systemId: 'tile-0-1',
+          attackerId: 'player1',
+          defenderId: 'player2',
+          type: 'space',
+          round: 1,
+          state: 'combat_round_assign',
+          pendingHits: { attacker: 2, defender: 0 }, // Attacker needs to assign
+          retreatAnnounced: { attacker: false, defender: false },
+        } as any,
+      });
+
+      const botIds = new Set(['player1']);
+      const botId = getCurrentBotPlayerId(state, botIds);
+
+      expect(botId).toBe('player1');
+    });
+
+    it('should return bot in timing window', () => {
+      const state = createMockGameState({
+        phase: 'action',
+        activeTimingWindow: {
+          id: 'window1',
+          type: 'after_activation',
+          triggerPlayerId: 'player2',
+          eligiblePlayers: ['player1', 'player2'],
+          responses: { player1: 'pending', player2: 'pass' },
+        } as any,
+      });
+
+      const botIds = new Set(['player1']);
+      const botId = getCurrentBotPlayerId(state, botIds);
+
+      expect(botId).toBe('player1');
+    });
+
+    it('should return bot in status phase scoring', () => {
+      const state = createMockGameState({
+        phase: 'status',
+        subPhase: 'score_objectives',
+        statusPhase: {
+          currentStep: 1,
+          scoringComplete: [], // No one has scored yet
+          scoredThisPhase: [],
+          redistributionComplete: [],
+        },
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({ id: 'player2' }),
+        ],
+      });
+
+      const botIds = new Set(['player1']);
+      const botId = getCurrentBotPlayerId(state, botIds);
+
+      expect(botId).toBe('player1');
     });
   });
 });
