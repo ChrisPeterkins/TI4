@@ -586,6 +586,229 @@ describe('Agenda Phase Validators', () => {
 
       expect(result.valid).toBe(true);
     });
+
+    it('should allow voting for planet in elect planet', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({
+            id: 'player2',
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'planet',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2',
+        outcome: 'mecatol_rex', // Voting for a planet
+        exhaustedPlanets: ['jord'],
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail if Nekro tries to vote', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({
+            id: 'player2',
+            faction: 'nekro', // Nekro cannot vote
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'for_against',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2',
+        outcome: 'for',
+        exhaustedPlanets: ['jord'],
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Nekro Virus cannot vote');
+    });
+
+    it('should fail if Political Secret prevents voting', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            // Player1 has player2's Political Secret in play
+            promissoryNotesInPlay: [
+              { noteId: 'political_secret', originalOwnerId: 'player2' },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'for_against',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2', // Their Political Secret is in play
+        outcome: 'for',
+        exhaustedPlanets: ['jord'],
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Political Secret prevents you from voting');
+    });
+
+    it('should allow player whose Political Secret is not played', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            // Has Political Secret of player3, not player2
+            promissoryNotesInPlay: [
+              { noteId: 'political_secret', originalOwnerId: 'player3' },
+            ],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'for_against',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2', // Their Political Secret is NOT in play
+        outcome: 'for',
+        exhaustedPlanets: ['jord'],
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow voting with no planets exhausted (zero votes)', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({
+            id: 'player2',
+            planets: [{ planetId: 'jord', exhausted: false, attachments: [] }],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'for_against',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2',
+        outcome: 'for',
+        exhaustedPlanets: [], // No planets exhausted = 0 votes
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow voting with multiple planets', () => {
+      const state = createMockGameState({
+        subPhase: 'voting',
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({
+            id: 'player2',
+            planets: [
+              { planetId: 'jord', exhausted: false, attachments: [] },
+              { planetId: 'mars', exhausted: false, attachments: [] },
+              { planetId: 'earth', exhausted: false, attachments: [] },
+            ],
+          }),
+        ],
+        agendaPhase: {
+          agendaNumber: 1,
+          currentAgendaId: 'test_agenda',
+          currentElectionType: 'for_against',
+          votingOrder: ['player2', 'player1'],
+          currentVoterIndex: 0,
+          votes: {},
+          votingComplete: [],
+        },
+      });
+      const action: CastVoteAction = {
+        type: 'cast_vote',
+        playerId: 'player2',
+        outcome: 'for',
+        exhaustedPlanets: ['jord', 'mars'], // Multiple planets
+        abstain: false,
+        timestamp: Date.now(),
+      };
+
+      const result = validateCastVote(state, action);
+
+      expect(result.valid).toBe(true);
+    });
   });
 
   describe('validateSpeakerTiebreak', () => {
