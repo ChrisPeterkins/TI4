@@ -341,6 +341,60 @@ describe('Action Phase Validators', () => {
 
       expect(result.valid).toBe(true);
     });
+
+    it('should fail activating opponent home system without units present', () => {
+      const state = createMockGameState({
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, { systemId: 3, units: [] }), // Letnev home system, no units
+          ],
+          playerCount: 6,
+        },
+        players: [
+          createMockPlayer({ id: 'player1', faction: 'sol' }),
+          createMockPlayer({ id: 'player2', faction: 'letnev' }),
+        ],
+      });
+      const action: TacticalAction = {
+        type: 'tactical_action',
+        playerId: 'player1',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+      };
+
+      const result = validateTacticalAction(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Cannot activate another player\'s home system without units present');
+    });
+
+    it('should allow activating opponent home system with units present', () => {
+      const state = createMockGameState({
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              systemId: 3, // Letnev home system
+              units: [createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' })],
+            }),
+          ],
+          playerCount: 6,
+        },
+        players: [
+          createMockPlayer({ id: 'player1', faction: 'sol' }),
+          createMockPlayer({ id: 'player2', faction: 'letnev' }),
+        ],
+      });
+      const action: TacticalAction = {
+        type: 'tactical_action',
+        playerId: 'player1',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+      };
+
+      const result = validateTacticalAction(state, action);
+
+      expect(result.valid).toBe(true);
+    });
   });
 
   describe('validateStrategicAction', () => {
@@ -745,6 +799,143 @@ describe('Action Phase Validators', () => {
 
       expect(result.valid).toBe(true);
     });
+
+    it('should fail if Ceasefire blocks ship movement', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 0, r: 0 },
+        ceasefireBlocks: ['player1'], // Player is blocked by Ceasefire
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }),
+            createMockTile({ q: 1, r: 0 }, {
+              units: [createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player1' })],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: MoveUnitsAction = {
+        type: 'move_units',
+        playerId: 'player1',
+        moves: [
+          {
+            unitId: 'cruiser-1',
+            from: { systemPosition: { q: 1, r: 0 } },
+            to: { systemPosition: { q: 0, r: 0 } },
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      const result = validateMoveUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('blocked by Ceasefire');
+    });
+
+    it('should fail if source system not found', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }),
+            // Missing tile at (99, 99)
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: MoveUnitsAction = {
+        type: 'move_units',
+        playerId: 'player1',
+        moves: [
+          {
+            unitId: 'carrier-1',
+            from: { systemPosition: { q: 99, r: 99 } }, // Non-existent
+            to: { systemPosition: { q: 0, r: 0 } },
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      const result = validateMoveUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Source system not found');
+    });
+
+    it('should fail if fighter moves without carrier', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }),
+            createMockTile({ q: 1, r: 0 }, {
+              units: [createMockUnit({ id: 'fighter-1', type: 'fighter' })],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: MoveUnitsAction = {
+        type: 'move_units',
+        playerId: 'player1',
+        moves: [
+          {
+            unitId: 'fighter-1',
+            from: { systemPosition: { q: 1, r: 0 } },
+            to: { systemPosition: { q: 0, r: 0 } },
+            // No carrier specified
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      const result = validateMoveUnits(state, action);
+
+      // Fighter has 0 movement so it fails the ship path check first
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('cannot reach destination');
+    });
+
+    it('should fail if carrier for transported unit is not moving', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_movement',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }),
+            createMockTile({ q: 1, r: 0 }, {
+              units: [
+                createMockUnit({ id: 'carrier-1', type: 'carrier' }),
+                createMockUnit({ id: 'infantry-1', type: 'infantry' }),
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: MoveUnitsAction = {
+        type: 'move_units',
+        playerId: 'player1',
+        moves: [
+          {
+            unitId: 'infantry-1',
+            from: { systemPosition: { q: 1, r: 0 } },
+            to: { systemPosition: { q: 0, r: 0 } },
+            carrier: 'carrier-1', // Carrier not in moves
+          },
+        ],
+        timestamp: Date.now(),
+      };
+
+      const result = validateMoveUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('is not moving to carry');
+    });
   });
 
   describe('validateSkipMovement', () => {
@@ -931,6 +1122,203 @@ describe('Action Phase Validators', () => {
 
       // Even with 0 units, validation should pass if space dock exists
       expect(result.valid).toBe(true);
+    });
+
+    it('should fail if player not found', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_production',
+        activatedSystem: { q: 0, r: 0 },
+        activePlayerId: 'nonexistent',
+      });
+      const action: ProduceUnitsAction = {
+        type: 'produce_units',
+        playerId: 'nonexistent',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+        units: [],
+      };
+
+      const result = validateProduceUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('Player not found');
+    });
+
+    it('should fail if system not found', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_production',
+        activatedSystem: { q: 99, r: 99 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }), // Only this tile exists
+          ],
+          playerCount: 6,
+        },
+      });
+      const action: ProduceUnitsAction = {
+        type: 'produce_units',
+        playerId: 'player1',
+        systemPosition: { q: 99, r: 99 }, // Does not exist
+        timestamp: Date.now(),
+        units: [],
+      };
+
+      const result = validateProduceUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe('System not found');
+    });
+
+    it('should fail if Stymie blocks production in system with holder units', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_production',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              planets: [{
+                planetId: 'testplanet',
+                units: [
+                  createMockUnit({ id: 'dock-1', type: 'space_dock', ownerId: 'player1' }),
+                ],
+                attachments: [],
+                resources: 3,
+                influence: 2,
+              } as any],
+              units: [
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player2' }), // Stymie holder has units here
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            planets: [{ planetId: 'testplanet', exhausted: false, attachments: [] }],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            name: 'Player 2',
+            // Player2 has Stymie from Player1
+            promissoryNotesInPlay: [
+              { noteId: 'stymie', originalOwnerId: 'player1' },
+            ],
+          }),
+        ],
+      });
+      const action: ProduceUnitsAction = {
+        type: 'produce_units',
+        playerId: 'player1',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+        units: [{ type: 'infantry', count: 1 }],
+      };
+
+      const result = validateProduceUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Stymie prevents production');
+    });
+
+    it('should fail if Stymie blocks production in system adjacent to holder units', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_production',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              planets: [{
+                planetId: 'testplanet',
+                units: [
+                  createMockUnit({ id: 'dock-1', type: 'space_dock', ownerId: 'player1' }),
+                ],
+                attachments: [],
+                resources: 3,
+                influence: 2,
+              } as any],
+              units: [],
+            }),
+            createMockTile({ q: 1, r: 0 }, {
+              units: [
+                createMockUnit({ id: 'cruiser-1', type: 'cruiser', ownerId: 'player2' }), // Adjacent system has holder's units
+              ],
+            }),
+          ],
+          playerCount: 6,
+        },
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            planets: [{ planetId: 'testplanet', exhausted: false, attachments: [] }],
+          }),
+          createMockPlayer({
+            id: 'player2',
+            name: 'Player 2',
+            promissoryNotesInPlay: [
+              { noteId: 'stymie', originalOwnerId: 'player1' },
+            ],
+          }),
+        ],
+      });
+      const action: ProduceUnitsAction = {
+        type: 'produce_units',
+        playerId: 'player1',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+        units: [{ type: 'infantry', count: 1 }],
+      };
+
+      const result = validateProduceUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('Stymie prevents production');
+      expect(result.error).toContain('adjacent');
+    });
+
+    it('should fail if building space dock in opponent home system', () => {
+      const state = createMockGameState({
+        subPhase: 'tactical_production',
+        activatedSystem: { q: 0, r: 0 },
+        map: {
+          tiles: [
+            createMockTile({ q: 0, r: 0 }, {
+              systemId: 3, // Letnev home system
+              planets: [{
+                planetId: 'arc_prime',
+                units: [
+                  createMockUnit({ id: 'dock-1', type: 'space_dock', ownerId: 'player1' }),
+                ],
+                attachments: [],
+                resources: 4,
+                influence: 0,
+              } as any],
+              units: [],
+            }),
+          ],
+          playerCount: 6,
+        },
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'sol',
+            planets: [{ planetId: 'arc_prime', exhausted: false, attachments: [] }],
+          }),
+          createMockPlayer({ id: 'player2', faction: 'letnev' }),
+        ],
+      });
+      const action: ProduceUnitsAction = {
+        type: 'produce_units',
+        playerId: 'player1',
+        systemPosition: { q: 0, r: 0 },
+        timestamp: Date.now(),
+        units: [{ type: 'space_dock', count: 1 }],
+      };
+
+      const result = validateProduceUnits(state, action);
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('opponent\'s home system');
     });
   });
 
