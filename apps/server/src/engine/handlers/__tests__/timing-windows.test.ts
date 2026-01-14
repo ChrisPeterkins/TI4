@@ -817,6 +817,181 @@ describe('Timing Window Handlers', () => {
     });
   });
 
+  describe('Last Bastion immunity', () => {
+    it('should prevent Sabotage from cancelling cards when Last Bastion commander is unlocked', () => {
+      // Last Bastion player plays a card
+      const window: TimingWindow = {
+        id: 'test-window',
+        trigger: 'action_card_played',
+        eligiblePlayers: ['player2'],
+        responses: { player2: 'played' },
+        playedCards: [{ playerId: 'player2', cardId: 'sabotage' }],
+        expiresAt: Date.now() + 30000,
+        resolved: false,
+        context: {
+          sourcePlayerId: 'player1',
+          sourceCardId: 'direct_hit',
+        },
+      };
+
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'last_bastion',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: true }, // Commander unlocked - immune to Sabotage
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+          createMockPlayer({ id: 'player2' }),
+        ],
+        timingWindowStack: [window],
+        activeTimingWindow: window,
+      });
+
+      const result = resolveTimingWindow(state, window);
+
+      expect(result.success).toBe(true);
+      // Original card should NOT be sabotaged due to Last Bastion immunity
+      expect(result.data?.originalCardSabotaged).toBe(false);
+    });
+
+    it('should allow Sabotage to cancel cards when Last Bastion commander is NOT unlocked', () => {
+      const window: TimingWindow = {
+        id: 'test-window',
+        trigger: 'action_card_played',
+        eligiblePlayers: ['player2'],
+        responses: { player2: 'played' },
+        playedCards: [{ playerId: 'player2', cardId: 'sabotage' }],
+        expiresAt: Date.now() + 30000,
+        resolved: false,
+        context: {
+          sourcePlayerId: 'player1',
+          sourceCardId: 'direct_hit',
+        },
+      };
+
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'last_bastion',
+            leaders: {
+              agent: { unlocked: true, exhausted: false },
+              commander: { unlocked: false }, // Commander NOT unlocked
+              hero: { unlocked: false, purged: false },
+            },
+          }),
+          createMockPlayer({ id: 'player2' }),
+        ],
+        timingWindowStack: [window],
+        activeTimingWindow: window,
+      });
+
+      const result = resolveTimingWindow(state, window);
+
+      expect(result.success).toBe(true);
+      // Original card SHOULD be sabotaged
+      expect(result.data?.originalCardSabotaged).toBe(true);
+    });
+
+    it('should allow Sabotage against non-Last Bastion factions', () => {
+      const window: TimingWindow = {
+        id: 'test-window',
+        trigger: 'action_card_played',
+        eligiblePlayers: ['player2'],
+        responses: { player2: 'played' },
+        playedCards: [{ playerId: 'player2', cardId: 'sabotage' }],
+        expiresAt: Date.now() + 30000,
+        resolved: false,
+        context: {
+          sourcePlayerId: 'player1',
+          sourceCardId: 'direct_hit',
+        },
+      };
+
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({
+            id: 'player1',
+            faction: 'sol', // Not Last Bastion
+          }),
+          createMockPlayer({ id: 'player2' }),
+        ],
+        timingWindowStack: [window],
+        activeTimingWindow: window,
+      });
+
+      const result = resolveTimingWindow(state, window);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.originalCardSabotaged).toBe(true);
+    });
+  });
+
+  describe('Multiple players responding', () => {
+    it('should handle multiple players playing cards in same window', () => {
+      const window: TimingWindow = {
+        id: 'test-window',
+        trigger: 'space_combat_start',
+        eligiblePlayers: ['player1', 'player2'],
+        responses: { player1: 'played', player2: 'played' },
+        playedCards: [
+          { playerId: 'player1', cardId: 'morale_boost' },
+          { playerId: 'player2', cardId: 'morale_boost' },
+        ],
+        expiresAt: Date.now() + 30000,
+        resolved: false,
+      };
+
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({ id: 'player2' }),
+        ],
+        timingWindowStack: [window],
+        activeTimingWindow: window,
+      });
+
+      const result = resolveTimingWindow(state, window);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.playedCards).toHaveLength(2);
+    });
+
+    it('should handle mix of pass and play responses', () => {
+      const window: TimingWindow = {
+        id: 'test-window',
+        trigger: 'space_combat_start',
+        eligiblePlayers: ['player1', 'player2', 'player3'],
+        responses: { player1: 'played', player2: 'pass', player3: 'played' },
+        playedCards: [
+          { playerId: 'player1', cardId: 'morale_boost' },
+          { playerId: 'player3', cardId: 'skilled_retreat' },
+        ],
+        expiresAt: Date.now() + 30000,
+        resolved: false,
+      };
+
+      const state = createMockGameState({
+        players: [
+          createMockPlayer({ id: 'player1' }),
+          createMockPlayer({ id: 'player2' }),
+          createMockPlayer({ id: 'player3' }),
+        ],
+        timingWindowStack: [window],
+        activeTimingWindow: window,
+      });
+
+      const result = resolveTimingWindow(state, window);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.playedCards).toHaveLength(2);
+    });
+  });
+
   describe('resolveTimingWindow', () => {
     it('should mark window as resolved', () => {
       const window: TimingWindow = {
